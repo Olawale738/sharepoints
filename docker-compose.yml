@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: letw-postgres
+    environment:
+      POSTGRES_USER: letw
+      POSTGRES_PASSWORD: letw_password
+      POSTGRES_DB: letw_collab
+    ports:
+      - "55432:5432"
+    volumes:
+      - letw-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U letw -d letw_collab"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  letw-postgres-data:
