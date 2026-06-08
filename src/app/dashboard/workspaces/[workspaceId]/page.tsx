@@ -466,6 +466,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               attachmentFile: message.attachmentFile
             }))}
             canCreateChannels={permissions.canCreateChannels}
+            canDeleteChannels={hasAdminAccess}
             canSendMessages={permissions.canSendMessages}
           />
 

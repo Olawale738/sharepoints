@@ -33,6 +33,7 @@ export const activityActions = {
   memberRemoved: "workspace.member_removed",
   rolePermissionsUpdated: "workspace.role_permissions_updated",
   channelCreated: "chat.channel_created",
+  channelDeleted: "chat.channel_deleted",
   messageCreated: "chat.message_created",
   directMessageCreated: "chat.direct_message_created",
   orgChatMessageCreated: "chat.org_message_created",

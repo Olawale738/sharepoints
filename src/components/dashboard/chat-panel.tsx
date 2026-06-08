@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Hash, Loader2, MessageSquarePlus, Paperclip, Send } from "lucide-react";
+import { Hash, Loader2, MessageSquarePlus, Paperclip, Send, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ type ChatPanelProps = {
   channels: Channel[];
   initialMessages: Message[];
   canCreateChannels: boolean;
+  canDeleteChannels: boolean;
   canSendMessages: boolean;
 };
 
@@ -46,6 +47,7 @@ export function ChatPanel({
   channels: initialChannels,
   initialMessages,
   canCreateChannels,
+  canDeleteChannels,
   canSendMessages
 }: ChatPanelProps) {
   const [channels, setChannels] = useState(initialChannels);
@@ -56,6 +58,7 @@ export function ChatPanel({
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [deletingChannelId, setDeletingChannelId] = useState("");
 
   useEffect(() => {
     async function loadMessages() {
@@ -126,6 +129,42 @@ export function ChatPanel({
     setChannelName("");
   }
 
+  async function deleteChannel(channelId: string, channelName: string) {
+    if (!canDeleteChannels || channels.length <= 1) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete #${channelName}? Messages in this channel will also be deleted.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setDeletingChannelId(channelId);
+    const response = await fetch(`/api/channels/${channelId}`, {
+      method: "DELETE"
+    });
+    const data = (await response.json().catch(() => null)) as { deletedChannelId?: string; error?: string } | null;
+    setDeletingChannelId("");
+
+    if (!response.ok || !data?.deletedChannelId) {
+      setError(data?.error ?? "Channel could not be deleted.");
+      return;
+    }
+
+    setChannels((current) => {
+      const nextChannels = current.filter((channel) => channel.id !== data.deletedChannelId);
+
+      if (activeChannelId === data.deletedChannelId) {
+        setActiveChannelId(nextChannels[0]?.id ?? "");
+        setMessages([]);
+      }
+
+      return nextChannels;
+    });
+  }
+
   const activeChannel = channels.find((channel) => channel.id === activeChannelId);
 
   return (
@@ -136,18 +175,38 @@ export function ChatPanel({
           <h2 className="text-sm font-semibold">Channels</h2>
         </div>
         <div className="space-y-1">
-          {channels.map((channel) => (
-            <button
-              key={channel.id}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition ${
-                channel.id === activeChannelId ? "bg-moss text-white" : "text-ink hover:bg-mint/60"
-              }`}
-              onClick={() => setActiveChannelId(channel.id)}
-            >
-              <span className="truncate"># {channel.name}</span>
-              {channel._count ? <span className="text-xs opacity-70">{channel._count.messages}</span> : null}
-            </button>
-          ))}
+          {channels.map((channel) => {
+            const isActive = channel.id === activeChannelId;
+            const isDeleting = deletingChannelId === channel.id;
+            const deleteDisabled = isDeleting || channels.length <= 1;
+
+            return (
+              <div
+                key={channel.id}
+                className={`flex items-center rounded-md text-sm transition ${
+                  isActive ? "bg-moss text-white" : "text-ink hover:bg-mint/60"
+                }`}
+              >
+                <button
+                  className="flex min-w-0 flex-1 items-center justify-between px-3 py-2 text-left"
+                  onClick={() => setActiveChannelId(channel.id)}
+                >
+                  <span className="truncate"># {channel.name}</span>
+                  {channel._count ? <span className="ml-2 text-xs opacity-70">{channel._count.messages}</span> : null}
+                </button>
+                {canDeleteChannels ? (
+                  <button
+                    className="mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded text-current transition hover:bg-white/20 disabled:pointer-events-none disabled:opacity-40"
+                    disabled={deleteDisabled}
+                    title={channels.length <= 1 ? "A workspace must keep at least one channel." : `Delete #${channel.name}`}
+                    onClick={() => deleteChannel(channel.id, channel.name)}
+                  >
+                    {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
         {canCreateChannels ? (
           <div className="mt-4 flex gap-2">
