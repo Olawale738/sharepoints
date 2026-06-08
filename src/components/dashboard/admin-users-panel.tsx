@@ -15,6 +15,7 @@ type AdminUser = {
   suspendedAt?: string | null;
   accessRevokedAt?: string | null;
   deletedAt?: string | null;
+  isAdmin: boolean;
   status: "ACTIVE" | "SUSPENDED" | "REVOKED" | "DELETED";
   _count: {
     workspaceMemberships: number;
@@ -85,6 +86,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
           const isCurrentUser = currentUserId === user.id;
           const isDeleted = user.status === "DELETED";
           const canRestore = user.status === "SUSPENDED" || user.status === "REVOKED";
+          const canRevoke = !isDeleted && !isCurrentUser && !user.isAdmin;
 
           return (
             <div key={user.id} className="px-4 py-4">
@@ -93,6 +95,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate font-medium text-ink">{user.name ?? user.email ?? "Unnamed user"}</p>
                     <Badge className={statusClassName[user.status]}>{user.status.toLowerCase()}</Badge>
+                    {user.isAdmin ? <Badge className="bg-moss text-white">admin protected</Badge> : null}
                     {isCurrentUser ? <Badge className="bg-wheat">you</Badge> : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-ink/55">{user.email ?? "No email"}</p>
@@ -129,7 +132,8 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                     <Button
                       className="h-9"
                       variant="secondary"
-                      disabled={isBusy || isCurrentUser}
+                      disabled={isBusy || !canRevoke}
+                      title={user.isAdmin ? "Admin users cannot be revoked." : undefined}
                       onClick={() => updateUser(user.id, "REVOKE")}
                     >
                       {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}

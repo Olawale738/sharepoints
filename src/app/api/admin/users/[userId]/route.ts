@@ -104,6 +104,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         suspendedAt: true,
         accessRevokedAt: true,
         deletedAt: true,
+        workspaceMemberships: {
+          select: {
+            role: true
+          }
+        },
         _count: {
           select: {
             workspaceMemberships: true,
@@ -124,9 +129,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     });
 
+    const { workspaceMemberships, ...userItem } = user;
+
     return ok({
       user: {
-        ...user,
+        ...userItem,
+        isAdmin: workspaceMemberships.some((membership) => membership.role === "ADMIN"),
         status: userAccessStatus(user)
       }
     });

@@ -21,6 +21,11 @@ export async function GET() {
         suspendedAt: true,
         accessRevokedAt: true,
         deletedAt: true,
+        workspaceMemberships: {
+          select: {
+            role: true
+          }
+        },
         _count: {
           select: {
             workspaceMemberships: true,
@@ -34,10 +39,15 @@ export async function GET() {
     });
 
     return ok({
-      users: users.map((item) => ({
-        ...item,
-        status: userAccessStatus(item)
-      }))
+      users: users.map((item) => {
+        const { workspaceMemberships, ...userItem } = item;
+
+        return {
+          ...userItem,
+          isAdmin: workspaceMemberships.some((membership) => membership.role === "ADMIN"),
+          status: userAccessStatus(item)
+        };
+      })
     });
   } catch (error) {
     return handleRouteError(error);

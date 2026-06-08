@@ -103,6 +103,10 @@ export async function requireCanManageUser(
     throw new ApiError(403, "Only admins can manage users.");
   }
 
+  if (action === "REVOKE" && targetAdminMemberships.length > 0) {
+    throw new ApiError(409, "Admin accounts cannot be revoked. Remove admin roles before revoking access.");
+  }
+
   const isTargetActive = targetUser ? userAccessStatus(targetUser) === "ACTIVE" : false;
   const destructiveAdminAction = action === "SUSPEND" || action === "REVOKE" || action === "DELETE";
 

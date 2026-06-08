@@ -253,6 +253,11 @@ export default async function DashboardPage() {
           suspendedAt: true,
           accessRevokedAt: true,
           deletedAt: true,
+          workspaceMemberships: {
+            select: {
+              role: true
+            }
+          },
           _count: {
             select: {
               workspaceMemberships: true,
@@ -467,6 +472,7 @@ export default async function DashboardPage() {
                 suspendedAt: adminUser.suspendedAt?.toISOString() ?? null,
                 accessRevokedAt: adminUser.accessRevokedAt?.toISOString() ?? null,
                 deletedAt: adminUser.deletedAt?.toISOString() ?? null,
+                isAdmin: adminUser.workspaceMemberships.some((membership) => membership.role === "ADMIN"),
                 status: userAccessStatus(adminUser),
                 _count: adminUser._count
               }))}
