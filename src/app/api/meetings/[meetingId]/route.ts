@@ -28,10 +28,29 @@ export async function DELETE(request: Request, context: RouteContext) {
       throw new ApiError(404, "Meeting not found.");
     }
 
-    await requireWorkspaceAdminAccess(user.id, existing.workspaceId, "Only admins can cancel workspace meetings.");
+    await requireWorkspaceAdminAccess(user.id, existing.workspaceId, "Only admins can manage workspace meetings.");
 
     if (existing.cancelledAt) {
-      throw new ApiError(409, "This meeting has already been cancelled.");
+      await prisma.workspaceMeeting.delete({
+        where: {
+          id: meetingId
+        }
+      });
+
+      await logActivity({
+        userId: user.id,
+        workspaceId: existing.workspaceId,
+        action: activityActions.meetingCleared,
+        targetId: existing.id,
+        metadata: {
+          title: existing.title
+        }
+      });
+
+      return ok({
+        cleared: true,
+        meetingId
+      });
     }
 
     const meeting = await prisma.workspaceMeeting.update({

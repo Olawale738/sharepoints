@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarPlus, Check, CalendarClock, Copy, HelpCircle, KeyRound, Loader2, Plus, Video, X, XCircle } from "lucide-react";
+import { CalendarPlus, Check, CalendarClock, Copy, HelpCircle, KeyRound, Loader2, Plus, Trash2, Video, X, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -197,6 +197,30 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
     setStatus(`${meeting.title} was cancelled.`);
   }
 
+  async function clearCancelledMeeting(meeting: Meeting) {
+    if (!window.confirm(`Clear cancelled meeting ${meeting.title}?`)) {
+      return;
+    }
+
+    setError("");
+    setStatus("");
+    setBusyMeetingId(meeting.id);
+    const response = await fetch(`/api/meetings/${meeting.id}`, {
+      method: "DELETE"
+    });
+    setBusyMeetingId("");
+
+    const data = (await response.json().catch(() => null)) as { cleared?: boolean; meetingId?: string; error?: string } | null;
+
+    if (!response.ok || !data?.cleared) {
+      setError(data?.error ?? "Cancelled meeting could not be cleared.");
+      return;
+    }
+
+    setMeetings((current) => current.filter((item) => item.id !== meeting.id));
+    setStatus(`${meeting.title} was cleared from the meeting list.`);
+  }
+
   async function respondToMeeting(meeting: Meeting, responseStatus: MeetingResponseStatus) {
     setError("");
     setStatus("");
@@ -359,6 +383,17 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                     >
                       {busyMeetingId === meeting.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
                       Cancel
+                    </Button>
+                  ) : null}
+                  {canCancel && isCancelled ? (
+                    <Button
+                      className="h-9"
+                      variant="secondary"
+                      disabled={busyMeetingId === meeting.id}
+                      onClick={() => clearCancelledMeeting(meeting)}
+                    >
+                      {busyMeetingId === meeting.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      Clear
                     </Button>
                   ) : null}
                 </div>
