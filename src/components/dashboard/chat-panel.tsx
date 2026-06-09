@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Hash, Loader2, MessageSquarePlus, Paperclip, Send, Trash2 } from "lucide-react";
+import { Hash, Loader2, MessageSquarePlus, Trash2 } from "lucide-react";
 
+import { ChatComposer } from "@/components/dashboard/chat-composer";
+import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatBytes, formatDate } from "@/lib/utils";
 
 type Channel = {
   id: string;
@@ -16,14 +17,18 @@ type Channel = {
   };
 };
 
-type Message = {
+type Message = BubbleMessage & {
   id: string;
   body: string;
   externalAuthor?: string | null;
   createdAt: string;
+  editedAt?: string | null;
+  deletedAt?: string | null;
   author?: {
+    id?: string | null;
     name?: string | null;
     email?: string | null;
+    image?: string | null;
   } | null;
   attachmentFile?: {
     id: string;
@@ -35,6 +40,7 @@ type Message = {
 
 type ChatPanelProps = {
   workspaceId: string;
+  currentUserId: string;
   channels: Channel[];
   initialMessages: Message[];
   canCreateChannels: boolean;
@@ -44,6 +50,7 @@ type ChatPanelProps = {
 
 export function ChatPanel({
   workspaceId,
+  currentUserId,
   channels: initialChannels,
   initialMessages,
   canCreateChannels,
@@ -103,6 +110,10 @@ export function ChatPanel({
 
     setMessages((current) => [...current, data.message as Message]);
     setBody("");
+  }
+
+  function updateMessage(updatedMessage: Message) {
+    setMessages((current) => current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message)));
   }
 
   async function createChannel() {
@@ -229,7 +240,7 @@ export function ChatPanel({
           {activeChannel?.description ? <p className="text-sm text-ink/55">{activeChannel.description}</p> : null}
         </header>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div className="flex-1 space-y-3 overflow-y-auto bg-paper px-4 py-4">
           {isLoading ? (
             <p className="flex items-center gap-2 text-sm text-ink/55">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -240,47 +251,27 @@ export function ChatPanel({
             <p className="text-sm text-ink/55">No messages yet.</p>
           ) : null}
           {messages.map((message) => (
-            <article key={message.id} className="rounded-md border border-ink/10 bg-paper px-3 py-2">
-              <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink/50">
-                <span className="font-medium text-ink">
-                  {message.author?.name ?? message.author?.email ?? message.externalAuthor ?? "Webhook"}
-                </span>
-                <span>{formatDate(message.createdAt)}</span>
-              </div>
-              <p className="whitespace-pre-wrap text-sm text-ink">{message.body}</p>
-              {message.attachmentFile ? (
-                <a
-                  className="mt-2 inline-flex items-center gap-2 rounded-md border border-ink/10 bg-white px-2 py-1 text-xs text-moss"
-                  href={`/api/files/${message.attachmentFile.id}/download`}
-                >
-                  <Paperclip className="h-3.5 w-3.5" />
-                  {message.attachmentFile.fileName} ({formatBytes(message.attachmentFile.size)})
-                </a>
-              ) : null}
-            </article>
+            <ChatMessageBubble
+              key={message.id}
+              currentUserId={currentUserId}
+              endpoint={`/api/channels/${activeChannelId}/messages/${message.id}`}
+              message={message}
+              onError={setError}
+              onMessageChange={(updatedMessage) => updateMessage(updatedMessage as Message)}
+            />
           ))}
         </div>
 
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Message this channel"
-              value={body}
-              disabled={!canSendMessages}
-              onChange={(event) => setBody(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-            <Button className="shrink-0" onClick={sendMessage} disabled={isSending || !activeChannelId || !canSendMessages}>
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Send
-            </Button>
-          </div>
+          <ChatComposer
+            disabled={!canSendMessages || !activeChannelId}
+            isSending={isSending}
+            placeholder="Message this channel"
+            value={body}
+            onChange={setBody}
+            onSend={sendMessage}
+          />
         </div>
       </section>
     </div>

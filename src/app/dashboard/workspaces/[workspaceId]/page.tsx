@@ -229,8 +229,10 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           include: {
             author: {
               select: {
+                id: true,
                 name: true,
-                email: true
+                email: true,
+                image: true
               }
             },
             attachmentFile: {
@@ -451,6 +453,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
 
           <ChatPanel
             workspaceId={workspaceId}
+            currentUserId={session.user.id}
             channels={channels.map((channel) => ({
               id: channel.id,
               name: channel.name,
@@ -462,6 +465,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               body: message.body,
               externalAuthor: message.externalAuthor,
               createdAt: message.createdAt.toISOString(),
+              editedAt: message.editedAt?.toISOString() ?? null,
+              deletedAt: message.deletedAt?.toISOString() ?? null,
               author: message.author,
               attachmentFile: message.attachmentFile
             }))}
@@ -489,6 +494,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
                 id: message.id,
                 body: message.body,
                 createdAt: message.createdAt.toISOString(),
+                editedAt: message.editedAt?.toISOString() ?? null,
+                deletedAt: message.deletedAt?.toISOString() ?? null,
                 author: message.author
               }))
             }))}

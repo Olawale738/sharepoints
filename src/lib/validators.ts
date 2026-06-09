@@ -100,6 +100,10 @@ export const createDirectMessageSchema = z.object({
   body: z.string().trim().min(1).max(4000)
 });
 
+export const updateMessageSchema = z.object({
+  body: z.string().trim().min(1).max(4000)
+});
+
 export const createIntegrationSchema = z.object({
   name: z.string().trim().min(2).max(80),
   channelId: z.string().cuid().optional().nullable(),

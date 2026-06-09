@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Loader2, Send, UsersRound } from "lucide-react";
+import { Building2, Loader2, UsersRound } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { formatDate } from "@/lib/utils";
+import { ChatComposer } from "@/components/dashboard/chat-composer";
+import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
 
-type OrgChatMessage = {
+type OrgChatMessage = BubbleMessage & {
   id: string;
   body: string;
   createdAt: string;
+  editedAt?: string | null;
+  deletedAt?: string | null;
   author: {
     id: string;
     name?: string | null;
@@ -37,10 +38,6 @@ type OrganizationChatPanelProps = {
   rooms: OrgChatRoom[];
   initialMessages: OrgChatMessage[];
 };
-
-function displayName(user: { name?: string | null; email?: string | null }) {
-  return user.name ?? user.email ?? "Member";
-}
 
 export function OrganizationChatPanel({
   currentUserId,
@@ -126,6 +123,12 @@ export function OrganizationChatPanel({
     setBody("");
   }
 
+  function updateMessage(updatedMessage: OrgChatMessage) {
+    setMessages((current) =>
+      current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
+    );
+  }
+
   return (
     <div className="grid min-h-[34rem] overflow-hidden rounded-lg border border-ink/10 bg-white xl:grid-cols-[18rem_minmax(0,1fr)]">
       <aside className="border-b border-ink/10 bg-ink/[0.025] p-4 xl:border-b-0 xl:border-r">
@@ -163,7 +166,7 @@ export function OrganizationChatPanel({
           {activeRoom?.description ? <p className="text-sm text-ink/55">{activeRoom.description}</p> : null}
         </header>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div className="flex-1 space-y-3 overflow-y-auto bg-paper px-4 py-4">
           {isLoading ? (
             <p className="flex items-center gap-2 text-sm text-ink/55">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -176,50 +179,28 @@ export function OrganizationChatPanel({
           {!isLoading && activeRoomId && messages.length === 0 ? (
             <p className="text-sm text-ink/55">No messages yet.</p>
           ) : null}
-          {messages.map((message) => {
-            const isMine = message.author.id === currentUserId;
-
-            return (
-              <article
-                key={message.id}
-                className={`max-w-[85%] rounded-md border border-ink/10 px-3 py-2 ${
-                  isMine ? "ml-auto bg-mint/70" : "bg-paper"
-                }`}
-              >
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink/50">
-                  <span className="font-medium text-ink">{displayName(message.author)}</span>
-                  <span>{formatDate(message.createdAt)}</span>
-                </div>
-                <p className="whitespace-pre-wrap break-words text-sm text-ink">{message.body}</p>
-              </article>
-            );
-          })}
+          {messages.map((message) => (
+            <ChatMessageBubble
+              key={message.id}
+              currentUserId={currentUserId}
+              endpoint={`/api/org-chat/rooms/${activeRoomId}/messages/${message.id}`}
+              message={message}
+              onError={setError}
+              onMessageChange={(updatedMessage) => updateMessage(updatedMessage as OrgChatMessage)}
+            />
+          ))}
         </div>
 
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Message this room"
-              value={body}
-              disabled={!activeRoomId || !canSendMessages}
-              onChange={(event) => setBody(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-            <Button
-              className="shrink-0"
-              disabled={!activeRoomId || !canSendMessages || isSending}
-              onClick={sendMessage}
-            >
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Send
-            </Button>
-          </div>
+          <ChatComposer
+            disabled={!activeRoomId || !canSendMessages}
+            isSending={isSending}
+            placeholder="Message this room"
+            value={body}
+            onChange={setBody}
+            onSend={sendMessage}
+          />
         </div>
       </section>
     </div>

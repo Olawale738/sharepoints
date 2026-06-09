@@ -933,6 +933,8 @@ export default async function DashboardPage() {
             id: message.id,
             body: message.body,
             createdAt: message.createdAt.toISOString(),
+            editedAt: message.editedAt?.toISOString() ?? null,
+            deletedAt: message.deletedAt?.toISOString() ?? null,
             author: message.author
           }))}
         />

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, MessageCircle, MessagesSquare, Send, UserRound } from "lucide-react";
+import { Loader2, MessageCircle, MessagesSquare, UserRound } from "lucide-react";
 
+import { ChatComposer } from "@/components/dashboard/chat-composer";
+import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { formatDate } from "@/lib/utils";
 
 type WorkspaceMember = {
   userId: string;
@@ -16,10 +16,12 @@ type WorkspaceMember = {
   };
 };
 
-type DirectMessage = {
+type DirectMessage = BubbleMessage & {
   id: string;
   body: string;
   createdAt: string;
+  editedAt?: string | null;
+  deletedAt?: string | null;
   author: {
     id: string;
     name?: string | null;
@@ -59,6 +61,14 @@ type DirectMessagesPanelProps = {
 
 function displayName(user: { name?: string | null; email?: string | null }) {
   return user.name ?? user.email ?? "Workspace member";
+}
+
+function previewText(message?: DirectMessage) {
+  if (!message) {
+    return "";
+  }
+
+  return message.deletedAt ? "This message was deleted." : message.body;
 }
 
 export function DirectMessagesPanel({
@@ -183,6 +193,24 @@ export function DirectMessagesPanel({
     setBody("");
   }
 
+  function updateMessage(updatedMessage: DirectMessage) {
+    setMessages((current) =>
+      current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
+    );
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === activeConversationId
+          ? {
+              ...conversation,
+              messages: conversation.messages.map((message) =>
+                message.id === updatedMessage.id ? updatedMessage : message
+              )
+            }
+          : conversation
+      )
+    );
+  }
+
   return (
     <div className="grid min-h-[30rem] overflow-hidden rounded-lg border border-ink/10 bg-white lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside className="border-b border-ink/10 bg-ink/[0.025] p-4 lg:border-b-0 lg:border-r">
@@ -210,7 +238,7 @@ export function DirectMessagesPanel({
                   <span className="truncate">{displayName(partner)}</span>
                 </span>
                 {latestMessage ? (
-                  <span className="mt-1 block truncate text-xs opacity-75">{latestMessage.body}</span>
+                  <span className="mt-1 block truncate text-xs opacity-75">{previewText(latestMessage)}</span>
                 ) : null}
               </button>
             );
@@ -256,7 +284,7 @@ export function DirectMessagesPanel({
           <p className="text-sm text-ink/55">Direct chat inside this workspace</p>
         </header>
 
-        <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div className="flex-1 space-y-3 overflow-y-auto bg-paper px-4 py-4">
           {isLoading ? (
             <p className="flex items-center gap-2 text-sm text-ink/55">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -269,50 +297,28 @@ export function DirectMessagesPanel({
           {!isLoading && activeConversationId && messages.length === 0 ? (
             <p className="text-sm text-ink/55">No messages in this conversation yet.</p>
           ) : null}
-          {messages.map((message) => {
-            const isMine = message.author.id === currentUserId;
-
-            return (
-              <article
+          {messages.map((message) => (
+              <ChatMessageBubble
                 key={message.id}
-                className={`max-w-[85%] rounded-md border border-ink/10 px-3 py-2 ${
-                  isMine ? "ml-auto bg-mint/70" : "bg-paper"
-                }`}
-              >
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink/50">
-                  <span className="font-medium text-ink">{displayName(message.author)}</span>
-                  <span>{formatDate(message.createdAt)}</span>
-                </div>
-                <p className="whitespace-pre-wrap text-sm text-ink">{message.body}</p>
-              </article>
-            );
-          })}
+                currentUserId={currentUserId}
+                endpoint={`/api/direct-conversations/${activeConversationId}/messages/${message.id}`}
+                message={message}
+                onError={setError}
+                onMessageChange={(updatedMessage) => updateMessage(updatedMessage as DirectMessage)}
+              />
+          ))}
         </div>
 
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Message this member"
-              value={body}
-              disabled={!activeConversationId || !canSendMessages}
-              onChange={(event) => setBody(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage();
-                }
-              }}
-            />
-            <Button
-              className="shrink-0"
-              disabled={!activeConversationId || !canSendMessages || isSending}
-              onClick={sendMessage}
-            >
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Send
-            </Button>
-          </div>
+          <ChatComposer
+            disabled={!activeConversationId || !canSendMessages}
+            isSending={isSending}
+            placeholder="Message this member"
+            value={body}
+            onChange={setBody}
+            onSend={sendMessage}
+          />
         </div>
       </section>
     </div>

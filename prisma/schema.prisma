@@ -333,6 +333,8 @@ model ChatMessage {
   externalAuthor   String?
   body             String      @db.Text
   attachmentFileId String?
+  editedAt         DateTime?
+  deletedAt        DateTime?
   channel          ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author           User?       @relation("AuthoredMessages", fields: [authorId], references: [id], onDelete: SetNull)
   attachmentFile   File?       @relation("MessageAttachment", fields: [attachmentFileId], references: [id], onDelete: SetNull)
@@ -341,6 +343,7 @@ model ChatMessage {
 
   @@index([channelId, createdAt])
   @@index([authorId, createdAt])
+  @@index([deletedAt])
 }
 
 model DirectConversation {
@@ -369,12 +372,15 @@ model DirectMessage {
   conversationId String
   authorId       String
   body           String             @db.Text
+  editedAt       DateTime?
+  deletedAt      DateTime?
   conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   author         User               @relation("AuthoredDirectMessages", fields: [authorId], references: [id], onDelete: Cascade)
   createdAt      DateTime           @default(now())
 
   @@index([conversationId, createdAt])
   @@index([authorId, createdAt])
+  @@index([deletedAt])
 }
 
 model OrgChatRoom {
@@ -397,6 +403,8 @@ model OrgChatMessage {
   roomId    String
   authorId  String
   body      String      @db.Text
+  editedAt  DateTime?
+  deletedAt DateTime?
   room      OrgChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
   author    User        @relation("AuthoredOrgChatMessages", fields: [authorId], references: [id], onDelete: Cascade)
   createdAt DateTime    @default(now())
@@ -404,6 +412,7 @@ model OrgChatMessage {
 
   @@index([roomId, createdAt])
   @@index([authorId, createdAt])
+  @@index([deletedAt])
 }
 
 model Integration {
