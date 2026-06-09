@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   Building2,
+  CalendarClock,
   Database,
   Files,
   FolderPlus,
@@ -10,7 +11,9 @@ import {
   MessageSquareText,
   ShieldCheck,
   Sparkles,
+  SlidersHorizontal,
   TrendingUp,
+  UserCog,
   UsersRound
 } from "lucide-react";
 import { TaskStatus, WorkspaceRole } from "@prisma/client";
@@ -688,6 +691,32 @@ export default async function DashboardPage() {
       className: "bg-white"
     }
   ];
+  const adminControlWorkspaceHref = adminMemberships[0]
+    ? `/dashboard/workspaces/${adminMemberships[0].workspace.id}`
+    : "/dashboard";
+  const latestAdminControls = [
+    {
+      title: "Approve meeting schedulers",
+      detail: "Give Leaders or Moderators permission to schedule workspace video meetings.",
+      action: "Open role permissions",
+      href: adminControlWorkspaceHref,
+      icon: SlidersHorizontal
+    },
+    {
+      title: "Assign Leaders and Moderators",
+      detail: "Choose workspace members and promote them to Leader or Moderator.",
+      action: "Open members panel",
+      href: adminControlWorkspaceHref,
+      icon: UserCog
+    },
+    {
+      title: "Schedule workspace video",
+      detail: "Create protected video meetings with invite links, passcodes, RSVP, and calendar files.",
+      action: "Open meetings",
+      href: adminControlWorkspaceHref,
+      icon: CalendarClock
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -753,6 +782,39 @@ export default async function DashboardPage() {
         assignedOpenTasksCount={assignedOpenTasksCount}
         uploadedFilesCount={currentUserRecord?._count.uploadedFiles ?? 0}
       />
+
+      {isGlobalAdmin ? (
+        <section className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <Sparkles className="h-4 w-4 text-moss" />
+                Latest admin controls
+              </p>
+              <p className="mt-1 text-xs text-ink/55">New workspace controls are now available for LETW admins.</p>
+            </div>
+            <Badge className="bg-mint">Live now</Badge>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {latestAdminControls.map((control) => {
+              const Icon = control.icon;
+
+              return (
+                <Link
+                  key={control.title}
+                  className="rounded-md border border-ink/10 bg-paper p-3 transition hover:bg-mint/40"
+                  href={control.href}
+                >
+                  <Icon className="h-5 w-5 text-moss" />
+                  <p className="mt-3 text-sm font-semibold text-ink">{control.title}</p>
+                  <p className="mt-1 min-h-10 text-xs text-ink/55">{control.detail}</p>
+                  <p className="mt-3 text-xs font-semibold text-moss">{control.action}</p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <DashboardCommandCenter
         workspaces={memberships.map((membership) => ({
