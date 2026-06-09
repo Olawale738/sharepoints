@@ -28,9 +28,9 @@ type DashboardShellProps = {
 export function DashboardShell({ user, workspaces, canCreateWorkspace, children }: DashboardShellProps) {
   return (
     <div className="min-h-screen bg-paper">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-white/10 bg-navy px-4 py-5 text-white lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-ink/10 bg-white px-4 py-5 lg:block">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-white">
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-white">
             <Image
               src="/letw-logo.png"
               alt="LETW logo"
@@ -41,12 +41,12 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
             />
           </div>
           <div>
-            <p className="font-semibold text-white">LETW</p>
-            <p className="text-xs text-white/60">Collaboration</p>
+            <p className="font-semibold text-ink">LETW</p>
+            <p className="text-xs text-ink/55">Collaboration</p>
           </div>
         </Link>
 
-        <div className="mt-6 rounded-lg border border-white/10 bg-white/10 p-3">
+        <div className="mt-6 rounded-lg border border-ink/10 bg-paper p-3">
           <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
         </div>
 
@@ -54,8 +54,8 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
           <DashboardWorkspaceSwitcher workspaces={workspaces} />
         </div>
 
-        <div className="mt-6 rounded-lg border border-white/10 bg-white/10 p-3 text-xs text-white/65">
-          <p className="font-medium text-white">Protected LETW access</p>
+        <div className="mt-6 rounded-lg border border-ink/10 bg-paper p-3 text-xs text-ink/55">
+          <p className="font-medium text-ink">Protected LETW access</p>
           <p className="mt-1">@letw.org accounts must be invited before they can use the service.</p>
         </div>
       </aside>
@@ -85,7 +85,7 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
             <summary className="cursor-pointer text-sm font-medium">Workspaces</summary>
             <div className="mt-4 space-y-4">
               <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
-              <div className="rounded-lg bg-navy p-3">
+              <div className="rounded-lg border border-ink/10 bg-paper p-3">
                 <DashboardWorkspaceSwitcher workspaces={workspaces} />
               </div>
             </div>

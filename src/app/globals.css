@@ -13,9 +13,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(232, 238, 242, 0.78), rgba(248, 246, 240, 0) 420px),
-    #f8f6f0;
+  background: #f8f6f0;
   color: #18201f;
   font-feature-settings: "ss01" on, "cv01" on;
 }

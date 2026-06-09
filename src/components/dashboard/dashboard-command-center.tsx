@@ -60,27 +60,27 @@ export function DashboardCommandCenter({ workspaces, recentFiles, canCreateWorks
   }, [normalizedQuery, recentFiles]);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-panel">
-      <div className="border-b border-ink/10 bg-navy px-5 py-5 text-white">
+    <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
+      <div className="border-b border-ink/10 bg-paper px-5 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="inline-flex items-center gap-2 text-sm font-medium text-gold">
+            <p className="inline-flex items-center gap-2 text-sm font-medium text-moss">
               <Sparkles className="h-4 w-4" />
               LETW command center
             </p>
-            <h2 className="mt-2 text-2xl font-semibold">Find any workspace, file, or next action fast.</h2>
-            <p className="mt-2 max-w-3xl text-sm text-white/70">
+            <h2 className="mt-2 text-2xl font-semibold text-ink">Find any workspace, file, or next action fast.</h2>
+            <p className="mt-2 max-w-3xl text-sm text-ink/60">
               A single control surface for collaboration, document access, team movement, and operational review.
             </p>
           </div>
-          <div className="rounded-md border border-white/15 bg-white/10 px-3 py-2 text-sm text-white/80">
+          <div className="rounded-md border border-ink/10 bg-white px-3 py-2 text-sm text-ink/60">
             {canCreateWorkspace ? "Admin and leader creation enabled" : "Workspace creation is restricted"}
           </div>
         </div>
         <div className="relative mt-5">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
           <Input
-            className="h-11 border-white/20 bg-white pl-9 text-ink"
+            className="h-11 bg-white pl-9 text-ink"
             placeholder="Search workspaces or recent files"
             value={query}
             onChange={(event) => setQuery(event.target.value)}

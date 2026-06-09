@@ -369,13 +369,13 @@ export default async function DashboardPage() {
       value: openTaskCount,
       detail: `${channelCount} chat channels`,
       icon: Gauge,
-      className: "bg-navy text-white"
+      className: "bg-white"
     }
   ];
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-panel">
+      <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-medium text-moss">
@@ -391,27 +391,27 @@ export default async function DashboardPage() {
             <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
           </div>
         </div>
-        <div className="grid border-t border-ink/10 bg-navy text-white md:grid-cols-3">
-          <div className="border-b border-white/10 px-5 py-4 md:border-b-0 md:border-r">
-            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+        <div className="grid border-t border-ink/10 bg-paper md:grid-cols-3">
+          <div className="border-b border-ink/10 px-5 py-4 md:border-b-0 md:border-r">
+            <p className="flex items-center gap-2 text-sm font-medium text-moss">
               <Sparkles className="h-4 w-4" />
               Invitation-only
             </p>
-            <p className="mt-1 text-xs text-white/65">Only invited @letw.org accounts can sign in.</p>
+            <p className="mt-1 text-xs text-ink/55">Only invited @letw.org accounts can sign in.</p>
           </div>
-          <div className="border-b border-white/10 px-5 py-4 md:border-b-0 md:border-r">
-            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+          <div className="border-b border-ink/10 px-5 py-4 md:border-b-0 md:border-r">
+            <p className="flex items-center gap-2 text-sm font-medium text-moss">
               <Database className="h-4 w-4" />
               {formatBytes(storageBytes)} managed
             </p>
-            <p className="mt-1 text-xs text-white/65">Documents are stored with workspace-level access checks.</p>
+            <p className="mt-1 text-xs text-ink/55">Documents are stored with workspace-level access checks.</p>
           </div>
           <div className="px-5 py-4">
-            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+            <p className="flex items-center gap-2 text-sm font-medium text-moss">
               <MessageSquareText className="h-4 w-4" />
               {channelCount} channels
             </p>
-            <p className="mt-1 text-xs text-white/65">Workspace and organization chat stay permission-aware.</p>
+            <p className="mt-1 text-xs text-ink/55">Workspace and organization chat stay permission-aware.</p>
           </div>
         </div>
       </section>
@@ -438,14 +438,13 @@ export default async function DashboardPage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metric) => {
           const Icon = metric.icon;
-          const isDark = metric.className.includes("navy");
 
           return (
             <div key={metric.label} className={`rounded-lg border border-ink/10 p-4 shadow-soft ${metric.className}`}>
-              <Icon className={`h-5 w-5 ${isDark ? "text-gold" : "text-moss"}`} />
-              <p className={`mt-3 text-2xl font-semibold ${isDark ? "text-white" : "text-ink"}`}>{metric.value}</p>
-              <p className={`text-sm ${isDark ? "text-white/65" : "text-ink/55"}`}>{metric.label}</p>
-              <p className={`mt-2 text-xs ${isDark ? "text-white/60" : "text-ink/45"}`}>{metric.detail}</p>
+              <Icon className="h-5 w-5 text-moss" />
+              <p className="mt-3 text-2xl font-semibold text-ink">{metric.value}</p>
+              <p className="text-sm text-ink/55">{metric.label}</p>
+              <p className="mt-2 text-xs text-ink/45">{metric.detail}</p>
             </div>
           );
         })}
@@ -461,7 +460,7 @@ export default async function DashboardPage() {
               </p>
               <p className="mt-1 text-xs text-ink/55">A quick read on content, team size, and role coverage.</p>
             </div>
-            <Badge className="bg-steel">{workspacePulse.length} tracked</Badge>
+            <Badge className="bg-mint">{workspacePulse.length} tracked</Badge>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {workspacePulse.map((workspace) => (
