@@ -21,9 +21,11 @@ import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitati
 import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command-center";
 import { DashboardGovernanceCenter } from "@/components/dashboard/dashboard-governance-center";
 import { OrganizationChatPanel } from "@/components/dashboard/organization-chat-panel";
+import { UserAccessPassport } from "@/components/dashboard/user-access-passport";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 import { Badge } from "@/components/ui/badge";
 import { activityActions } from "@/lib/activity";
+import { normalizeEmail } from "@/lib/email-policy";
 import { ensureOrgChatRooms, getOrgChatAudienceCounts, getUserOrgChatAudiences } from "@/lib/org-chat";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
@@ -60,6 +62,51 @@ export default async function DashboardPage() {
     }
   });
   const isGlobalAdmin = ownMemberships.some((membership) => membership.role === WorkspaceRole.ADMIN);
+  const normalizedSessionEmail = normalizeEmail(session.user.email);
+  const [currentUserRecord, currentInvitation, assignedOpenTasksCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: session.user.id
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        suspendedAt: true,
+        accessRevokedAt: true,
+        deletedAt: true,
+        _count: {
+          select: {
+            uploadedFiles: true
+          }
+        }
+      }
+    }),
+    normalizedSessionEmail
+      ? prisma.companyEmailInvitation.findUnique({
+          where: {
+            email: normalizedSessionEmail
+          },
+          include: {
+            invitedBy: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          }
+        })
+      : null,
+    prisma.workspaceTask.count({
+      where: {
+        assignedToId: session.user.id,
+        status: {
+          not: TaskStatus.DONE
+        }
+      }
+    })
+  ]);
   const globalWorkspaces = isGlobalAdmin
     ? await prisma.workspace.findMany({
         include: {
@@ -452,6 +499,12 @@ export default async function DashboardPage() {
   const canCreateWorkspace = isGlobalAdmin || ownMemberships.some((membership) => canCreateWorkspaceFromRole(membership.role));
   const filesCount = memberships.reduce((total, membership) => total + membership.workspace._count.files, 0);
   const memberSeats = memberships.reduce((total, membership) => total + membership.workspace._count.members, 0);
+  const roleSummary = Object.entries(
+    memberships.reduce<Record<string, number>>((summary, membership) => {
+      summary[membership.role] = (summary[membership.role] ?? 0) + 1;
+      return summary;
+    }, {})
+  ).map(([role, count]) => ({ role, count }));
   const roleDashboards = [
     {
       title: "Admin dashboard",
@@ -678,6 +731,28 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <UserAccessPassport
+        user={{
+          name: currentUserRecord?.name ?? session.user.name,
+          email: currentUserRecord?.email ?? session.user.email,
+          createdAt: currentUserRecord?.createdAt.toISOString() ?? null
+        }}
+        status={currentUserRecord ? userAccessStatus(currentUserRecord) : "ACTIVE"}
+        invitation={
+          currentInvitation
+            ? {
+                acceptedAt: currentInvitation.acceptedAt?.toISOString() ?? null,
+                createdAt: currentInvitation.createdAt.toISOString(),
+                invitedBy: currentInvitation.invitedBy
+              }
+            : null
+        }
+        roleSummary={roleSummary}
+        workspaceCount={memberships.length}
+        assignedOpenTasksCount={assignedOpenTasksCount}
+        uploadedFilesCount={currentUserRecord?._count.uploadedFiles ?? 0}
+      />
 
       <DashboardCommandCenter
         workspaces={memberships.map((membership) => ({

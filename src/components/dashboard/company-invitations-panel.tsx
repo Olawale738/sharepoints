@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { Check, Copy, Loader2, MailPlus, ShieldX } from "lucide-react";
+import { FormEvent, useMemo, useState } from "react";
+import { Check, Copy, Loader2, MailPlus, Search, Send, ShieldX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,50 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
   const [isInviting, setIsInviting] = useState(false);
   const [revokingId, setRevokingId] = useState("");
   const [copyingId, setCopyingId] = useState("");
+  const [resendingId, setResendingId] = useState("");
+  const [query, setQuery] = useState("");
+
+  const invitationStats = useMemo(
+    () =>
+      invitations.reduce(
+        (stats, invitation) => {
+          if (invitation.revokedAt) {
+            return { ...stats, revoked: stats.revoked + 1 };
+          }
+
+          if (invitation.acceptedAt) {
+            return { ...stats, accepted: stats.accepted + 1 };
+          }
+
+          return { ...stats, pending: stats.pending + 1 };
+        },
+        { pending: 0, accepted: 0, revoked: 0 }
+      ),
+    [invitations]
+  );
+  const filteredInvitations = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return invitations;
+    }
+
+    return invitations.filter((invitation) =>
+      [
+        invitation.email,
+        invitation.acceptedAt ? "accepted registered" : "",
+        invitation.revokedAt ? "revoked" : "",
+        !invitation.acceptedAt && !invitation.revokedAt ? "pending invited" : "",
+        invitation.invitedBy?.name ?? "",
+        invitation.invitedBy?.email ?? "",
+        invitation.acceptedBy?.name ?? "",
+        invitation.acceptedBy?.email ?? ""
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
+    );
+  }, [invitations, query]);
 
   function inviteLink(email: string) {
     const path = `/register?email=${encodeURIComponent(email)}`;
@@ -148,11 +192,57 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
     setStatus(`${data.invitation.email} can no longer use the service unless invited again.`);
   }
 
+  async function resendInvitation(invitation: CompanyInvitation) {
+    setError("");
+    setStatus("");
+    setResendingId(invitation.id);
+
+    const response = await fetch(`/api/company-invitations/${invitation.id}/resend`, {
+      method: "POST"
+    });
+    setResendingId("");
+
+    const data = (await response.json().catch(() => null)) as {
+      invitation?: CompanyInvitation;
+      invitationUrl?: string;
+      emailSent?: boolean;
+      message?: string;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !data?.invitation) {
+      setError(data?.error ?? "Invitation email could not be resent.");
+      return;
+    }
+
+    if (data.invitationUrl && !data.emailSent) {
+      await copyText(data.invitationUrl);
+    }
+
+    setStatus(data.message ?? `Invitation email resent to ${invitation.email}.`);
+  }
+
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <MailPlus className="h-4 w-4 text-moss" />
-        <h2 className="text-sm font-semibold">Access invitations</h2>
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <MailPlus className="h-4 w-4 text-moss" />
+          <h2 className="text-sm font-semibold">Access invitations</h2>
+        </div>
+        <div className="grid gap-2 text-xs sm:grid-cols-3">
+          <div className="rounded-md border border-ink/10 bg-paper px-3 py-2">
+            <p className="font-medium text-ink">{invitationStats.pending}</p>
+            <p className="text-ink/50">Pending</p>
+          </div>
+          <div className="rounded-md border border-ink/10 bg-paper px-3 py-2">
+            <p className="font-medium text-ink">{invitationStats.accepted}</p>
+            <p className="text-ink/50">Registered</p>
+          </div>
+          <div className="rounded-md border border-ink/10 bg-paper px-3 py-2">
+            <p className="font-medium text-ink">{invitationStats.revoked}</p>
+            <p className="text-ink/50">Revoked</p>
+          </div>
+        </div>
       </div>
       <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={inviteCompanyEmail}>
         <Input name="email" placeholder="person@letw.org" type="email" required />
@@ -163,13 +253,26 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
       </form>
       {error ? <p className="mb-3 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
       {status ? <p className="mb-3 rounded-md bg-mint px-3 py-2 text-sm text-ink">{status}</p> : null}
+      <div className="relative mb-3">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+        <Input
+          className="pl-9"
+          placeholder="Search invited, registered, pending, or revoked users"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
 
       <div className="space-y-3">
         {invitations.length === 0 ? <p className="text-sm text-ink/55">No access invitations yet.</p> : null}
-        {invitations.map((invitation) => {
+        {invitations.length > 0 && filteredInvitations.length === 0 ? (
+          <p className="rounded-md bg-paper px-3 py-4 text-sm text-ink/55">No invitations match that search.</p>
+        ) : null}
+        {filteredInvitations.map((invitation) => {
           const isRevoked = Boolean(invitation.revokedAt);
           const isAccepted = Boolean(invitation.acceptedAt);
           const showRevoke = !invitation.isAdminProtected;
+          const canResend = !isRevoked && !isAccepted;
 
           return (
             <div key={invitation.id} className="rounded-md border border-ink/10 bg-paper p-3 text-sm">
@@ -194,6 +297,17 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
+                  {canResend ? (
+                    <Button
+                      className="h-9"
+                      variant="secondary"
+                      disabled={resendingId === invitation.id}
+                      onClick={() => resendInvitation(invitation)}
+                    >
+                      {resendingId === invitation.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Resend
+                    </Button>
+                  ) : null}
                   <Button
                     className="h-9"
                     variant="secondary"

@@ -45,6 +45,7 @@ export const activityActions = {
   taskUpdated: "task.updated",
   taskDeleted: "task.deleted",
   fileShareLinkCreated: "file.share_link_created",
+  companyInvitationResent: "company_invitation.resent",
   passwordResetRequested: "auth.password_reset_requested",
   passwordResetCompleted: "auth.password_reset_completed",
   userSuspended: "user.suspended",

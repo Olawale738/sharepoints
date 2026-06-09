@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, RotateCcw, ShieldOff, Trash2, UserMinus, UsersRound } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Loader2, RotateCcw, Search, ShieldOff, Trash2, UserMinus, UsersRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/utils";
 
 type AdminUser = {
@@ -41,6 +42,39 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
   const [busyUserId, setBusyUserId] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [query, setQuery] = useState("");
+  const userStats = useMemo(
+    () =>
+      users.reduce(
+        (stats, user) => ({
+          ...stats,
+          [user.status]: stats[user.status] + 1
+        }),
+        { ACTIVE: 0, SUSPENDED: 0, REVOKED: 0, DELETED: 0 } as Record<AdminUser["status"], number>
+      ),
+    [users]
+  );
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return users;
+    }
+
+    return users.filter((user) =>
+      [
+        user.name ?? "",
+        user.email ?? "",
+        user.status,
+        user.isAdmin ? "admin protected" : "",
+        `${user._count.workspaceMemberships} workspaces`,
+        `${user._count.uploadedFiles} files`
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
+    );
+  }, [query, users]);
 
   async function updateUser(userId: string, action: "SUSPEND" | "RESTORE" | "REVOKE" | "DELETE") {
     setError("");
@@ -75,13 +109,35 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
         </div>
         <Badge>{users.length}</Badge>
       </div>
+      <div className="border-b border-ink/10 bg-paper px-4 py-3">
+        <div className="grid gap-2 text-xs sm:grid-cols-4">
+          {(Object.keys(userStats) as AdminUser["status"][]).map((userStatus) => (
+            <div key={userStatus} className="rounded-md border border-ink/10 bg-white px-3 py-2">
+              <p className="font-medium text-ink">{userStats[userStatus]}</p>
+              <p className="text-ink/50">{userStatus.toLowerCase()}</p>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink/40" />
+          <Input
+            className="bg-white pl-9"
+            placeholder="Search registered users by name, email, status, or admin"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+      </div>
 
       {error ? <p className="border-b border-ink/10 bg-clay/10 px-4 py-2 text-sm text-clay">{error}</p> : null}
       {status ? <p className="border-b border-ink/10 bg-mint px-4 py-2 text-sm text-ink">{status}</p> : null}
 
       <div className="divide-y divide-ink/10">
         {users.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No users yet.</p> : null}
-        {users.map((user) => {
+        {users.length > 0 && filteredUsers.length === 0 ? (
+          <p className="px-4 py-8 text-sm text-ink/55">No registered users match that search.</p>
+        ) : null}
+        {filteredUsers.map((user) => {
           const isBusy = busyUserId === user.id;
           const isCurrentUser = currentUserId === user.id;
           const isDeleted = user.status === "DELETED";
