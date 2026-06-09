@@ -19,9 +19,11 @@ import { auth } from "@/auth";
 import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
 import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command-center";
+import { DashboardGovernanceCenter } from "@/components/dashboard/dashboard-governance-center";
 import { OrganizationChatPanel } from "@/components/dashboard/organization-chat-panel";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 import { Badge } from "@/components/ui/badge";
+import { activityActions } from "@/lib/activity";
 import { ensureOrgChatRooms, getOrgChatAudienceCounts, getUserOrgChatAudiences } from "@/lib/org-chat";
 import { prisma } from "@/lib/prisma";
 import { roleLabel } from "@/lib/roles";
@@ -102,7 +104,34 @@ export default async function DashboardPage() {
 
   await ensureOrgChatRooms(session.user.id);
   const workspaceIds = memberships.map((membership) => membership.workspaceId);
-  const [recentFiles, recentActivities, fileStats, channelCount, openTaskCount] = workspaceIds.length
+  const now = new Date();
+  const sensitiveActivityActions = [
+    activityActions.workspaceDeleted,
+    activityActions.fileDeleted,
+    activityActions.memberRemoved,
+    activityActions.rolePermissionsUpdated,
+    activityActions.integrationDeleted,
+    activityActions.channelDeleted,
+    activityActions.userSuspended,
+    activityActions.userAccessRevoked,
+    activityActions.userDeleted
+  ];
+  const [
+    recentFiles,
+    recentActivities,
+    fileStats,
+    channelCount,
+    openTaskCount,
+    priorityTasks,
+    announcementHighlights,
+    memberDirectory,
+    activeShareLinks,
+    criticalActivities,
+    overdueTaskCount,
+    blockedTaskCount,
+    activeShareLinkCount,
+    nonExpiringShareLinkCount
+  ] = workspaceIds.length
     ? await Promise.all([
         prisma.file.findMany({
           where: {
@@ -127,7 +156,7 @@ export default async function DashboardPage() {
           orderBy: {
             createdAt: "desc"
           },
-          take: 6
+          take: 8
         }),
         prisma.activityLog.findMany({
           where: {
@@ -152,7 +181,7 @@ export default async function DashboardPage() {
           orderBy: {
             createdAt: "desc"
           },
-          take: 8
+          take: 12
         }),
         prisma.file.aggregate({
           where: {
@@ -183,9 +212,195 @@ export default async function DashboardPage() {
               not: TaskStatus.DONE
             }
           }
+        }),
+        prisma.workspaceTask.findMany({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            },
+            status: {
+              not: TaskStatus.DONE
+            }
+          },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            assignedTo: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+          take: 8
+        }),
+        prisma.workspaceAnnouncement.findMany({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            }
+          },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          },
+          orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+          take: 8
+        }),
+        prisma.workspaceMember.findMany({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            }
+          },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            joinedAt: "desc"
+          },
+          take: 18
+        }),
+        prisma.fileShareLink.findMany({
+          where: {
+            file: {
+              workspaceId: {
+                in: workspaceIds
+              }
+            },
+            OR: [{ expiresAt: null }, { expiresAt: { gte: now } }]
+          },
+          include: {
+            file: {
+              select: {
+                id: true,
+                fileName: true,
+                workspace: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            },
+            createdBy: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 8
+        }),
+        prisma.activityLog.findMany({
+          where: {
+            action: {
+              in: sensitiveActivityActions
+            },
+            OR: isGlobalAdmin
+              ? [
+                  {
+                    workspaceId: {
+                      in: workspaceIds
+                    }
+                  },
+                  {
+                    workspaceId: null
+                  }
+                ]
+              : [
+                  {
+                    workspaceId: {
+                      in: workspaceIds
+                    }
+                  }
+                ]
+          },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            user: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 8
+        }),
+        prisma.workspaceTask.count({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            },
+            status: {
+              not: TaskStatus.DONE
+            },
+            dueDate: {
+              lt: now
+            }
+          }
+        }),
+        prisma.workspaceTask.count({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            },
+            status: TaskStatus.BLOCKED
+          }
+        }),
+        prisma.fileShareLink.count({
+          where: {
+            file: {
+              workspaceId: {
+                in: workspaceIds
+              }
+            },
+            OR: [{ expiresAt: null }, { expiresAt: { gte: now } }]
+          }
+        }),
+        prisma.fileShareLink.count({
+          where: {
+            file: {
+              workspaceId: {
+                in: workspaceIds
+              }
+            },
+            expiresAt: null
+          }
         })
       ])
-    : [[], [], { _sum: { size: null }, _count: { id: 0 } }, 0, 0];
+    : [[], [], { _sum: { size: null }, _count: { id: 0 } }, 0, 0, [], [], [], [], [], 0, 0, 0, 0];
   const [{ readable: orgChatAudiences, sendable: sendableOrgChatAudiences }, orgChatAudienceCounts] =
     await Promise.all([getUserOrgChatAudiences(session.user.id), getOrgChatAudienceCounts()]);
   const orgChatRooms = orgChatAudiences.length
@@ -322,6 +537,9 @@ export default async function DashboardPage() {
   ]);
   const storageBytes = fileStats._sum.size ?? 0;
   const pendingInvitations = companyInvitations.filter((invitation) => !invitation.acceptedAt && !invitation.revokedAt).length;
+  const restrictedUsersCount = isGlobalAdmin
+    ? adminUsers.filter((adminUser) => userAccessStatus(adminUser) !== "ACTIVE").length
+    : 0;
   const workspacePulse = memberships
     .map((membership) => {
       const filesScore = Math.min(35, membership.workspace._count.files * 7);
@@ -342,6 +560,51 @@ export default async function DashboardPage() {
     })
     .sort((first, second) => second.score - first.score)
     .slice(0, 6);
+  const dormantWorkspaces = memberships
+    .filter((membership) => membership.workspace._count.files === 0 || membership.workspace._count.members <= 1)
+    .map((membership) => ({
+      id: membership.workspace.id,
+      name: membership.workspace.name,
+      filesCount: membership.workspace._count.files,
+      membersCount: membership.workspace._count.members
+    }))
+    .slice(0, 6);
+  const governanceSignals = [
+    {
+      label: "Overdue tasks",
+      value: overdueTaskCount,
+      detail: overdueTaskCount
+        ? "Tasks are past due and need attention."
+        : "No visible task is past due.",
+      tone: overdueTaskCount ? "danger" as const : "ok" as const
+    },
+    {
+      label: "Blocked tasks",
+      value: blockedTaskCount,
+      detail: blockedTaskCount
+        ? "Blocked work may need leadership support."
+        : "No blocked work in visible workspaces.",
+      tone: blockedTaskCount ? "warn" as const : "ok" as const
+    },
+    {
+      label: "Active share links",
+      value: activeShareLinkCount,
+      detail: nonExpiringShareLinkCount
+        ? `${nonExpiringShareLinkCount} active link${nonExpiringShareLinkCount === 1 ? "" : "s"} without expiration.`
+        : "Active links have expiration protection.",
+      tone: nonExpiringShareLinkCount ? "warn" as const : "ok" as const
+    },
+    {
+      label: "Restricted users",
+      value: restrictedUsersCount,
+      detail: isGlobalAdmin
+        ? restrictedUsersCount
+          ? "Suspended, revoked, or deleted accounts exist."
+          : "No restricted user accounts found."
+        : "Visible to organization admins.",
+      tone: restrictedUsersCount ? "danger" as const : "ok" as const
+    }
+  ];
   const metricCards = [
     {
       label: "Workspaces",
@@ -432,6 +695,35 @@ export default async function DashboardPage() {
           createdAt: file.createdAt.toISOString(),
           workspace: file.workspace
         }))}
+        tasks={priorityTasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          dueDate: task.dueDate?.toISOString() ?? null,
+          workspace: task.workspace,
+          assignedTo: task.assignedTo
+        }))}
+        announcements={announcementHighlights.map((announcement) => ({
+          id: announcement.id,
+          title: announcement.title,
+          body: announcement.body,
+          pinned: announcement.pinned,
+          createdAt: announcement.createdAt.toISOString(),
+          workspace: announcement.workspace
+        }))}
+        members={memberDirectory.map((member) => ({
+          id: member.id,
+          role: member.role,
+          workspace: member.workspace,
+          user: member.user
+        }))}
+        activities={recentActivities.map((activity) => ({
+          id: activity.id,
+          action: activity.action,
+          createdAt: activity.createdAt.toISOString(),
+          workspace: activity.workspace,
+          user: activity.user
+        }))}
         canCreateWorkspace={canCreateWorkspace}
       />
 
@@ -449,6 +741,35 @@ export default async function DashboardPage() {
           );
         })}
       </section>
+
+      {workspaceIds.length ? (
+        <DashboardGovernanceCenter
+          signals={governanceSignals}
+          priorityTasks={priorityTasks.map((task) => ({
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            dueDate: task.dueDate?.toISOString() ?? null,
+            workspace: task.workspace,
+            assignedTo: task.assignedTo
+          }))}
+          activeShareLinks={activeShareLinks.map((shareLink) => ({
+            id: shareLink.id,
+            createdAt: shareLink.createdAt.toISOString(),
+            expiresAt: shareLink.expiresAt?.toISOString() ?? null,
+            file: shareLink.file,
+            createdBy: shareLink.createdBy
+          }))}
+          criticalActivities={criticalActivities.map((activity) => ({
+            id: activity.id,
+            action: activity.action,
+            createdAt: activity.createdAt.toISOString(),
+            workspace: activity.workspace,
+            user: activity.user
+          }))}
+          dormantWorkspaces={dormantWorkspaces}
+        />
+      ) : null}
 
       {workspacePulse.length ? (
         <section className="rounded-lg border border-ink/10 bg-white p-4">
