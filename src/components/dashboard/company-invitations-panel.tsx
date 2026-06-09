@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Check, Copy, Loader2, MailPlus, Search, Send, ShieldX } from "lucide-react";
+import { Check, Copy, Loader2, MailPlus, Search, Send, ShieldX, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
   const [revokingId, setRevokingId] = useState("");
   const [copyingId, setCopyingId] = useState("");
   const [resendingId, setResendingId] = useState("");
+  const [clearingId, setClearingId] = useState("");
   const [query, setQuery] = useState("");
 
   const invitationStats = useMemo(
@@ -222,6 +223,34 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
     setStatus(data.message ?? `Invitation email resent to ${invitation.email}.`);
   }
 
+  async function clearInvitationLog(invitation: CompanyInvitation) {
+    if (!window.confirm(`Clear the revoked invitation log for ${invitation.email}?`)) {
+      return;
+    }
+
+    setError("");
+    setStatus("");
+    setClearingId(invitation.id);
+
+    const response = await fetch(`/api/company-invitations/${invitation.id}/clear`, {
+      method: "DELETE"
+    });
+    setClearingId("");
+
+    const data = (await response.json().catch(() => null)) as {
+      invitation?: Pick<CompanyInvitation, "id" | "email">;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !data?.invitation) {
+      setError(data?.error ?? "This invitation log could not be cleared.");
+      return;
+    }
+
+    setInvitations((current) => current.filter((currentInvitation) => currentInvitation.id !== data.invitation?.id));
+    setStatus(`Cleared revoked invitation log for ${data.invitation.email}.`);
+  }
+
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4">
       <div className="mb-4 flex flex-col gap-3">
@@ -330,6 +359,21 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
                         <ShieldX className="h-4 w-4" />
                       )}
                       Revoke
+                    </Button>
+                  ) : null}
+                  {isRevoked && showRevoke ? (
+                    <Button
+                      className="h-9"
+                      variant="secondary"
+                      disabled={clearingId === invitation.id}
+                      onClick={() => clearInvitationLog(invitation)}
+                    >
+                      {clearingId === invitation.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Clear log
                     </Button>
                   ) : null}
                 </div>

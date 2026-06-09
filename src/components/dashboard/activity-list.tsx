@@ -32,7 +32,8 @@ const labels: Record<string, string> = {
   "task.updated": "updated a task",
   "task.deleted": "deleted a task",
   "file.share_link_created": "created a file share link",
-  "company_invitation.resent": "resent an access invitation"
+  "company_invitation.resent": "resent an access invitation",
+  "company_invitation.cleared": "cleared a revoked invitation log"
 };
 
 export function ActivityList({ items }: { items: ActivityItem[] }) {
