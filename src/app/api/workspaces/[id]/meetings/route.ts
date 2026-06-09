@@ -1,6 +1,6 @@
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { createMeetingPasscode, createMeetingRoomName, meetingInclude, meetingInviteUrl } from "@/lib/meetings";
+import { createMeetingPasscode, createMeetingRoomName, meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess, requireWorkspaceMembership } from "@/lib/rbac";
 import { createWorkspaceMeetingSchema } from "@/lib/validators";
@@ -8,35 +8,6 @@ import { createWorkspaceMeetingSchema } from "@/lib/validators";
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-function serializeMeeting(meeting: {
-  id: string;
-  workspaceId: string;
-  title: string;
-  description: string | null;
-  startsAt: Date;
-  endsAt: Date;
-  passcode: string;
-  cancelledAt: Date | null;
-  createdAt: Date;
-  createdBy: { name?: string | null; email?: string | null };
-  workspace?: { id: string; name: string };
-}, origin?: string) {
-  return {
-    id: meeting.id,
-    workspaceId: meeting.workspaceId,
-    title: meeting.title,
-    description: meeting.description,
-    startsAt: meeting.startsAt.toISOString(),
-    endsAt: meeting.endsAt.toISOString(),
-    passcode: meeting.passcode,
-    cancelledAt: meeting.cancelledAt?.toISOString() ?? null,
-    createdAt: meeting.createdAt.toISOString(),
-    createdBy: meeting.createdBy,
-    workspace: meeting.workspace,
-    inviteUrl: meetingInviteUrl(meeting.id, origin)
-  };
-}
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -56,7 +27,7 @@ export async function GET(request: Request, context: RouteContext) {
     const origin = new URL(request.url).origin;
 
     return ok({
-      meetings: meetings.map((meeting) => serializeMeeting(meeting, origin))
+      meetings: meetings.map((meeting) => serializeMeeting(meeting, user.id, origin))
     });
   } catch (error) {
     return handleRouteError(error);
@@ -126,7 +97,7 @@ export async function POST(request: Request, context: RouteContext) {
       }
     });
 
-    return ok({ meeting: serializeMeeting(meeting, new URL(request.url).origin) }, { status: 201 });
+    return ok({ meeting: serializeMeeting(meeting, user.id, new URL(request.url).origin) }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);
   }

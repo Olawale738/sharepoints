@@ -21,7 +21,7 @@ import { TasksPanel } from "@/components/dashboard/tasks-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
-import { meetingInviteUrl } from "@/lib/meetings";
+import { serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { defaultPermissionsForRole, getRolePermissions, hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 import { roleLabel } from "@/lib/roles";
@@ -219,6 +219,12 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           select: {
             name: true,
             email: true
+          }
+        },
+        responses: {
+          select: {
+            userId: true,
+            status: true
           }
         }
       },
@@ -468,18 +474,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
 
           <MeetingsPanel
             workspaceId={workspaceId}
-            meetings={meetings.map((meeting) => ({
-              id: meeting.id,
-              workspaceId: meeting.workspaceId,
-              title: meeting.title,
-              description: meeting.description,
-              startsAt: meeting.startsAt.toISOString(),
-              endsAt: meeting.endsAt.toISOString(),
-              passcode: meeting.passcode,
-              cancelledAt: meeting.cancelledAt?.toISOString() ?? null,
-              inviteUrl: meetingInviteUrl(meeting.id, origin),
-              createdBy: meeting.createdBy
-            }))}
+            meetings={meetings.map((meeting) => serializeMeeting(meeting, session.user.id, origin))}
             canManage={hasAdminAccess}
           />
 

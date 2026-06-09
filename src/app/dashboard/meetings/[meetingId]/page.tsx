@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CalendarClock, KeyRound, UsersRound } from "lucide-react";
+import { CalendarClock, CalendarPlus, KeyRound, UsersRound } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CopyTextButton } from "@/components/dashboard/copy-text-button";
@@ -110,9 +110,20 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
         />
       )}
 
-      <Link className="inline-flex text-sm font-medium text-moss hover:underline" href={`/dashboard/workspaces/${meeting.workspaceId}`}>
-        Back to workspace
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        {!isCancelled ? (
+          <a
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium text-ink transition hover:bg-mint/50"
+            href={`/api/meetings/${meeting.id}/calendar`}
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Add to calendar
+          </a>
+        ) : null}
+        <Link className="inline-flex h-9 items-center text-sm font-medium text-moss hover:underline" href={`/dashboard/workspaces/${meeting.workspaceId}`}>
+          Back to workspace
+        </Link>
+      </div>
     </div>
   );
 }

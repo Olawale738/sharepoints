@@ -145,6 +145,10 @@ export const createWorkspaceMeetingSchema = z
     path: ["endsAt"]
   });
 
+export const updateMeetingResponseSchema = z.object({
+  status: z.enum(["YES", "MAYBE", "NO"])
+});
+
 export const createFileShareLinkSchema = z.object({
   expiresInDays: z.number().int().min(1).max(365).optional().nullable()
 });

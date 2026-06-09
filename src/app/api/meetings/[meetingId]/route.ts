@@ -1,6 +1,6 @@
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { meetingInclude, meetingInviteUrl } from "@/lib/meetings";
+import { meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess } from "@/lib/rbac";
 
@@ -55,21 +55,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     });
 
     return ok({
-      meeting: {
-        id: meeting.id,
-        workspaceId: meeting.workspaceId,
-        title: meeting.title,
-        description: meeting.description,
-        passcode: meeting.passcode,
-        startsAt: meeting.startsAt.toISOString(),
-        endsAt: meeting.endsAt.toISOString(),
-        cancelledAt: meeting.cancelledAt?.toISOString() ?? null,
-        createdAt: meeting.createdAt.toISOString(),
-        updatedAt: meeting.updatedAt.toISOString(),
-        createdBy: meeting.createdBy,
-        workspace: meeting.workspace,
-        inviteUrl: meetingInviteUrl(meeting.id, new URL(request.url).origin)
-      }
+      meeting: serializeMeeting(meeting, user.id, new URL(request.url).origin)
     });
   } catch (error) {
     return handleRouteError(error);

@@ -35,6 +35,12 @@ enum OrgChatAudience {
   USER
 }
 
+enum MeetingResponseStatus {
+  YES
+  MAYBE
+  NO
+}
+
 model User {
   id                         String                   @id @default(cuid())
   name                       String?
@@ -70,6 +76,7 @@ model User {
   assignedTasks              WorkspaceTask[]          @relation("AssignedTasks")
   createdTasks               WorkspaceTask[]          @relation("CreatedTasks")
   createdMeetings            WorkspaceMeeting[]       @relation("CreatedMeetings")
+  meetingResponses           WorkspaceMeetingResponse[]
   createdShareLinks          FileShareLink[]          @relation("CreatedShareLinks")
   activityLogs               ActivityLog[]
 
@@ -199,12 +206,28 @@ model WorkspaceMeeting {
   cancelledAt DateTime?
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy   User      @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
+  responses   WorkspaceMeetingResponse[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId, startsAt])
   @@index([createdById, startsAt])
   @@index([cancelledAt])
+}
+
+model WorkspaceMeetingResponse {
+  id        String                @id @default(cuid())
+  meetingId String
+  userId    String
+  status    MeetingResponseStatus
+  meeting   WorkspaceMeeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([meetingId, status])
+  @@index([userId, updatedAt])
 }
 
 model WorkspaceMember {

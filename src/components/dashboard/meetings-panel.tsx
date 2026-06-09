@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarClock, Copy, KeyRound, Loader2, Plus, Video, XCircle } from "lucide-react";
+import { CalendarPlus, Check, CalendarClock, Copy, HelpCircle, KeyRound, Loader2, Plus, Video, X, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,15 @@ type Meeting = {
   passcode: string;
   cancelledAt?: string | null;
   inviteUrl: string;
+  currentUserResponse?: MeetingResponseStatus | null;
+  responseCounts: Record<MeetingResponseStatus, number>;
   createdBy: {
     name?: string | null;
     email?: string | null;
   };
 };
+
+type MeetingResponseStatus = "YES" | "MAYBE" | "NO";
 
 type MeetingsPanelProps = {
   workspaceId: string;
@@ -192,6 +196,28 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
     setStatus(`${meeting.title} was cancelled.`);
   }
 
+  async function respondToMeeting(meeting: Meeting, responseStatus: MeetingResponseStatus) {
+    setError("");
+    setStatus("");
+    setBusyMeetingId(meeting.id);
+    const response = await fetch(`/api/meetings/${meeting.id}/rsvp`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: responseStatus })
+    });
+    setBusyMeetingId("");
+
+    const data = (await response.json().catch(() => null)) as { meeting?: Meeting; error?: string } | null;
+
+    if (!response.ok || !data?.meeting) {
+      setError(data?.error ?? "Meeting response could not be saved.");
+      return;
+    }
+
+    setMeetings((current) => current.map((item) => (item.id === meeting.id ? data.meeting as Meeting : item)));
+    setStatus("Your meeting response was saved.");
+  }
+
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -246,6 +272,17 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
                     <KeyRound className="h-3.5 w-3.5 text-moss" />
                     Passcode <span className="font-semibold text-ink">{meeting.passcode}</span>
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <Badge className="bg-mint">
+                      Going {meeting.responseCounts.YES}
+                    </Badge>
+                    <Badge className="bg-wheat">
+                      Maybe {meeting.responseCounts.MAYBE}
+                    </Badge>
+                    <Badge className="bg-clay/10 text-clay">
+                      No {meeting.responseCounts.NO}
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {isCancelled ? (
@@ -266,6 +303,52 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
                     <Copy className="h-4 w-4" />
                     Copy invite
                   </Button>
+                  {!isCancelled ? (
+                    <a
+                      className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium text-ink transition hover:bg-mint/50"
+                      href={`/api/meetings/${meeting.id}/calendar`}
+                    >
+                      <CalendarPlus className="h-4 w-4" />
+                      Calendar
+                    </a>
+                  ) : null}
+                  {!isCancelled ? (
+                    <div className="flex flex-wrap gap-1 rounded-md border border-ink/10 bg-white p-1">
+                      <button
+                        className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium transition ${
+                          meeting.currentUserResponse === "YES" ? "bg-moss text-white" : "text-ink hover:bg-mint/50"
+                        }`}
+                        disabled={busyMeetingId === meeting.id}
+                        type="button"
+                        onClick={() => respondToMeeting(meeting, "YES")}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Going
+                      </button>
+                      <button
+                        className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium transition ${
+                          meeting.currentUserResponse === "MAYBE" ? "bg-wheat text-ink" : "text-ink hover:bg-mint/50"
+                        }`}
+                        disabled={busyMeetingId === meeting.id}
+                        type="button"
+                        onClick={() => respondToMeeting(meeting, "MAYBE")}
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" />
+                        Maybe
+                      </button>
+                      <button
+                        className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium transition ${
+                          meeting.currentUserResponse === "NO" ? "bg-clay text-white" : "text-ink hover:bg-clay/10"
+                        }`}
+                        disabled={busyMeetingId === meeting.id}
+                        type="button"
+                        onClick={() => respondToMeeting(meeting, "NO")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        No
+                      </button>
+                    </div>
+                  ) : null}
                   {canManage && !isCancelled ? (
                     <Button
                       className="h-9"
