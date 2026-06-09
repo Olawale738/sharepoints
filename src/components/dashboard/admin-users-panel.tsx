@@ -86,7 +86,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
           const isCurrentUser = currentUserId === user.id;
           const isDeleted = user.status === "DELETED";
           const canRestore = user.status === "SUSPENDED" || user.status === "REVOKED";
-          const canRevoke = !isDeleted && !isCurrentUser && !user.isAdmin;
+          const showRevoke = !isDeleted && !user.isAdmin;
 
           return (
             <div key={user.id} className="px-4 py-4">
@@ -128,12 +128,11 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                       Suspend
                     </Button>
                   ) : null}
-                  {!isDeleted ? (
+                  {showRevoke ? (
                     <Button
                       className="h-9"
                       variant="secondary"
-                      disabled={isBusy || !canRevoke}
-                      title={user.isAdmin ? "Admin users cannot be revoked." : undefined}
+                      disabled={isBusy || isCurrentUser}
                       onClick={() => updateUser(user.id, "REVOKE")}
                     >
                       {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}

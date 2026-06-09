@@ -169,7 +169,7 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
         {invitations.map((invitation) => {
           const isRevoked = Boolean(invitation.revokedAt);
           const isAccepted = Boolean(invitation.acceptedAt);
-          const revokeDisabled = isRevoked || revokingId === invitation.id || Boolean(invitation.isAdminProtected);
+          const showRevoke = !invitation.isAdminProtected;
 
           return (
             <div key={invitation.id} className="rounded-md border border-ink/10 bg-paper p-3 text-sm">
@@ -203,20 +203,21 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
                     {copyingId === invitation.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     Copy link
                   </Button>
-                  <Button
-                    className="h-9"
-                    variant="secondary"
-                    disabled={revokeDisabled}
-                    title={invitation.isAdminProtected ? "Admin invitations cannot be revoked." : undefined}
-                    onClick={() => revokeInvitation(invitation.id)}
-                  >
-                    {revokingId === invitation.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <ShieldX className="h-4 w-4" />
-                    )}
-                    Revoke
-                  </Button>
+                  {showRevoke ? (
+                    <Button
+                      className="h-9"
+                      variant="secondary"
+                      disabled={isRevoked || revokingId === invitation.id}
+                      onClick={() => revokeInvitation(invitation.id)}
+                    >
+                      {revokingId === invitation.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ShieldX className="h-4 w-4" />
+                      )}
+                      Revoke
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
