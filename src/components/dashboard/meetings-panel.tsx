@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CalendarClock, Copy, KeyRound, Loader2, Plus, Video, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ type MeetingsPanelProps = {
   canManage: boolean;
 };
 
-function formatDateTime(value: string) {
+function localDateTime(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -41,8 +41,21 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function meetingStatus(meeting: Meeting) {
-  const now = Date.now();
+function dateTimeFallback(value: string) {
+  return new Date(value).toISOString().slice(0, 16).replace("T", " ");
+}
+
+function DateTimeText({ value }: { value: string }) {
+  const [text, setText] = useState(dateTimeFallback(value));
+
+  useEffect(() => {
+    setText(localDateTime(value));
+  }, [value]);
+
+  return <span suppressHydrationWarning>{text}</span>;
+}
+
+function meetingStatus(meeting: Meeting, now: number | null) {
   const startsAt = new Date(meeting.startsAt).getTime();
   const endsAt = new Date(meeting.endsAt).getTime();
 
@@ -50,11 +63,11 @@ function meetingStatus(meeting: Meeting) {
     return { label: "Cancelled", className: "bg-clay/10 text-clay" };
   }
 
-  if (now >= startsAt && now <= endsAt) {
+  if (now && now >= startsAt && now <= endsAt) {
     return { label: "Live now", className: "bg-moss text-white" };
   }
 
-  if (now > endsAt) {
+  if (now && now > endsAt) {
     return { label: "Ended", className: "bg-ink/10 text-ink/60" };
   }
 
@@ -66,7 +79,7 @@ function toInviteText(meeting: Meeting) {
     `LETW video meeting: ${meeting.title}`,
     `Join link: ${meeting.inviteUrl}`,
     `Passcode: ${meeting.passcode}`,
-    `Time: ${formatDateTime(meeting.startsAt)}`
+    `Time: ${localDateTime(meeting.startsAt)}`
   ].join("\n");
 }
 
@@ -92,6 +105,14 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
   const [status, setStatus] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [busyMeetingId, setBusyMeetingId] = useState("");
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   const sortedMeetings = useMemo(
     () =>
@@ -202,7 +223,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
       <div className="space-y-3">
         {sortedMeetings.length === 0 ? <p className="text-sm text-ink/55">No video meetings scheduled yet.</p> : null}
         {sortedMeetings.map((meeting) => {
-          const statusInfo = meetingStatus(meeting);
+          const statusInfo = meetingStatus(meeting, now);
           const isCancelled = Boolean(meeting.cancelledAt);
 
           return (
@@ -213,13 +234,13 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
                     <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
                     <span className="inline-flex items-center gap-1 text-xs text-ink/55">
                       <CalendarClock className="h-3.5 w-3.5" />
-                      {formatDateTime(meeting.startsAt)}
+                      <DateTimeText value={meeting.startsAt} />
                     </span>
                   </div>
                   <h3 className="text-sm font-semibold text-ink">{meeting.title}</h3>
                   {meeting.description ? <p className="mt-1 whitespace-pre-wrap text-sm text-ink/65">{meeting.description}</p> : null}
                   <p className="mt-2 text-xs text-ink/50">
-                    Ends {formatDateTime(meeting.endsAt)} - scheduled by {meeting.createdBy.name ?? meeting.createdBy.email}
+                    Ends <DateTimeText value={meeting.endsAt} /> - scheduled by {meeting.createdBy.name ?? meeting.createdBy.email}
                   </p>
                   <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-white px-2 py-1 text-xs text-ink/70">
                     <KeyRound className="h-3.5 w-3.5 text-moss" />
