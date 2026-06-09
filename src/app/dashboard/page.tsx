@@ -1,11 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, Building2, Crown, Files, FolderPlus, ShieldCheck, UsersRound } from "lucide-react";
-import { WorkspaceRole } from "@prisma/client";
+import {
+  Activity,
+  Building2,
+  Database,
+  Files,
+  FolderPlus,
+  Gauge,
+  MessageSquareText,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  UsersRound
+} from "lucide-react";
+import { TaskStatus, WorkspaceRole } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
+import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command-center";
 import { OrganizationChatPanel } from "@/components/dashboard/organization-chat-panel";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +102,7 @@ export default async function DashboardPage() {
 
   await ensureOrgChatRooms(session.user.id);
   const workspaceIds = memberships.map((membership) => membership.workspaceId);
-  const [recentFiles, recentActivities] = workspaceIds.length
+  const [recentFiles, recentActivities, fileStats, channelCount, openTaskCount] = workspaceIds.length
     ? await Promise.all([
         prisma.file.findMany({
           where: {
@@ -140,9 +153,39 @@ export default async function DashboardPage() {
             createdAt: "desc"
           },
           take: 8
+        }),
+        prisma.file.aggregate({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            }
+          },
+          _sum: {
+            size: true
+          },
+          _count: {
+            id: true
+          }
+        }),
+        prisma.chatChannel.count({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            }
+          }
+        }),
+        prisma.workspaceTask.count({
+          where: {
+            workspaceId: {
+              in: workspaceIds
+            },
+            status: {
+              not: TaskStatus.DONE
+            }
+          }
         })
       ])
-    : [[], []];
+    : [[], [], { _sum: { size: null }, _count: { id: 0 } }, 0, 0];
   const [{ readable: orgChatAudiences, sendable: sendableOrgChatAudiences }, orgChatAudienceCounts] =
     await Promise.all([getUserOrgChatAudiences(session.user.id), getOrgChatAudienceCounts()]);
   const orgChatRooms = orgChatAudiences.length
@@ -277,47 +320,175 @@ export default async function DashboardPage() {
       .map((adminUser) => adminUser.email?.toLowerCase())
       .filter((email): email is string => Boolean(email))
   ]);
+  const storageBytes = fileStats._sum.size ?? 0;
+  const pendingInvitations = companyInvitations.filter((invitation) => !invitation.acceptedAt && !invitation.revokedAt).length;
+  const workspacePulse = memberships
+    .map((membership) => {
+      const filesScore = Math.min(35, membership.workspace._count.files * 7);
+      const membersScore = Math.min(35, membership.workspace._count.members * 7);
+      const roleScore = membership.role === WorkspaceRole.ADMIN ? 20 : membership.role === WorkspaceRole.LEADER ? 14 : 8;
+      const score = Math.min(100, 20 + filesScore + membersScore + roleScore);
+
+      return {
+        id: membership.id,
+        workspaceId: membership.workspace.id,
+        name: membership.workspace.name,
+        role: membership.role,
+        score,
+        filesCount: membership.workspace._count.files,
+        membersCount: membership.workspace._count.members,
+        status: score >= 82 ? "Thriving" : score >= 60 ? "Healthy" : "Needs setup"
+      };
+    })
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 6);
+  const metricCards = [
+    {
+      label: "Workspaces",
+      value: memberships.length,
+      detail: `${adminMemberships.length} admin spaces`,
+      icon: Building2,
+      className: "bg-white"
+    },
+    {
+      label: "Documents",
+      value: filesCount,
+      detail: formatBytes(storageBytes),
+      icon: Files,
+      className: "bg-white"
+    },
+    {
+      label: "Members",
+      value: memberSeats,
+      detail: `${pendingInvitations} pending invites`,
+      icon: UsersRound,
+      className: "bg-white"
+    },
+    {
+      label: "Open work",
+      value: openTaskCount,
+      detail: `${channelCount} chat channels`,
+      icon: Gauge,
+      className: "bg-navy text-white"
+    }
+  ];
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-5 rounded-lg border border-ink/10 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-medium text-moss">
-            <ShieldCheck className="h-4 w-4" />
-            User dashboard
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold text-ink">LETW collaboration center</h1>
-          <p className="mt-2 max-w-3xl text-sm text-ink/60">
-            Manage workspaces, files, team access, chat channels, and integration activity from one place.
-          </p>
+      <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-panel">
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-moss">
+              <ShieldCheck className="h-4 w-4" />
+              Secure collaboration workspace
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">LETW collaboration center</h1>
+            <p className="mt-2 max-w-3xl text-sm text-ink/60">
+              A private SharePoint-style operating home for LETW files, teams, chat, invitations, permissions, and audit trails.
+            </p>
+          </div>
+          <div className="w-full max-w-sm rounded-md border border-ink/10 bg-paper p-3">
+            <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
+          </div>
         </div>
-        <div className="w-full max-w-sm rounded-md border border-ink/10 bg-paper p-3">
-          <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
+        <div className="grid border-t border-ink/10 bg-navy text-white md:grid-cols-3">
+          <div className="border-b border-white/10 px-5 py-4 md:border-b-0 md:border-r">
+            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+              <Sparkles className="h-4 w-4" />
+              Invitation-only
+            </p>
+            <p className="mt-1 text-xs text-white/65">Only invited @letw.org accounts can sign in.</p>
+          </div>
+          <div className="border-b border-white/10 px-5 py-4 md:border-b-0 md:border-r">
+            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+              <Database className="h-4 w-4" />
+              {formatBytes(storageBytes)} managed
+            </p>
+            <p className="mt-1 text-xs text-white/65">Documents are stored with workspace-level access checks.</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="flex items-center gap-2 text-sm font-medium text-gold">
+              <MessageSquareText className="h-4 w-4" />
+              {channelCount} channels
+            </p>
+            <p className="mt-1 text-xs text-white/65">Workspace and organization chat stay permission-aware.</p>
+          </div>
         </div>
       </section>
 
+      <DashboardCommandCenter
+        workspaces={memberships.map((membership) => ({
+          id: membership.workspace.id,
+          name: membership.workspace.name,
+          role: membership.role,
+          description: membership.workspace.description,
+          filesCount: membership.workspace._count.files,
+          membersCount: membership.workspace._count.members
+        }))}
+        recentFiles={recentFiles.map((file) => ({
+          id: file.id,
+          fileName: file.fileName,
+          size: file.size,
+          createdAt: file.createdAt.toISOString(),
+          workspace: file.workspace
+        }))}
+        canCreateWorkspace={canCreateWorkspace}
+      />
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <Building2 className="h-5 w-5 text-moss" />
-          <p className="mt-3 text-2xl font-semibold text-ink">{memberships.length}</p>
-          <p className="text-sm text-ink/55">Workspaces</p>
-        </div>
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <Crown className="h-5 w-5 text-moss" />
-          <p className="mt-3 text-2xl font-semibold text-ink">{adminMemberships.length}</p>
-          <p className="text-sm text-ink/55">Admin spaces</p>
-        </div>
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <Files className="h-5 w-5 text-moss" />
-          <p className="mt-3 text-2xl font-semibold text-ink">{filesCount}</p>
-          <p className="text-sm text-ink/55">Documents</p>
-        </div>
-        <div className="rounded-lg border border-ink/10 bg-white p-4">
-          <UsersRound className="h-5 w-5 text-moss" />
-          <p className="mt-3 text-2xl font-semibold text-ink">{memberSeats}</p>
-          <p className="text-sm text-ink/55">Member seats</p>
-        </div>
+        {metricCards.map((metric) => {
+          const Icon = metric.icon;
+          const isDark = metric.className.includes("navy");
+
+          return (
+            <div key={metric.label} className={`rounded-lg border border-ink/10 p-4 shadow-soft ${metric.className}`}>
+              <Icon className={`h-5 w-5 ${isDark ? "text-gold" : "text-moss"}`} />
+              <p className={`mt-3 text-2xl font-semibold ${isDark ? "text-white" : "text-ink"}`}>{metric.value}</p>
+              <p className={`text-sm ${isDark ? "text-white/65" : "text-ink/55"}`}>{metric.label}</p>
+              <p className={`mt-2 text-xs ${isDark ? "text-white/60" : "text-ink/45"}`}>{metric.detail}</p>
+            </div>
+          );
+        })}
       </section>
+
+      {workspacePulse.length ? (
+        <section className="rounded-lg border border-ink/10 bg-white p-4">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <TrendingUp className="h-4 w-4 text-moss" />
+                Workspace health
+              </p>
+              <p className="mt-1 text-xs text-ink/55">A quick read on content, team size, and role coverage.</p>
+            </div>
+            <Badge className="bg-steel">{workspacePulse.length} tracked</Badge>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {workspacePulse.map((workspace) => (
+              <Link
+                key={workspace.id}
+                href={`/dashboard/workspaces/${workspace.workspaceId}`}
+                className="rounded-md border border-ink/10 bg-paper p-3 transition hover:bg-mint/40"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{workspace.name}</p>
+                    <p className="mt-1 text-xs text-ink/50">
+                      {workspace.filesCount} files - {workspace.membersCount} members - {roleLabel(workspace.role)}
+                    </p>
+                  </div>
+                  <Badge className={workspace.score >= 82 ? "bg-mint" : workspace.score >= 60 ? "bg-wheat" : "bg-clay/10 text-clay"}>
+                    {workspace.status}
+                  </Badge>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                  <div className="h-full rounded-full bg-moss" style={{ width: `${workspace.score}%` }} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-4">
         {roleDashboards.map((dashboard) => (
@@ -438,7 +609,7 @@ export default async function DashboardPage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-ink">{file.fileName}</p>
                       <p className="truncate text-xs text-ink/50">
-                        {file.workspace.name} · {file.uploadedBy.name ?? file.uploadedBy.email}
+                        {file.workspace.name} - {file.uploadedBy.name ?? file.uploadedBy.email}
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-3 text-xs text-ink/50">
@@ -503,7 +674,7 @@ export default async function DashboardPage() {
                       <span>{activity.action.replaceAll("_", " ")}</span>
                     </p>
                     <p className="text-xs text-ink/50">
-                      {activity.workspace?.name} · {formatDate(activity.createdAt)}
+                      {activity.workspace?.name} - {formatDate(activity.createdAt)}
                     </p>
                   </div>
                 ))}

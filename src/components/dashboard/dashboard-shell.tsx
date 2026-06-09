@@ -1,12 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { Files, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { ShieldCheck, UserRound } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
+import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
-import { roleLabel } from "@/lib/roles";
 
 type WorkspaceNavItem = {
   id: string;
@@ -29,9 +28,9 @@ type DashboardShellProps = {
 export function DashboardShell({ user, workspaces, canCreateWorkspace, children }: DashboardShellProps) {
   return (
     <div className="min-h-screen bg-paper">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-ink/10 bg-white px-4 py-5 lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-white/10 bg-navy px-4 py-5 text-white lg:block">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-white">
+          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-white/15 bg-white">
             <Image
               src="/letw-logo.png"
               alt="LETW logo"
@@ -42,43 +41,27 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
             />
           </div>
           <div>
-            <p className="font-semibold text-ink">LETW</p>
-            <p className="text-xs text-ink/55">Collaboration</p>
+            <p className="font-semibold text-white">LETW</p>
+            <p className="text-xs text-white/60">Collaboration</p>
           </div>
         </Link>
 
-        <div className="mt-6">
+        <div className="mt-6 rounded-lg border border-white/10 bg-white/10 p-3">
           <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
         </div>
 
-        <nav className="mt-6 space-y-2">
-          {workspaces.map((workspace) => (
-            <Link
-              key={workspace.id}
-              href={`/dashboard/workspaces/${workspace.id}`}
-              className="block rounded-md border border-transparent px-3 py-3 transition hover:border-ink/10 hover:bg-mint/50"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="line-clamp-2 text-sm font-medium text-ink">{workspace.name}</span>
-                <Badge className="bg-wheat">{roleLabel(workspace.role)}</Badge>
-              </div>
-              <div className="mt-2 flex items-center gap-3 text-xs text-ink/55">
-                <span className="inline-flex items-center gap-1">
-                  <Files className="h-3.5 w-3.5" />
-                  {workspace.filesCount}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <UsersRound className="h-3.5 w-3.5" />
-                  {workspace.membersCount}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </nav>
+        <div className="mt-6">
+          <DashboardWorkspaceSwitcher workspaces={workspaces} />
+        </div>
+
+        <div className="mt-6 rounded-lg border border-white/10 bg-white/10 p-3 text-xs text-white/65">
+          <p className="font-medium text-white">Protected LETW access</p>
+          <p className="mt-1">@letw.org accounts must be invited before they can use the service.</p>
+        </div>
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-20 border-b border-ink/10 bg-paper/95 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 border-b border-ink/10 bg-paper/90 px-4 py-3 backdrop-blur lg:px-8">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-sm font-medium text-moss">
@@ -102,20 +85,9 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
             <summary className="cursor-pointer text-sm font-medium">Workspaces</summary>
             <div className="mt-4 space-y-4">
               <WorkspaceActions canCreateWorkspace={canCreateWorkspace} />
-              <nav className="space-y-2">
-                {workspaces.map((workspace) => (
-                  <Link
-                    key={workspace.id}
-                    href={`/dashboard/workspaces/${workspace.id}`}
-                    className="block rounded-md border border-ink/10 px-3 py-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="line-clamp-2 text-sm font-medium text-ink">{workspace.name}</span>
-                      <Badge className="bg-wheat">{roleLabel(workspace.role)}</Badge>
-                    </div>
-                  </Link>
-                ))}
-              </nav>
+              <div className="rounded-lg bg-navy p-3">
+                <DashboardWorkspaceSwitcher workspaces={workspaces} />
+              </div>
             </div>
           </details>
         </header>
