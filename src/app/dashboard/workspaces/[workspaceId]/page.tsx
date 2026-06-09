@@ -356,6 +356,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       canViewActivity: saved?.canViewActivity ?? defaults.canViewActivity,
       canCreateAnnouncements: saved?.canCreateAnnouncements ?? defaults.canCreateAnnouncements,
       canManageTasks: saved?.canManageTasks ?? defaults.canManageTasks,
+      canScheduleMeetings: saved?.canScheduleMeetings ?? defaults.canScheduleMeetings,
       canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks
     };
   });
@@ -475,7 +476,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           <MeetingsPanel
             workspaceId={workspaceId}
             meetings={meetings.map((meeting) => serializeMeeting(meeting, session.user.id, origin))}
-            canManage={hasAdminAccess}
+            canSchedule={permissions.canScheduleMeetings}
+            canCancel={hasAdminAccess}
           />
 
           <ChatPanel

@@ -32,7 +32,8 @@ type MeetingResponseStatus = "YES" | "MAYBE" | "NO";
 type MeetingsPanelProps = {
   workspaceId: string;
   meetings: Meeting[];
-  canManage: boolean;
+  canSchedule: boolean;
+  canCancel: boolean;
 };
 
 function localDateTime(value: string) {
@@ -103,7 +104,7 @@ async function copyText(value: string) {
   }
 }
 
-export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManage }: MeetingsPanelProps) {
+export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSchedule, canCancel }: MeetingsPanelProps) {
   const [meetings, setMeetings] = useState(initialMeetings);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -228,7 +229,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
         <Badge className="bg-mint">{meetings.filter((meeting) => !meeting.cancelledAt).length} active</Badge>
       </div>
 
-      {canManage ? (
+      {canSchedule ? (
         <form className="mb-4 grid gap-3 rounded-md border border-ink/10 bg-paper p-3 lg:grid-cols-2" onSubmit={scheduleMeeting}>
           <Input className="lg:col-span-2" name="title" placeholder="Meeting title" required />
           <Input name="startsAt" type="datetime-local" required />
@@ -349,7 +350,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canManag
                       </button>
                     </div>
                   ) : null}
-                  {canManage && !isCancelled ? (
+                  {canCancel && !isCancelled ? (
                     <Button
                       className="h-9"
                       variant="secondary"

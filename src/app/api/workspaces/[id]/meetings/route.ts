@@ -2,7 +2,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { createMeetingPasscode, createMeetingRoomName, meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceAdminAccess, requireWorkspaceMembership } from "@/lib/rbac";
+import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createWorkspaceMeetingSchema } from "@/lib/validators";
 
 type RouteContext = {
@@ -38,7 +38,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
     const { id } = await context.params;
-    await requireWorkspaceAdminAccess(user.id, id, "Only admins can schedule workspace video meetings.");
+    await requireWorkspacePermission(user.id, id, "canScheduleMeetings");
 
     const body = await request.json();
     const parsed = createWorkspaceMeetingSchema.safeParse(body);

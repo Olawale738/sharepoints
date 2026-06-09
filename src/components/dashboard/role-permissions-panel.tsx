@@ -18,6 +18,7 @@ type RolePermission = {
   canViewActivity: boolean;
   canCreateAnnouncements: boolean;
   canManageTasks: boolean;
+  canScheduleMeetings: boolean;
   canCreateShareLinks: boolean;
 };
 
@@ -39,6 +40,7 @@ const permissionLabels: Array<{ key: PermissionKey; label: string }> = [
   { key: "canViewActivity", label: "View activity" },
   { key: "canCreateAnnouncements", label: "Create announcements" },
   { key: "canManageTasks", label: "Manage tasks" },
+  { key: "canScheduleMeetings", label: "Schedule video meetings" },
   { key: "canCreateShareLinks", label: "Create share links" }
 ];
 

@@ -257,6 +257,7 @@ model WorkspaceRolePermission {
   canViewActivity        Boolean       @default(false)
   canCreateAnnouncements Boolean       @default(false)
   canManageTasks         Boolean       @default(false)
+  canScheduleMeetings    Boolean       @default(false)
   canCreateShareLinks    Boolean       @default(false)
   workspace              Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt              DateTime      @default(now())

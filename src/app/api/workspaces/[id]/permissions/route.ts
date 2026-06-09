@@ -27,6 +27,7 @@ function serializeRolePermissions(role: WorkspaceRole, saved?: SavedRolePermissi
     canCreateAnnouncements:
       saved?.canCreateAnnouncements ?? defaultPermissionsForRole(role).canCreateAnnouncements,
     canManageTasks: saved?.canManageTasks ?? defaultPermissionsForRole(role).canManageTasks,
+    canScheduleMeetings: saved?.canScheduleMeetings ?? defaultPermissionsForRole(role).canScheduleMeetings,
     canCreateShareLinks: saved?.canCreateShareLinks ?? defaultPermissionsForRole(role).canCreateShareLinks
   };
 }

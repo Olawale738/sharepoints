@@ -14,6 +14,7 @@ export const permissionKeys = [
   "canViewActivity",
   "canCreateAnnouncements",
   "canManageTasks",
+  "canScheduleMeetings",
   "canCreateShareLinks"
 ] as const;
 
@@ -32,6 +33,7 @@ export const allWorkspacePermissions: WorkspacePermissions = {
   canViewActivity: true,
   canCreateAnnouncements: true,
   canManageTasks: true,
+  canScheduleMeetings: true,
   canCreateShareLinks: true
 };
 
@@ -52,6 +54,7 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canViewActivity: true,
       canCreateAnnouncements: true,
       canManageTasks: true,
+      canScheduleMeetings: false,
       canCreateShareLinks: true
     };
   }
@@ -68,6 +71,7 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canViewActivity: true,
       canCreateAnnouncements: true,
       canManageTasks: true,
+      canScheduleMeetings: false,
       canCreateShareLinks: false
     };
   }
@@ -83,6 +87,7 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
     canViewActivity: false,
     canCreateAnnouncements: false,
     canManageTasks: false,
+    canScheduleMeetings: false,
     canCreateShareLinks: false
   };
 }
@@ -149,6 +154,7 @@ export async function getRolePermissions(workspaceId: string, role: WorkspaceRol
     canViewActivity: saved.canViewActivity,
     canCreateAnnouncements: saved.canCreateAnnouncements,
     canManageTasks: saved.canManageTasks,
+    canScheduleMeetings: saved.canScheduleMeetings,
     canCreateShareLinks: saved.canCreateShareLinks
   };
 }
