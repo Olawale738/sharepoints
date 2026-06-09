@@ -14,6 +14,7 @@ type CompanyInvitation = {
   acceptedAt?: string | null;
   revokedAt?: string | null;
   createdAt: string;
+  isAdminProtected?: boolean;
   invitedBy?: {
     name?: string | null;
     email?: string | null;
@@ -168,6 +169,7 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
         {invitations.map((invitation) => {
           const isRevoked = Boolean(invitation.revokedAt);
           const isAccepted = Boolean(invitation.acceptedAt);
+          const revokeDisabled = isRevoked || revokingId === invitation.id || Boolean(invitation.isAdminProtected);
 
           return (
             <div key={invitation.id} className="rounded-md border border-ink/10 bg-paper p-3 text-sm">
@@ -178,6 +180,7 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
                     <Badge className={isRevoked ? "bg-clay/10 text-clay" : isAccepted ? "bg-mint" : "bg-wheat"}>
                       {isRevoked ? "Revoked" : isAccepted ? "Accepted" : "Invited"}
                     </Badge>
+                    {invitation.isAdminProtected ? <Badge className="bg-moss text-white">admin protected</Badge> : null}
                   </div>
                   <p className="mt-1 text-xs text-ink/50">
                     Invited {formatDate(invitation.createdAt)}
@@ -203,7 +206,8 @@ export function CompanyInvitationsPanel({ invitations: initialInvitations }: Com
                   <Button
                     className="h-9"
                     variant="secondary"
-                    disabled={isRevoked || revokingId === invitation.id}
+                    disabled={revokeDisabled}
+                    title={invitation.isAdminProtected ? "Admin invitations cannot be revoked." : undefined}
                     onClick={() => revokeInvitation(invitation.id)}
                   >
                     {revokingId === invitation.id ? (

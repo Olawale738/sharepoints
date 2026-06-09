@@ -270,6 +270,13 @@ export default async function DashboardPage() {
         take: 250
       })
     : [];
+  const protectedAdminInvitationEmails = new Set([
+    (process.env.SEED_ADMIN_EMAIL ?? "president@letw.org").toLowerCase(),
+    ...adminUsers
+      .filter((adminUser) => adminUser.workspaceMemberships.some((membership) => membership.role === "ADMIN"))
+      .map((adminUser) => adminUser.email?.toLowerCase())
+      .filter((email): email is string => Boolean(email))
+  ]);
 
   return (
     <div className="space-y-6">
@@ -454,6 +461,7 @@ export default async function DashboardPage() {
                 acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
                 revokedAt: invitation.revokedAt?.toISOString() ?? null,
                 createdAt: invitation.createdAt.toISOString(),
+                isAdminProtected: protectedAdminInvitationEmails.has(invitation.email.toLowerCase()),
                 invitedBy: invitation.invitedBy,
                 acceptedBy: invitation.acceptedBy
               }))}

@@ -17,12 +17,37 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id
       },
       select: {
-        id: true
+        id: true,
+        email: true
       }
     });
 
     if (!existing) {
       throw new ApiError(404, "Access invitation not found.");
+    }
+
+    const protectedAdminEmail = (process.env.SEED_ADMIN_EMAIL ?? "president@letw.org").toLowerCase();
+    const invitationEmail = existing.email.toLowerCase();
+
+    if (invitationEmail === protectedAdminEmail) {
+      throw new ApiError(409, "The primary admin invitation cannot be revoked.");
+    }
+
+    const invitedUser = await prisma.user.findUnique({
+      where: {
+        email: invitationEmail
+      },
+      select: {
+        workspaceMemberships: {
+          select: {
+            role: true
+          }
+        }
+      }
+    });
+
+    if (invitedUser?.workspaceMemberships.some((membership) => membership.role === "ADMIN")) {
+      throw new ApiError(409, "Admin invitations cannot be revoked. Remove admin roles first.");
     }
 
     const invitation = await prisma.companyEmailInvitation.update({
