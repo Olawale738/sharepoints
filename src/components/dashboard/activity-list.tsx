@@ -37,6 +37,8 @@ const labels: Record<string, string> = {
   "task.created": "created a task",
   "task.updated": "updated a task",
   "task.deleted": "deleted a task",
+  "meeting.scheduled": "scheduled a video meeting",
+  "meeting.cancelled": "cancelled a video meeting",
   "file.share_link_created": "created a file share link",
   "company_invitation.resent": "resent an access invitation",
   "company_invitation.cleared": "cleared a revoked invitation log"

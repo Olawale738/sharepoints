@@ -69,6 +69,7 @@ model User {
   authoredAnnouncements      WorkspaceAnnouncement[]  @relation("AuthoredAnnouncements")
   assignedTasks              WorkspaceTask[]          @relation("AssignedTasks")
   createdTasks               WorkspaceTask[]          @relation("CreatedTasks")
+  createdMeetings            WorkspaceMeeting[]       @relation("CreatedMeetings")
   createdShareLinks          FileShareLink[]          @relation("CreatedShareLinks")
   activityLogs               ActivityLog[]
 
@@ -172,6 +173,7 @@ model Workspace {
   rolePermissions     WorkspaceRolePermission[]
   announcements       WorkspaceAnnouncement[]
   tasks               WorkspaceTask[]
+  meetings            WorkspaceMeeting[]
   folders             Folder[]
   files               File[]
   chatChannels        ChatChannel[]
@@ -182,6 +184,27 @@ model Workspace {
   updatedAt           DateTime                  @updatedAt
 
   @@index([createdById])
+}
+
+model WorkspaceMeeting {
+  id          String    @id @default(cuid())
+  workspaceId String
+  createdById String
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  roomName    String    @unique
+  passcode    String
+  cancelledAt DateTime?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, startsAt])
+  @@index([createdById, startsAt])
+  @@index([cancelledAt])
 }
 
 model WorkspaceMember {

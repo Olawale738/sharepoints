@@ -50,6 +50,8 @@ export const activityActions = {
   taskCreated: "task.created",
   taskUpdated: "task.updated",
   taskDeleted: "task.deleted",
+  meetingScheduled: "meeting.scheduled",
+  meetingCancelled: "meeting.cancelled",
   fileShareLinkCreated: "file.share_link_created",
   companyInvitationResent: "company_invitation.resent",
   companyInvitationCleared: "company_invitation.cleared",

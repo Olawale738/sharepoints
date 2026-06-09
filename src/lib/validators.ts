@@ -133,6 +133,18 @@ export const updateTaskSchema = createTaskSchema.partial().extend({
   status: z.enum(["TODO", "IN_PROGRESS", "BLOCKED", "DONE"]).optional()
 });
 
+export const createWorkspaceMeetingSchema = z
+  .object({
+    title: z.string().trim().min(2).max(120),
+    description: z.string().trim().max(1000).optional().or(z.literal("")),
+    startsAt: z.string().datetime(),
+    endsAt: z.string().datetime()
+  })
+  .refine((value) => new Date(value.endsAt).getTime() > new Date(value.startsAt).getTime(), {
+    message: "Meeting end time must be after the start time.",
+    path: ["endsAt"]
+  });
+
 export const createFileShareLinkSchema = z.object({
   expiresInDays: z.number().int().min(1).max(365).optional().nullable()
 });

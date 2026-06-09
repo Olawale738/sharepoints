@@ -14,12 +14,14 @@ import { FileTable } from "@/components/dashboard/file-table";
 import { FileUpload } from "@/components/dashboard/file-upload";
 import { FolderCreateForm } from "@/components/dashboard/folder-create-form";
 import { IntegrationsPanel } from "@/components/dashboard/integrations-panel";
+import { MeetingsPanel } from "@/components/dashboard/meetings-panel";
 import { MembersPanel } from "@/components/dashboard/members-panel";
 import { RolePermissionsPanel } from "@/components/dashboard/role-permissions-panel";
 import { TasksPanel } from "@/components/dashboard/tasks-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
+import { meetingInviteUrl } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { defaultPermissionsForRole, getRolePermissions, hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 import { roleLabel } from "@/lib/roles";
@@ -120,7 +122,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
     ? defaultPermissionsForRole(WorkspaceRole.ADMIN)
     : await getRolePermissions(workspaceId, membership.role);
 
-  const [folders, files, members, activities, announcements, tasks] = await Promise.all([
+  const [folders, files, members, activities, announcements, tasks, meetings] = await Promise.all([
     prisma.folder.findMany({
       where: {
         workspaceId,
@@ -209,6 +211,19 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
       take: 50
+    }),
+    prisma.workspaceMeeting.findMany({
+      where: { workspaceId },
+      include: {
+        createdBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
+      take: 100
     })
   ]);
 
@@ -449,6 +464,23 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               user: member.user
             }))}
             canManage={permissions.canManageTasks}
+          />
+
+          <MeetingsPanel
+            workspaceId={workspaceId}
+            meetings={meetings.map((meeting) => ({
+              id: meeting.id,
+              workspaceId: meeting.workspaceId,
+              title: meeting.title,
+              description: meeting.description,
+              startsAt: meeting.startsAt.toISOString(),
+              endsAt: meeting.endsAt.toISOString(),
+              passcode: meeting.passcode,
+              cancelledAt: meeting.cancelledAt?.toISOString() ?? null,
+              inviteUrl: meetingInviteUrl(meeting.id, origin),
+              createdBy: meeting.createdBy
+            }))}
+            canManage={hasAdminAccess}
           />
 
           <ChatPanel
