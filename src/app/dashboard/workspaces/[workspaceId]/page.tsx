@@ -559,6 +559,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
 
           {permissions.canViewActivity ? (
             <ActivityList
+              workspaceId={workspaceId}
+              canClear={hasAdminAccess}
               items={activities.map((activity) => ({
                 id: activity.id,
                 action: activity.action,

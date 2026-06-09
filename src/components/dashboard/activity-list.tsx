@@ -1,5 +1,9 @@
-import { Clock3 } from "lucide-react";
+"use client";
 
+import { useState } from "react";
+import { Clock3, Loader2, Trash2 } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 
 type ActivityItem = {
@@ -46,13 +50,58 @@ const labels: Record<string, string> = {
   "company_invitation.cleared": "cleared a revoked invitation log"
 };
 
-export function ActivityList({ items }: { items: ActivityItem[] }) {
+type ActivityListProps = {
+  items: ActivityItem[];
+  workspaceId: string;
+  canClear: boolean;
+};
+
+export function ActivityList({ items: initialItems, workspaceId, canClear }: ActivityListProps) {
+  const [items, setItems] = useState(initialItems);
+  const [isClearing, setIsClearing] = useState(false);
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+
+  async function clearActivity() {
+    if (!window.confirm("Clear all activity logs for this workspace?")) {
+      return;
+    }
+
+    setError("");
+    setStatus("");
+    setIsClearing(true);
+    const response = await fetch(`/api/workspaces/${workspaceId}/activity`, {
+      method: "DELETE"
+    });
+    setIsClearing(false);
+
+    const data = (await response.json().catch(() => null)) as { cleared?: boolean; count?: number; error?: string } | null;
+
+    if (!response.ok || !data?.cleared) {
+      setError(data?.error ?? "Activity logs could not be cleared.");
+      return;
+    }
+
+    setItems([]);
+    setStatus(`${data.count ?? 0} activity log${data.count === 1 ? "" : "s"} cleared.`);
+  }
+
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4">
-      <div className="mb-4 flex items-center gap-2">
-        <Clock3 className="h-4 w-4 text-moss" />
-        <h2 className="text-sm font-semibold">Activity</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Clock3 className="h-4 w-4 text-moss" />
+          <h2 className="text-sm font-semibold">Activity</h2>
+        </div>
+        {canClear && items.length ? (
+          <Button className="h-8 px-2 text-xs" variant="secondary" disabled={isClearing} onClick={clearActivity}>
+            {isClearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Clear logs
+          </Button>
+        ) : null}
       </div>
+      {error ? <p className="mb-3 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
+      {status ? <p className="mb-3 rounded-md bg-mint/70 px-3 py-2 text-sm text-ink">{status}</p> : null}
       <div className="space-y-3">
         {items.length === 0 ? <p className="text-sm text-ink/55">No activity yet.</p> : null}
         {items.map((item) => (
