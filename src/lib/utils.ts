@@ -20,10 +20,11 @@ export function formatBytes(bytes: number) {
 export function formatDate(value: string | Date) {
   const date = typeof value === "string" ? new Date(value) : value;
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
+    timeZone: "UTC"
   }).format(date);
 }
 
@@ -43,4 +44,3 @@ export function sanitizeFileName(value: string) {
     .trim()
     .slice(0, 160);
 }
-

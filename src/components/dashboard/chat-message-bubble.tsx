@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Edit3, Loader2, Paperclip, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -51,11 +51,20 @@ export function ChatMessageBubble({
   const [draft, setDraft] = useState(message.body);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(Date.now());
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   const isMine = Boolean(message.author?.id && message.author.id === currentUserId);
   const isDeleted = Boolean(message.deletedAt);
   const canEdit = isMine && !isDeleted;
-  const canDelete = canEdit && Date.now() - new Date(message.createdAt).getTime() <= messageDeleteWindowMs;
+  const canDelete =
+    canEdit && currentTime !== null && currentTime - new Date(message.createdAt).getTime() <= messageDeleteWindowMs;
   const bubbleTone = isDeleted ? "bg-white/75 text-ink/55" : isMine ? "bg-mint text-ink" : "bg-white text-ink";
 
   async function saveEdit() {
