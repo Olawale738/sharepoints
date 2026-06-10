@@ -37,6 +37,11 @@ type Meeting = {
   notes?: string | null;
   actionItems?: string | null;
   recordingUrl?: string | null;
+  autoRecord?: boolean;
+  recordingMode?: string;
+  recordingStatus?: string | null;
+  recordingError?: string | null;
+  recordingStartedAt?: string | null;
   approvalStatus?: ApprovalStatus;
   rejectedReason?: string | null;
   startsAt: string;
@@ -158,7 +163,9 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
   const [status, setStatus] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [busyMeetingId, setBusyMeetingId] = useState("");
-  const [detailsByMeeting, setDetailsByMeeting] = useState<Record<string, Pick<Meeting, "agenda" | "notes" | "actionItems" | "recordingUrl">>>({});
+  const [detailsByMeeting, setDetailsByMeeting] = useState<
+    Record<string, Pick<Meeting, "agenda" | "notes" | "actionItems" | "recordingUrl" | "autoRecord" | "recordingMode">>
+  >({});
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -201,6 +208,8 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
         description: String(formData.get("description") ?? ""),
         agenda: String(formData.get("agenda") ?? ""),
         recordingUrl: String(formData.get("recordingUrl") ?? ""),
+        autoRecord: Boolean(formData.get("autoRecord")),
+        recordingMode: String(formData.get("recordingMode") ?? "file"),
         startsAt: new Date(startsAt).toISOString(),
         endsAt: new Date(endsAt).toISOString()
       })
@@ -310,7 +319,9 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
         agenda: details.agenda ?? meeting.agenda ?? "",
         notes: details.notes ?? meeting.notes ?? "",
         actionItems: details.actionItems ?? meeting.actionItems ?? "",
-        recordingUrl: details.recordingUrl ?? meeting.recordingUrl ?? ""
+        recordingUrl: details.recordingUrl ?? meeting.recordingUrl ?? "",
+        autoRecord: details.autoRecord ?? meeting.autoRecord ?? false,
+        recordingMode: details.recordingMode ?? meeting.recordingMode ?? "file"
       })
     });
     setBusyMeetingId("");
@@ -342,6 +353,24 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
           <Input name="startsAt" type="datetime-local" required />
           <Input name="endsAt" type="datetime-local" required />
           <Input className="lg:col-span-2" name="recordingUrl" placeholder="Recording link after the meeting" />
+          <div className="lg:col-span-2 grid gap-3 rounded-md border border-ink/10 bg-white p-3 md:grid-cols-[minmax(0,1fr)_12rem]">
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input className="h-4 w-4 accent-moss" name="autoRecord" type="checkbox" />
+              Ask Jitsi to start recording automatically when a moderator joins
+            </label>
+            <select
+              className="h-10 rounded-md border border-ink/10 bg-paper px-3 text-sm outline-none focus:border-moss focus:ring-2 focus:ring-moss/20"
+              name="recordingMode"
+              defaultValue="file"
+            >
+              <option value="file">Server file recording</option>
+              <option value="local">Local browser recording</option>
+              <option value="stream">Live stream recording</option>
+            </select>
+            <p className="md:col-span-2 text-xs text-ink/50">
+              Server file recording requires Jitsi recording support, such as Jibri or Jitsi-as-a-Service recording.
+            </p>
+          </div>
           <Textarea className="lg:col-span-2" name="agenda" placeholder="Agenda" rows={2} />
           <Textarea className="lg:col-span-2" name="description" placeholder="Meeting description" rows={2} />
           <div className="lg:col-span-2">
@@ -403,6 +432,12 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                       <Link2 className="h-4 w-4" />
                       Recording link
                     </a>
+                  ) : null}
+                  {meeting.autoRecord ? (
+                    <p className="mt-3 rounded-md bg-white px-3 py-2 text-xs text-ink/60">
+                      Auto recording: {meeting.recordingStatus ?? "waiting for moderator"} using {meeting.recordingMode ?? "file"} mode.
+                      {meeting.recordingError ? <span className="block text-clay">Error: {meeting.recordingError}</span> : null}
+                    </p>
                   ) : null}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
                     <Badge className="bg-mint">Going {meeting.responseCounts.YES}</Badge>
@@ -563,6 +598,36 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                       }))
                     }
                   />
+                  <div className="rounded-md border border-ink/10 bg-white p-3">
+                    <label className="flex items-center gap-2 text-sm text-ink/70">
+                      <input
+                        className="h-4 w-4 accent-moss"
+                        type="checkbox"
+                        checked={draftDetails.autoRecord ?? meeting.autoRecord ?? false}
+                        onChange={(event) =>
+                          setDetailsByMeeting((current) => ({
+                            ...current,
+                            [meeting.id]: { ...current[meeting.id], autoRecord: event.target.checked }
+                          }))
+                        }
+                      />
+                      Auto-start Jitsi recording
+                    </label>
+                    <select
+                      className="mt-2 h-10 w-full rounded-md border border-ink/10 bg-paper px-3 text-sm outline-none focus:border-moss focus:ring-2 focus:ring-moss/20"
+                      value={draftDetails.recordingMode ?? meeting.recordingMode ?? "file"}
+                      onChange={(event) =>
+                        setDetailsByMeeting((current) => ({
+                          ...current,
+                          [meeting.id]: { ...current[meeting.id], recordingMode: event.target.value }
+                        }))
+                      }
+                    >
+                      <option value="file">Server file recording</option>
+                      <option value="local">Local browser recording</option>
+                      <option value="stream">Live stream recording</option>
+                    </select>
+                  </div>
                   <Textarea
                     className="bg-white"
                     placeholder="Meeting notes"

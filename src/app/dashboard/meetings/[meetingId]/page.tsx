@@ -87,6 +87,12 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
               <CalendarClock className="h-4 w-4 text-moss" />
               {formatDateTime(meeting.startsAt)} - {formatDateTime(meeting.endsAt)}
             </p>
+            {meeting.autoRecord ? (
+              <p className="mt-3 rounded-md bg-mint/70 px-3 py-2 text-sm text-ink/70">
+                Automatic Jitsi recording is enabled for this meeting. Status: {meeting.recordingStatus ?? "waiting for moderator"}.
+                {meeting.recordingError ? <span className="block text-clay">Error: {meeting.recordingError}</span> : null}
+              </p>
+            ) : null}
           </div>
           <div className="rounded-md border border-ink/10 bg-paper px-3 py-2 text-sm text-ink/70">
             <p className="mb-1 flex items-center gap-2 font-medium text-ink">
@@ -147,7 +153,14 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
           This meeting is not approved yet. It will open after an admin or approved leader accepts it.
         </div>
       ) : hasValidPasscode ? (
-        <VideoMeetingRoom displayName={displayName} roomName={meeting.roomName} title={meeting.title} />
+        <VideoMeetingRoom
+          autoRecord={meeting.autoRecord}
+          displayName={displayName}
+          meetingId={meeting.id}
+          recordingMode={meeting.recordingMode}
+          roomName={meeting.roomName}
+          title={meeting.title}
+        />
       ) : (
         <MeetingPasscodeForm
           title={meeting.title}

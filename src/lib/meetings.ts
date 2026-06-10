@@ -39,6 +39,11 @@ type SerializableMeeting = {
   notes?: string | null;
   actionItems?: string | null;
   recordingUrl?: string | null;
+  autoRecord?: boolean;
+  recordingMode?: string;
+  recordingStatus?: string | null;
+  recordingError?: string | null;
+  recordingStartedAt?: Date | null;
   approvalStatus?: ApprovalStatus;
   rejectedReason?: string | null;
   startsAt: Date;
@@ -90,6 +95,11 @@ export function serializeMeeting(meeting: SerializableMeeting, userId: string, o
     notes: meeting.notes ?? null,
     actionItems: meeting.actionItems ?? null,
     recordingUrl: meeting.recordingUrl ?? null,
+    autoRecord: Boolean(meeting.autoRecord),
+    recordingMode: meeting.recordingMode ?? "file",
+    recordingStatus: meeting.recordingStatus ?? null,
+    recordingError: meeting.recordingError ?? null,
+    recordingStartedAt: meeting.recordingStartedAt?.toISOString() ?? null,
     approvalStatus: meeting.approvalStatus ?? "APPROVED",
     rejectedReason: meeting.rejectedReason ?? null,
     startsAt: meeting.startsAt.toISOString(),

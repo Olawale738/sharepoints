@@ -143,6 +143,8 @@ export const createWorkspaceMeetingSchema = z
     description: z.string().trim().max(1000).optional().or(z.literal("")),
     agenda: z.string().trim().max(2000).optional().or(z.literal("")),
     recordingUrl: z.string().url().max(2048).optional().or(z.literal("")),
+    autoRecord: z.boolean().optional(),
+    recordingMode: z.enum(["file", "local", "stream"]).optional(),
     startsAt: z.string().datetime(),
     endsAt: z.string().datetime()
   })
@@ -159,7 +161,11 @@ export const updateMeetingDetailsSchema = z.object({
   agenda: z.string().trim().max(2000).optional().or(z.literal("")),
   notes: z.string().trim().max(4000).optional().or(z.literal("")),
   actionItems: z.string().trim().max(4000).optional().or(z.literal("")),
-  recordingUrl: z.string().url().max(2048).optional().or(z.literal(""))
+  recordingUrl: z.string().url().max(2048).optional().or(z.literal("")),
+  autoRecord: z.boolean().optional(),
+  recordingMode: z.enum(["file", "local", "stream"]).optional(),
+  recordingStatus: z.string().trim().max(80).optional().or(z.literal("")),
+  recordingError: z.string().trim().max(500).optional().or(z.literal(""))
 });
 
 export const approvalDecisionSchema = z.object({

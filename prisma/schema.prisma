@@ -276,29 +276,34 @@ model WorkspaceDepartmentAccess {
 }
 
 model WorkspaceMeeting {
-  id             String                     @id @default(cuid())
-  workspaceId    String
-  createdById    String
-  title          String
-  description    String?
-  agenda         String?
-  notes          String?
-  actionItems    String?
-  recordingUrl   String?
-  startsAt       DateTime
-  endsAt         DateTime
-  roomName       String                     @unique
-  passcode       String
-  cancelledAt    DateTime?
-  approvalStatus ApprovalStatus             @default(APPROVED)
-  approvedById   String?
-  approvedAt     DateTime?
-  rejectedReason String?
-  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy      User                       @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
-  responses      WorkspaceMeetingResponse[]
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
+  id                 String                     @id @default(cuid())
+  workspaceId        String
+  createdById        String
+  title              String
+  description        String?
+  agenda             String?
+  notes              String?
+  actionItems        String?
+  recordingUrl       String?
+  autoRecord         Boolean                    @default(false)
+  recordingMode      String                     @default("file")
+  recordingStatus    String?
+  recordingError     String?
+  recordingStartedAt DateTime?
+  startsAt           DateTime
+  endsAt             DateTime
+  roomName           String                     @unique
+  passcode           String
+  cancelledAt        DateTime?
+  approvalStatus     ApprovalStatus             @default(APPROVED)
+  approvedById       String?
+  approvedAt         DateTime?
+  rejectedReason     String?
+  workspace          Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy          User                       @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
+  responses          WorkspaceMeetingResponse[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
   @@index([workspaceId, startsAt])
   @@index([workspaceId, approvalStatus])

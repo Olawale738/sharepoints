@@ -117,7 +117,17 @@ export async function PATCH(request: Request, context: RouteContext) {
         agenda: parsed.data.agenda === undefined ? undefined : parsed.data.agenda || null,
         notes: parsed.data.notes === undefined ? undefined : parsed.data.notes || null,
         actionItems: parsed.data.actionItems === undefined ? undefined : parsed.data.actionItems || null,
-        recordingUrl: parsed.data.recordingUrl === undefined ? undefined : parsed.data.recordingUrl || null
+        recordingUrl: parsed.data.recordingUrl === undefined ? undefined : parsed.data.recordingUrl || null,
+        autoRecord: parsed.data.autoRecord,
+        recordingMode: parsed.data.recordingMode,
+        recordingStatus: parsed.data.recordingStatus === undefined ? undefined : parsed.data.recordingStatus || null,
+        recordingError: parsed.data.recordingError === undefined ? undefined : parsed.data.recordingError || null,
+        recordingStartedAt:
+          parsed.data.recordingStatus === "recording"
+            ? new Date()
+            : parsed.data.recordingStatus === undefined
+              ? undefined
+              : null
       },
       include: meetingInclude
     });

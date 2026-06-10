@@ -88,6 +88,8 @@ export async function POST(request: Request, context: RouteContext) {
         description: parsed.data.description || null,
         agenda: parsed.data.agenda || null,
         recordingUrl: parsed.data.recordingUrl || null,
+        autoRecord: parsed.data.autoRecord ?? false,
+        recordingMode: parsed.data.recordingMode ?? "file",
         startsAt,
         endsAt,
         roomName: createMeetingRoomName(workspace.name),
