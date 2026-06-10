@@ -41,45 +41,93 @@ enum MeetingResponseStatus {
   NO
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum DepartmentKind {
+  DEPARTMENT
+  MINISTRY_UNIT
+  CATEGORY
+}
+
+enum SecurityEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  PASSWORD_RESET
+  SESSION_REVOKED
+  FORCE_PASSWORD_RESET
+  USER_SUSPENDED
+  USER_RESTORED
+  ACCESS_REVOKED
+  USER_DELETED
+}
+
 model User {
-  id                         String                   @id @default(cuid())
+  id                         String                     @id @default(cuid())
   name                       String?
-  email                      String?                  @unique
+  email                      String?                    @unique
   emailVerified              DateTime?
   image                      String?
   passwordHash               String?
+  departmentId               String?
+  category                   String?
+  forcePasswordReset         Boolean                    @default(false)
+  singleActiveSession        Boolean                    @default(false)
+  sessionVersion             Int                        @default(0)
   suspendedAt                DateTime?
   accessRevokedAt            DateTime?
   deletedAt                  DateTime?
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
   accounts                   Account[]
   sessions                   Session[]
   authenticators             Authenticator[]
+  department                 Department?                @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentsCreated         Department[]               @relation("DepartmentsCreated")
   passwordResetTokens        PasswordResetToken[]
-  companyInvitationsSent     CompanyEmailInvitation[] @relation("CompanyInvitationsSent")
-  companyInvitationsAccepted CompanyEmailInvitation[] @relation("CompanyInvitationsAccepted")
-  createdWorkspaces          Workspace[]              @relation("WorkspaceCreator")
+  approvalRequests           ApprovalRequest[]          @relation("ApprovalRequester")
+  approvalReviews            ApprovalRequest[]          @relation("ApprovalReviewer")
+  companyInvitationsSent     CompanyEmailInvitation[]   @relation("CompanyInvitationsSent")
+  companyInvitationsAccepted CompanyEmailInvitation[]   @relation("CompanyInvitationsAccepted")
+  createdWorkspaces          Workspace[]                @relation("WorkspaceCreator")
   workspaceMemberships       WorkspaceMember[]
-  uploadedFiles              File[]                   @relation("UploadedFiles")
-  createdFolders             Folder[]                 @relation("CreatedFolders")
-  createdChannels            ChatChannel[]            @relation("CreatedChannels")
-  chatMessages               ChatMessage[]            @relation("AuthoredMessages")
-  createdOrgChatRooms        OrgChatRoom[]            @relation("CreatedOrgChatRooms")
-  orgChatMessages            OrgChatMessage[]         @relation("AuthoredOrgChatMessages")
-  createdDirectConversations DirectConversation[]     @relation("CreatedDirectConversations")
-  directConversationsAsA     DirectConversation[]     @relation("DirectParticipantA")
-  directConversationsAsB     DirectConversation[]     @relation("DirectParticipantB")
-  directMessages             DirectMessage[]          @relation("AuthoredDirectMessages")
-  createdIntegrations        Integration[]            @relation("CreatedIntegrations")
-  authoredAnnouncements      WorkspaceAnnouncement[]  @relation("AuthoredAnnouncements")
-  assignedTasks              WorkspaceTask[]          @relation("AssignedTasks")
-  createdTasks               WorkspaceTask[]          @relation("CreatedTasks")
-  createdMeetings            WorkspaceMeeting[]       @relation("CreatedMeetings")
+  uploadedFiles              File[]                     @relation("UploadedFiles")
+  createdFolders             Folder[]                   @relation("CreatedFolders")
+  createdChannels            ChatChannel[]              @relation("CreatedChannels")
+  chatMessages               ChatMessage[]              @relation("AuthoredMessages")
+  createdOrgChatRooms        OrgChatRoom[]              @relation("CreatedOrgChatRooms")
+  orgChatMessages            OrgChatMessage[]           @relation("AuthoredOrgChatMessages")
+  createdDirectConversations DirectConversation[]       @relation("CreatedDirectConversations")
+  directConversationsAsA     DirectConversation[]       @relation("DirectParticipantA")
+  directConversationsAsB     DirectConversation[]       @relation("DirectParticipantB")
+  directMessages             DirectMessage[]            @relation("AuthoredDirectMessages")
+  createdIntegrations        Integration[]              @relation("CreatedIntegrations")
+  authoredAnnouncements      WorkspaceAnnouncement[]    @relation("AuthoredAnnouncements")
+  assignedTasks              WorkspaceTask[]            @relation("AssignedTasks")
+  taskAssignments            WorkspaceTaskAssignee[]
+  taskComments               WorkspaceTaskComment[]
+  createdTasks               WorkspaceTask[]            @relation("CreatedTasks")
+  createdMeetings            WorkspaceMeeting[]         @relation("CreatedMeetings")
   meetingResponses           WorkspaceMeetingResponse[]
-  createdShareLinks          FileShareLink[]          @relation("CreatedShareLinks")
+  createdShareLinks          FileShareLink[]            @relation("CreatedShareLinks")
+  securityEvents             SecurityEvent[]
   activityLogs               ActivityLog[]
 
+  @@index([departmentId])
+  @@index([category])
+  @@index([forcePasswordReset])
+  @@index([singleActiveSession])
+  @@index([sessionVersion])
   @@index([suspendedAt])
   @@index([accessRevokedAt])
   @@index([deletedAt])
@@ -113,6 +161,23 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Department {
+  id              String                      @id @default(cuid())
+  name            String
+  kind            DepartmentKind              @default(DEPARTMENT)
+  description     String?
+  createdById     String?
+  createdBy       User?                       @relation("DepartmentsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  members         User[]                      @relation("DepartmentMembers")
+  workspaceAccess WorkspaceDepartmentAccess[]
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@unique([name, kind])
+  @@index([kind])
+  @@index([createdById])
 }
 
 model VerificationToken {
@@ -169,15 +234,16 @@ model CompanyEmailInvitation {
 }
 
 model Workspace {
-  id                  String                    @id @default(cuid())
+  id                  String                      @id @default(cuid())
   name                String
-  slug                String                    @unique
+  slug                String                      @unique
   description         String?
-  joinCode            String                    @unique @default(cuid())
+  joinCode            String                      @unique @default(cuid())
   createdById         String
-  createdBy           User                      @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy           User                        @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members             WorkspaceMember[]
   rolePermissions     WorkspaceRolePermission[]
+  departmentAccesses  WorkspaceDepartmentAccess[]
   announcements       WorkspaceAnnouncement[]
   tasks               WorkspaceTask[]
   meetings            WorkspaceMeeting[]
@@ -187,30 +253,55 @@ model Workspace {
   directConversations DirectConversation[]
   integrations        Integration[]
   activityLogs        ActivityLog[]
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
+  approvalRequests    ApprovalRequest[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
   @@index([createdById])
 }
 
+model WorkspaceDepartmentAccess {
+  id                 String     @id @default(cuid())
+  workspaceId        String
+  departmentId       String
+  canAccessWorkspace Boolean    @default(true)
+  canAccessChat      Boolean    @default(true)
+  workspace          Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department         Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@unique([workspaceId, departmentId])
+  @@index([departmentId])
+}
+
 model WorkspaceMeeting {
-  id          String    @id @default(cuid())
-  workspaceId String
-  createdById String
-  title       String
-  description String?
-  startsAt    DateTime
-  endsAt      DateTime
-  roomName    String    @unique
-  passcode    String
-  cancelledAt DateTime?
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy   User      @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
-  responses   WorkspaceMeetingResponse[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String                     @id @default(cuid())
+  workspaceId    String
+  createdById    String
+  title          String
+  description    String?
+  agenda         String?
+  notes          String?
+  actionItems    String?
+  recordingUrl   String?
+  startsAt       DateTime
+  endsAt         DateTime
+  roomName       String                     @unique
+  passcode       String
+  cancelledAt    DateTime?
+  approvalStatus ApprovalStatus             @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy      User                       @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
+  responses      WorkspaceMeetingResponse[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
 
   @@index([workspaceId, startsAt])
+  @@index([workspaceId, approvalStatus])
   @@index([createdById, startsAt])
   @@index([cancelledAt])
 }
@@ -268,39 +359,80 @@ model WorkspaceRolePermission {
 }
 
 model WorkspaceAnnouncement {
-  id          String    @id @default(cuid())
-  workspaceId String
-  authorId    String
-  title       String
-  body        String    @db.Text
-  pinned      Boolean   @default(false)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  author      User      @relation("AuthoredAnnouncements", fields: [authorId], references: [id], onDelete: Restrict)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String         @id @default(cuid())
+  workspaceId    String
+  authorId       String
+  title          String
+  body           String         @db.Text
+  pinned         Boolean        @default(false)
+  approvalStatus ApprovalStatus @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author         User           @relation("AuthoredAnnouncements", fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@index([workspaceId, pinned, createdAt])
+  @@index([workspaceId, approvalStatus])
   @@index([authorId, createdAt])
 }
 
 model WorkspaceTask {
-  id           String     @id @default(cuid())
-  workspaceId  String
-  title        String
-  description  String?
-  status       TaskStatus @default(TODO)
-  dueDate      DateTime?
-  assignedToId String?
-  createdById  String
-  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  assignedTo   User?      @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdBy    User       @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Restrict)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id             String                  @id @default(cuid())
+  workspaceId    String
+  title          String
+  description    String?
+  status         TaskStatus              @default(TODO)
+  priority       TaskPriority            @default(NORMAL)
+  dueDate        DateTime?
+  reminderAt     DateTime?
+  assignedToId   String?
+  createdById    String
+  approvalStatus ApprovalStatus          @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  workspace      Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignedTo     User?                   @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignees      WorkspaceTaskAssignee[]
+  comments       WorkspaceTaskComment[]
+  createdBy      User                    @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([workspaceId, status, dueDate])
+  @@index([workspaceId, approvalStatus])
+  @@index([workspaceId, priority])
+  @@index([reminderAt])
   @@index([assignedToId, status])
   @@index([createdById, createdAt])
+}
+
+model WorkspaceTaskAssignee {
+  id        String        @id @default(cuid())
+  taskId    String
+  userId    String
+  task      WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
+
+model WorkspaceTaskComment {
+  id        String        @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String        @db.Text
+  task      WorkspaceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model Folder {
@@ -321,24 +453,29 @@ model Folder {
 }
 
 model File {
-  id           String          @id @default(cuid())
-  workspaceId  String
-  folderId     String?
-  uploadedById String
-  fileUrl      String
-  storageKey   String          @unique
-  fileName     String
-  fileType     String
-  size         Int
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  folder       Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy   User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
-  chatMessages ChatMessage[]   @relation("MessageAttachment")
-  shareLinks   FileShareLink[]
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  workspaceId    String
+  folderId       String?
+  uploadedById   String
+  fileUrl        String
+  storageKey     String          @unique
+  fileName       String
+  fileType       String
+  size           Int
+  approvalStatus ApprovalStatus  @default(APPROVED)
+  approvedById   String?
+  approvedAt     DateTime?
+  rejectedReason String?
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folder         Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy     User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
+  chatMessages   ChatMessage[]   @relation("MessageAttachment")
+  shareLinks     FileShareLink[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([workspaceId, folderId])
+  @@index([workspaceId, approvalStatus])
   @@index([uploadedById])
 }
 
@@ -495,4 +632,43 @@ model ActivityLog {
 
   @@index([workspaceId, createdAt])
   @@index([userId, createdAt])
+}
+
+model ApprovalRequest {
+  id          String         @id @default(cuid())
+  workspaceId String
+  requesterId String
+  reviewerId  String?
+  targetType  String
+  targetId    String
+  title       String
+  status      ApprovalStatus @default(PENDING)
+  reason      String?
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requester   User           @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  reviewer    User?          @relation("ApprovalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  reviewedAt  DateTime?
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([targetType, targetId])
+  @@index([workspaceId, status, createdAt])
+  @@index([requesterId, createdAt])
+  @@index([reviewerId, reviewedAt])
+}
+
+model SecurityEvent {
+  id        String            @id @default(cuid())
+  userId    String?
+  type      SecurityEventType
+  email     String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@index([type, createdAt])
 }

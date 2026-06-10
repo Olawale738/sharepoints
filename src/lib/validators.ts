@@ -126,8 +126,11 @@ export const createTaskSchema = z.object({
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   status: z.enum(["TODO", "IN_PROGRESS", "BLOCKED", "DONE"]).optional(),
+  priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
   dueDate: z.string().datetime().optional().nullable().or(z.literal("")),
-  assignedToId: z.string().cuid().optional().nullable().or(z.literal(""))
+  reminderAt: z.string().datetime().optional().nullable().or(z.literal("")),
+  assignedToId: z.string().cuid().optional().nullable().or(z.literal("")),
+  assigneeIds: z.array(z.string().cuid()).optional()
 });
 
 export const updateTaskSchema = createTaskSchema.partial().extend({
@@ -138,6 +141,8 @@ export const createWorkspaceMeetingSchema = z
   .object({
     title: z.string().trim().min(2).max(120),
     description: z.string().trim().max(1000).optional().or(z.literal("")),
+    agenda: z.string().trim().max(2000).optional().or(z.literal("")),
+    recordingUrl: z.string().url().max(2048).optional().or(z.literal("")),
     startsAt: z.string().datetime(),
     endsAt: z.string().datetime()
   })
@@ -148,6 +153,45 @@ export const createWorkspaceMeetingSchema = z
 
 export const updateMeetingResponseSchema = z.object({
   status: z.enum(["YES", "MAYBE", "NO"])
+});
+
+export const updateMeetingDetailsSchema = z.object({
+  agenda: z.string().trim().max(2000).optional().or(z.literal("")),
+  notes: z.string().trim().max(4000).optional().or(z.literal("")),
+  actionItems: z.string().trim().max(4000).optional().or(z.literal("")),
+  recordingUrl: z.string().url().max(2048).optional().or(z.literal(""))
+});
+
+export const approvalDecisionSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]),
+  reason: z.string().trim().max(500).optional().or(z.literal(""))
+});
+
+export const createTaskCommentSchema = z.object({
+  body: z.string().trim().min(1).max(2000)
+});
+
+export const createDepartmentSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  kind: z.enum(["DEPARTMENT", "MINISTRY_UNIT", "CATEGORY"]).optional(),
+  description: z.string().trim().max(240).optional().or(z.literal(""))
+});
+
+export const upsertWorkspaceDepartmentAccessSchema = z.object({
+  departmentId: z.string().cuid(),
+  canAccessWorkspace: z.boolean(),
+  canAccessChat: z.boolean()
+});
+
+export const updateUserOrganizationSchema = z.object({
+  departmentId: z.string().cuid().optional().nullable().or(z.literal("")),
+  category: z.string().trim().max(80).optional().nullable().or(z.literal("")),
+  forcePasswordReset: z.boolean().optional(),
+  singleActiveSession: z.boolean().optional()
+});
+
+export const searchSchema = z.object({
+  q: z.string().trim().min(1).max(120)
 });
 
 export const createFileShareLinkSchema = z.object({

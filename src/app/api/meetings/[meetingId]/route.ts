@@ -3,6 +3,7 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess } from "@/lib/rbac";
+import { updateMeetingDetailsSchema } from "@/lib/validators";
 
 type RouteContext = {
   params: Promise<{ meetingId: string }>;
@@ -71,6 +72,54 @@ export async function DELETE(request: Request, context: RouteContext) {
       metadata: {
         title: meeting.title
       }
+    });
+
+    return ok({
+      meeting: serializeMeeting(meeting, user.id, new URL(request.url).origin)
+    });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  try {
+    const user = await requireUser();
+    const { meetingId } = await context.params;
+    const existing = await prisma.workspaceMeeting.findUnique({
+      where: {
+        id: meetingId
+      },
+      select: {
+        id: true,
+        workspaceId: true
+      }
+    });
+
+    if (!existing) {
+      throw new ApiError(404, "Meeting not found.");
+    }
+
+    await requireWorkspaceAdminAccess(user.id, existing.workspaceId, "Only admins can update meeting notes.");
+
+    const body = await request.json();
+    const parsed = updateMeetingDetailsSchema.safeParse(body);
+
+    if (!parsed.success) {
+      throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid meeting details.");
+    }
+
+    const meeting = await prisma.workspaceMeeting.update({
+      where: {
+        id: meetingId
+      },
+      data: {
+        agenda: parsed.data.agenda === undefined ? undefined : parsed.data.agenda || null,
+        notes: parsed.data.notes === undefined ? undefined : parsed.data.notes || null,
+        actionItems: parsed.data.actionItems === undefined ? undefined : parsed.data.actionItems || null,
+        recordingUrl: parsed.data.recordingUrl === undefined ? undefined : parsed.data.recordingUrl || null
+      },
+      include: meetingInclude
     });
 
     return ok({

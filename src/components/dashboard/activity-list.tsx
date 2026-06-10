@@ -38,6 +38,7 @@ const labels: Record<string, string> = {
   "integration.created": "created an integration",
   "integration.webhook_received": "received a webhook",
   "announcement.created": "posted an announcement",
+  "approval.reviewed": "reviewed an approval request",
   "task.created": "created a task",
   "task.updated": "updated a task",
   "task.deleted": "deleted a task",

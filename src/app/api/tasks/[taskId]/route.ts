@@ -42,6 +42,25 @@ export async function PATCH(request: Request, context: RouteContext) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid task update.");
     }
 
+    const assigneeIds = parsed.data.assigneeIds
+      ? Array.from(new Set([...(parsed.data.assigneeIds ?? []), parsed.data.assignedToId || ""].filter(Boolean)))
+      : undefined;
+
+    if (assigneeIds?.length) {
+      const assigneeCount = await prisma.workspaceMember.count({
+        where: {
+          workspaceId: existingTask.workspaceId,
+          userId: {
+            in: assigneeIds
+          }
+        }
+      });
+
+      if (assigneeCount !== assigneeIds.length) {
+        throw new ApiError(404, "One or more assignees are not members of this workspace.");
+      }
+    }
+
     if (parsed.data.assignedToId) {
       const assignee = await prisma.workspaceMember.findUnique({
         where: {
@@ -64,9 +83,19 @@ export async function PATCH(request: Request, context: RouteContext) {
         title: parsed.data.title,
         description: parsed.data.description === undefined ? undefined : parsed.data.description || null,
         status: parsed.data.status,
+        priority: parsed.data.priority,
         dueDate: parsed.data.dueDate === undefined ? undefined : parseDueDate(parsed.data.dueDate),
+        reminderAt: parsed.data.reminderAt === undefined ? undefined : parseDueDate(parsed.data.reminderAt),
         assignedToId:
-          parsed.data.assignedToId === undefined ? undefined : parsed.data.assignedToId || null
+          parsed.data.assignedToId === undefined ? undefined : parsed.data.assignedToId || assigneeIds?.[0] || null,
+        assignees: assigneeIds
+          ? {
+              deleteMany: {},
+              create: assigneeIds.map((assigneeId) => ({
+                userId: assigneeId
+              }))
+            }
+          : undefined
       },
       include: {
         assignedTo: {
@@ -81,6 +110,29 @@ export async function PATCH(request: Request, context: RouteContext) {
             name: true,
             email: true
           }
+        },
+        assignees: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5
         }
       }
     });

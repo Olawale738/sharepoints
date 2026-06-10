@@ -1,0 +1,460 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import {
+  Activity,
+  CalendarClock,
+  Database,
+  Files,
+  ShieldCheck,
+  SlidersHorizontal,
+  UsersRound,
+  Workflow
+} from "lucide-react";
+
+import { auth } from "@/auth";
+import { AdminOrganizationPanel } from "@/components/dashboard/admin-organization-panel";
+import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
+import { ApprovalQueue } from "@/components/dashboard/approval-queue";
+import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
+import { SecurityCenterPanel } from "@/components/dashboard/security-center-panel";
+import { Badge } from "@/components/ui/badge";
+import { normalizeEmail } from "@/lib/email-policy";
+import { getAdminVisibleWorkspaceIds } from "@/lib/governance";
+import { prisma } from "@/lib/prisma";
+import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
+import { userAccessStatus } from "@/lib/user-access";
+import { formatBytes, formatDate } from "@/lib/utils";
+
+export default async function AdminControlCenterPage() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  if (!(await hasAnyWorkspaceAdminRole(session.user.id))) {
+    redirect("/dashboard");
+  }
+
+  const workspaceIds = await getAdminVisibleWorkspaceIds(session.user.id);
+  const now = new Date();
+  const [
+    users,
+    invitations,
+    departments,
+    approvals,
+    securityEvents,
+    workspaces,
+    fileStats,
+    meetings,
+    activities,
+    rolePermissionCount,
+    activeShareLinkCount
+  ] = await Promise.all([
+    prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        createdAt: true,
+        departmentId: true,
+        category: true,
+        forcePasswordReset: true,
+        singleActiveSession: true,
+        suspendedAt: true,
+        accessRevokedAt: true,
+        deletedAt: true,
+        workspaceMemberships: {
+          select: {
+            role: true
+          }
+        },
+        _count: {
+          select: {
+            workspaceMemberships: true,
+            uploadedFiles: true,
+            activityLogs: true
+          }
+        }
+      },
+      orderBy: [{ deletedAt: "asc" }, { createdAt: "desc" }],
+      take: 500
+    }),
+    prisma.companyEmailInvitation.findMany({
+      include: {
+        invitedBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        acceptedBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 250
+    }),
+    prisma.department.findMany({
+      include: {
+        _count: {
+          select: {
+            members: true,
+            workspaceAccess: true
+          }
+        }
+      },
+      orderBy: [{ kind: "asc" }, { name: "asc" }]
+    }),
+    prisma.approvalRequest.findMany({
+      where: {
+        workspaceId: {
+          in: workspaceIds
+        }
+      },
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        requester: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        reviewer: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      take: 100
+    }),
+    prisma.securityEvent.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 150
+    }),
+    prisma.workspace.findMany({
+      include: {
+        _count: {
+          select: {
+            files: true,
+            members: true,
+            chatChannels: true,
+            meetings: true,
+            tasks: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 100
+    }),
+    prisma.file.aggregate({
+      _sum: {
+        size: true
+      },
+      _count: {
+        id: true
+      }
+    }),
+    prisma.workspaceMeeting.findMany({
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        createdBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: [{ startsAt: "desc" }],
+      take: 12
+    }),
+    prisma.activityLog.findMany({
+      include: {
+        workspace: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 30
+    }),
+    prisma.workspaceRolePermission.count(),
+    prisma.fileShareLink.count({
+      where: {
+        OR: [{ expiresAt: null }, { expiresAt: { gte: now } }]
+      }
+    })
+  ]);
+
+  const protectedAdminInvitationEmails = new Set([
+    (process.env.SEED_ADMIN_EMAIL ?? "president@letw.org").toLowerCase(),
+    ...users
+      .filter((user) => user.workspaceMemberships.some((membership) => membership.role === "ADMIN"))
+      .map((user) => normalizeEmail(user.email))
+      .filter((email): email is string => Boolean(email))
+  ]);
+  const activeUsers = users.filter((user) => userAccessStatus(user) === "ACTIVE").length;
+  const pendingApprovals = approvals.filter((approval) => approval.status === "PENDING").length;
+  const pendingInvitations = invitations.filter((invitation) => !invitation.acceptedAt && !invitation.revokedAt).length;
+  const storageBytes = fileStats._sum.size ?? 0;
+  const metricCards = [
+    {
+      label: "Users",
+      value: users.length,
+      detail: `${activeUsers} active`,
+      icon: UsersRound
+    },
+    {
+      label: "Workspaces",
+      value: workspaces.length,
+      detail: `${rolePermissionCount} custom permission rules`,
+      icon: ShieldCheck
+    },
+    {
+      label: "Documents",
+      value: fileStats._count.id,
+      detail: formatBytes(storageBytes),
+      icon: Files
+    },
+    {
+      label: "Pending approvals",
+      value: pendingApprovals,
+      detail: `${pendingInvitations} pending invitations`,
+      icon: Workflow
+    },
+    {
+      label: "Storage links",
+      value: activeShareLinkCount,
+      detail: "Active member-only download links",
+      icon: Database
+    },
+    {
+      label: "Security events",
+      value: securityEvents.length,
+      detail: "Recent login and access events",
+      icon: Activity
+    }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-ink/10 bg-white p-5 shadow-soft">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-medium text-moss">
+              <SlidersHorizontal className="h-4 w-4" />
+              LETW admin control center
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">Organization command center</h1>
+            <p className="mt-2 max-w-3xl text-sm text-ink/60">
+              Manage users, invitations, workspaces, roles, approvals, activity, storage, meetings, departments, and security from one place.
+            </p>
+          </div>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-4 text-sm font-medium text-ink transition hover:bg-mint/50"
+            href="/dashboard"
+          >
+            Back to dashboard
+          </Link>
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        {metricCards.map((metric) => {
+          const Icon = metric.icon;
+
+          return (
+            <div key={metric.label} className="rounded-lg border border-ink/10 bg-white p-4">
+              <Icon className="h-5 w-5 text-moss" />
+              <p className="mt-3 text-2xl font-semibold text-ink">{metric.value}</p>
+              <p className="text-sm text-ink/55">{metric.label}</p>
+              <p className="mt-1 text-xs text-ink/45">{metric.detail}</p>
+            </div>
+          );
+        })}
+      </section>
+
+      <ApprovalQueue
+        approvals={approvals.map((approval) => ({
+          id: approval.id,
+          targetType: approval.targetType,
+          targetId: approval.targetId,
+          title: approval.title,
+          status: approval.status,
+          reason: approval.reason,
+          createdAt: approval.createdAt.toISOString(),
+          reviewedAt: approval.reviewedAt?.toISOString() ?? null,
+          workspace: approval.workspace,
+          requester: approval.requester,
+          reviewer: approval.reviewer
+        }))}
+      />
+
+      <AdminOrganizationPanel
+        users={users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          departmentId: user.departmentId,
+          category: user.category,
+          forcePasswordReset: user.forcePasswordReset,
+          singleActiveSession: user.singleActiveSession,
+          isAdmin: user.workspaceMemberships.some((membership) => membership.role === "ADMIN")
+        }))}
+        departments={departments}
+      />
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="space-y-6">
+          <AdminUsersPanel
+            currentUserId={session.user.id}
+            users={users.map((user) => ({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              createdAt: user.createdAt.toISOString(),
+              suspendedAt: user.suspendedAt?.toISOString() ?? null,
+              accessRevokedAt: user.accessRevokedAt?.toISOString() ?? null,
+              deletedAt: user.deletedAt?.toISOString() ?? null,
+              isAdmin: user.workspaceMemberships.some((membership) => membership.role === "ADMIN"),
+              status: userAccessStatus(user),
+              _count: user._count
+            }))}
+          />
+
+          <SecurityCenterPanel
+            events={securityEvents.map((event) => ({
+              id: event.id,
+              type: event.type,
+              email: event.email,
+              ipAddress: event.ipAddress,
+              userAgent: event.userAgent,
+              createdAt: event.createdAt.toISOString(),
+              user: event.user
+            }))}
+          />
+        </div>
+
+        <div className="space-y-6">
+          <CompanyInvitationsPanel
+            invitations={invitations.map((invitation) => ({
+              id: invitation.id,
+              email: invitation.email,
+              acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+              revokedAt: invitation.revokedAt?.toISOString() ?? null,
+              createdAt: invitation.createdAt.toISOString(),
+              isAdminProtected: protectedAdminInvitationEmails.has(invitation.email.toLowerCase()),
+              invitedBy: invitation.invitedBy,
+              acceptedBy: invitation.acceptedBy
+            }))}
+          />
+
+          <section className="rounded-lg border border-ink/10 bg-white">
+            <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-moss" />
+                <h2 className="text-sm font-semibold">Workspaces</h2>
+              </div>
+              <Badge>{workspaces.length}</Badge>
+            </div>
+            <div className="divide-y divide-ink/10">
+              {workspaces.map((workspace) => (
+                <Link key={workspace.id} className="block px-4 py-3 transition hover:bg-mint/35" href={`/dashboard/workspaces/${workspace.id}`}>
+                  <p className="text-sm font-medium text-ink">{workspace.name}</p>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {workspace._count.members} members - {workspace._count.files} files - {workspace._count.chatChannels} channels
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-ink/10 bg-white">
+            <div className="flex items-center gap-2 border-b border-ink/10 px-4 py-3">
+              <CalendarClock className="h-4 w-4 text-moss" />
+              <h2 className="text-sm font-semibold">Meetings</h2>
+            </div>
+            <div className="divide-y divide-ink/10">
+              {meetings.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No meetings yet.</p> : null}
+              {meetings.map((meeting) => (
+                <Link
+                  key={meeting.id}
+                  className="block px-4 py-3 transition hover:bg-mint/35"
+                  href={`/dashboard/workspaces/${meeting.workspaceId}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 truncate text-sm font-medium text-ink">{meeting.title}</p>
+                    <Badge className={meeting.approvalStatus === "PENDING" ? "bg-wheat" : meeting.cancelledAt ? "bg-clay/10 text-clay" : "bg-mint"}>
+                      {meeting.cancelledAt ? "cancelled" : meeting.approvalStatus.toLowerCase()}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {meeting.workspace.name} - {formatDate(meeting.startsAt)}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-ink/10 bg-white">
+            <div className="flex items-center gap-2 border-b border-ink/10 px-4 py-3">
+              <Activity className="h-4 w-4 text-moss" />
+              <h2 className="text-sm font-semibold">Activity logs</h2>
+            </div>
+            <div className="divide-y divide-ink/10">
+              {activities.map((activity) => (
+                <div key={activity.id} className="px-4 py-3 text-sm">
+                  <p className="font-medium text-ink">{activity.user?.name ?? activity.user?.email ?? "System"}</p>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {activity.action} - {activity.workspace?.name ?? "organization"} - {formatDate(activity.createdAt)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  );
+}

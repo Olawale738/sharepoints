@@ -1,5 +1,6 @@
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { createMeetingPasscode, createMeetingRoomName, meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
@@ -14,11 +15,17 @@ export async function GET(request: Request, context: RouteContext) {
     const user = await requireUser();
     const { id } = await context.params;
     await requireWorkspaceMembership(user.id, id);
+    const canApprove = await canApproveWorkspaceContent(user.id, id);
 
     const meetings = await prisma.workspaceMeeting.findMany({
-      where: {
-        workspaceId: id
-      },
+      where: canApprove
+        ? {
+            workspaceId: id
+          }
+        : {
+            workspaceId: id,
+            OR: [{ approvalStatus: "APPROVED" }, { createdById: user.id }]
+          },
       include: meetingInclude,
       orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
       take: 100
@@ -72,18 +79,32 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(404, "Workspace not found.");
     }
 
+    const approvalStatus = await initialApprovalStatus(user.id, id);
     const meeting = await prisma.workspaceMeeting.create({
       data: {
         workspaceId: id,
         createdById: user.id,
         title: parsed.data.title,
         description: parsed.data.description || null,
+        agenda: parsed.data.agenda || null,
+        recordingUrl: parsed.data.recordingUrl || null,
         startsAt,
         endsAt,
         roomName: createMeetingRoomName(workspace.name),
-        passcode: createMeetingPasscode()
+        passcode: createMeetingPasscode(),
+        approvalStatus,
+        approvedById: approvalStatus === "APPROVED" ? user.id : null,
+        approvedAt: approvalStatus === "APPROVED" ? new Date() : null
       },
       include: meetingInclude
+    });
+    await createApprovalRequestIfNeeded({
+      status: approvalStatus,
+      workspaceId: id,
+      requesterId: user.id,
+      targetType: "MEETING",
+      targetId: meeting.id,
+      title: meeting.title
     });
 
     await logActivity({
@@ -93,7 +114,8 @@ export async function POST(request: Request, context: RouteContext) {
       targetId: meeting.id,
       metadata: {
         title: meeting.title,
-        startsAt: meeting.startsAt.toISOString()
+        startsAt: meeting.startsAt.toISOString(),
+        approvalStatus
       }
     });
 

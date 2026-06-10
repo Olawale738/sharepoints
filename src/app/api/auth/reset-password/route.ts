@@ -5,7 +5,9 @@ import { ApiError, handleRouteError, ok } from "@/lib/api";
 import { hasCompanyEmailInvitation, normalizeEmail } from "@/lib/email-policy";
 import { hashPasswordResetToken } from "@/lib/password-reset";
 import { prisma } from "@/lib/prisma";
+import { logSecurityEvent } from "@/lib/security";
 import { resetPasswordSchema } from "@/lib/validators";
+import { SecurityEventType } from "@prisma/client";
 
 export async function POST(request: Request) {
   try {
@@ -47,7 +49,13 @@ export async function POST(request: Request) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: resetToken.userId },
-        data: { passwordHash }
+        data: {
+          passwordHash,
+          forcePasswordReset: false,
+          sessionVersion: {
+            increment: 1
+          }
+        }
       }),
       prisma.passwordResetToken.update({
         where: { id: resetToken.id },
@@ -70,6 +78,11 @@ export async function POST(request: Request) {
       userId: resetToken.userId,
       action: activityActions.passwordResetCompleted,
       targetId: resetToken.userId
+    });
+    await logSecurityEvent({
+      userId: resetToken.userId,
+      type: SecurityEventType.PASSWORD_RESET,
+      email
     });
 
     return ok({ message: "Password changed. You can now sign in with the new password." });

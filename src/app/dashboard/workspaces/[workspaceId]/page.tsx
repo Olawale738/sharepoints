@@ -7,6 +7,7 @@ import { WorkspaceRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { ActivityList } from "@/components/dashboard/activity-list";
 import { AnnouncementsPanel } from "@/components/dashboard/announcements-panel";
+import { ApprovalQueue } from "@/components/dashboard/approval-queue";
 import { ChatPanel } from "@/components/dashboard/chat-panel";
 import { CopyTextButton } from "@/components/dashboard/copy-text-button";
 import { DirectMessagesPanel } from "@/components/dashboard/direct-messages-panel";
@@ -18,10 +19,12 @@ import { MeetingsPanel } from "@/components/dashboard/meetings-panel";
 import { MembersPanel } from "@/components/dashboard/members-panel";
 import { RolePermissionsPanel } from "@/components/dashboard/role-permissions-panel";
 import { TasksPanel } from "@/components/dashboard/tasks-panel";
+import { WorkspaceDepartmentAccessPanel } from "@/components/dashboard/workspace-department-access-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
-import { serializeMeeting } from "@/lib/meetings";
+import { canApproveWorkspaceContent } from "@/lib/governance";
+import { meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { defaultPermissionsForRole, getRolePermissions, hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 import { roleLabel } from "@/lib/roles";
@@ -121,8 +124,9 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
   const permissions = hasAdminAccess
     ? defaultPermissionsForRole(WorkspaceRole.ADMIN)
     : await getRolePermissions(workspaceId, membership.role);
+  const canApproveContent = await canApproveWorkspaceContent(session.user.id, workspaceId);
 
-  const [folders, files, members, activities, announcements, tasks, meetings] = await Promise.all([
+  const [folders, files, members, activities, announcements, tasks, meetings, approvals, departments, departmentAccess] = await Promise.all([
     prisma.folder.findMany({
       where: {
         workspaceId,
@@ -133,10 +137,16 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       }
     }),
     prisma.file.findMany({
-      where: {
-        workspaceId,
-        folderId
-      },
+      where: canApproveContent
+        ? {
+            workspaceId,
+            folderId
+          }
+        : {
+            workspaceId,
+            folderId,
+            OR: [{ approvalStatus: "APPROVED" }, { uploadedById: session.user.id }]
+          },
       include: {
         uploadedBy: {
           select: {
@@ -180,7 +190,12 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       take: 8
     }),
     prisma.workspaceAnnouncement.findMany({
-      where: { workspaceId },
+      where: canApproveContent
+        ? { workspaceId }
+        : {
+            workspaceId,
+            OR: [{ approvalStatus: "APPROVED" }, { authorId: session.user.id }]
+          },
       include: {
         author: {
           select: {
@@ -193,7 +208,17 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       take: 10
     }),
     prisma.workspaceTask.findMany({
-      where: { workspaceId },
+      where: canApproveContent
+        ? { workspaceId }
+        : {
+            workspaceId,
+            OR: [
+              { approvalStatus: "APPROVED" },
+              { createdById: session.user.id },
+              { assignedToId: session.user.id },
+              { assignees: { some: { userId: session.user.id } } }
+            ]
+          },
       include: {
         assignedTo: {
           select: {
@@ -207,30 +232,93 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
             name: true,
             email: true
           }
+        },
+        assignees: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5
         }
       },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
       take: 50
     }),
     prisma.workspaceMeeting.findMany({
-      where: { workspaceId },
-      include: {
-        createdBy: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        responses: {
-          select: {
-            userId: true,
-            status: true
-          }
-        }
-      },
+      where: canApproveContent
+        ? { workspaceId }
+        : {
+            workspaceId,
+            OR: [{ approvalStatus: "APPROVED" }, { createdById: session.user.id }]
+          },
+      include: meetingInclude,
       orderBy: [{ startsAt: "asc" }, { createdAt: "desc" }],
       take: 100
-    })
+    }),
+    canApproveContent
+      ? prisma.approvalRequest.findMany({
+          where: { workspaceId },
+          include: {
+            workspace: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            requester: {
+              select: {
+                name: true,
+                email: true
+              }
+            },
+            reviewer: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+          take: 50
+        })
+      : Promise.resolve([]),
+    hasAdminAccess
+      ? prisma.department.findMany({
+          select: {
+            id: true,
+            name: true,
+            kind: true
+          },
+          orderBy: [{ kind: "asc" }, { name: "asc" }]
+        })
+      : Promise.resolve([]),
+    hasAdminAccess
+      ? prisma.workspaceDepartmentAccess.findMany({
+          where: { workspaceId },
+          select: {
+            id: true,
+            departmentId: true,
+            canAccessWorkspace: true,
+            canAccessChat: true
+          }
+        })
+      : Promise.resolve([])
   ]);
 
   const channels = await prisma.chatChannel.findMany({
@@ -448,6 +536,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               fileType: file.fileType,
               size: file.size,
               createdAt: file.createdAt.toISOString(),
+              approvalStatus: file.approvalStatus,
+              rejectedReason: file.rejectedReason,
               uploadedBy: file.uploadedBy
             }))}
             canDeleteFiles={permissions.canDeleteFiles}
@@ -461,8 +551,22 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               title: task.title,
               description: task.description,
               status: task.status,
+              priority: task.priority,
+              approvalStatus: task.approvalStatus,
+              rejectedReason: task.rejectedReason,
               dueDate: task.dueDate?.toISOString() ?? null,
+              reminderAt: task.reminderAt?.toISOString() ?? null,
               assignedTo: task.assignedTo,
+              assignees: task.assignees.map((assignee) => ({
+                userId: assignee.userId,
+                user: assignee.user
+              })),
+              comments: task.comments.map((comment) => ({
+                id: comment.id,
+                body: comment.body,
+                createdAt: comment.createdAt.toISOString(),
+                author: comment.author
+              })),
               createdBy: task.createdBy,
               createdAt: task.createdAt.toISOString()
             }))}
@@ -540,11 +644,33 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               title: announcement.title,
               body: announcement.body,
               pinned: announcement.pinned,
+              approvalStatus: announcement.approvalStatus,
+              rejectedReason: announcement.rejectedReason,
               author: announcement.author,
               createdAt: announcement.createdAt.toISOString()
             }))}
             canCreate={permissions.canCreateAnnouncements}
           />
+
+          {canApproveContent ? (
+            <ApprovalQueue
+              compact
+              title="Workspace approvals"
+              approvals={approvals.map((approval) => ({
+                id: approval.id,
+                targetType: approval.targetType,
+                targetId: approval.targetId,
+                title: approval.title,
+                status: approval.status,
+                reason: approval.reason,
+                createdAt: approval.createdAt.toISOString(),
+                reviewedAt: approval.reviewedAt?.toISOString() ?? null,
+                workspace: approval.workspace,
+                requester: approval.requester,
+                reviewer: approval.reviewer
+              }))}
+            />
+          ) : null}
 
           <MembersPanel
             workspaceId={workspaceId}
@@ -588,6 +714,18 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
 
           {hasAdminAccess ? (
             <RolePermissionsPanel workspaceId={workspaceId} permissions={configurableRolePermissions} />
+          ) : null}
+
+          {hasAdminAccess ? (
+            <WorkspaceDepartmentAccessPanel
+              workspaceId={workspaceId}
+              departments={departments.map((department) => ({
+                id: department.id,
+                name: department.name,
+                kind: department.kind
+              }))}
+              access={departmentAccess}
+            />
           ) : null}
 
           {hasAdminAccess ? (

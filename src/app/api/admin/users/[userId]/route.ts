@@ -1,6 +1,9 @@
+import { SecurityEventType } from "@prisma/client";
+
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { logSecurityEvent } from "@/lib/security";
 import {
   requireCanManageUser,
   restoreCompanyInvitationForUser,
@@ -128,6 +131,29 @@ export async function PATCH(request: Request, context: RouteContext) {
         action: parsed.data.action
       }
     });
+
+    const securityType =
+      parsed.data.action === "SUSPEND"
+        ? SecurityEventType.USER_SUSPENDED
+        : parsed.data.action === "REVOKE"
+          ? SecurityEventType.ACCESS_REVOKED
+          : parsed.data.action === "DELETE"
+            ? SecurityEventType.USER_DELETED
+            : parsed.data.action === "RESTORE"
+              ? SecurityEventType.USER_RESTORED
+              : null;
+
+    if (securityType) {
+      await logSecurityEvent({
+        userId: user.id,
+        type: securityType,
+        email: user.email,
+        metadata: {
+          adminId: actor.id,
+          action: parsed.data.action
+        }
+      });
+    }
 
     const { workspaceMemberships, ...userItem } = user;
 

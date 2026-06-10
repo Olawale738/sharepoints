@@ -131,6 +131,22 @@ export async function getDownloadUrl(key: string, fileName: string) {
   return getSignedUrl(client, command, { expiresIn: 60 * 5 });
 }
 
+export async function getInlineUrl(key: string, fileName: string, contentType: string) {
+  if (!isS3Configured()) {
+    throw new Error("Signed preview URLs are only available when S3 is configured.");
+  }
+
+  const client = getS3Client();
+  const command = new GetObjectCommand({
+    Bucket: getS3Bucket(),
+    Key: key,
+    ResponseContentType: contentType || "application/octet-stream",
+    ResponseContentDisposition: `inline; filename="${fileName.replace(/"/g, "")}"`
+  });
+
+  return getSignedUrl(client, command, { expiresIn: 60 * 5 });
+}
+
 export async function getDownloadResponse(key: string, fileName: string, contentType: string) {
   if (isS3Configured()) {
     return Response.redirect(await getDownloadUrl(key, fileName), 302);
@@ -144,6 +160,48 @@ export async function getDownloadResponse(key: string, fileName: string, content
       "Content-Type": contentType || "application/octet-stream",
       "Content-Length": String(body.length),
       "Content-Disposition": `attachment; filename="${safeFileName}"`
+    }
+  });
+}
+
+export async function getObjectBuffer(key: string) {
+  if (!isS3Configured()) {
+    return readFile(getLocalObjectPath(key));
+  }
+
+  const client = getS3Client();
+  const response = await client.send(
+    new GetObjectCommand({
+      Bucket: getS3Bucket(),
+      Key: key
+    })
+  );
+  const chunks: Buffer[] = [];
+
+  if (!response.Body) {
+    return Buffer.alloc(0);
+  }
+
+  for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+    chunks.push(Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks);
+}
+
+export async function getInlineResponse(key: string, fileName: string, contentType: string) {
+  if (isS3Configured()) {
+    return Response.redirect(await getInlineUrl(key, fileName, contentType), 302);
+  }
+
+  const body = await readFile(getLocalObjectPath(key));
+  const safeFileName = fileName.replace(/"/g, "");
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": contentType || "application/octet-stream",
+      "Content-Length": String(body.length),
+      "Content-Disposition": `inline; filename="${safeFileName}"`
     }
   });
 }

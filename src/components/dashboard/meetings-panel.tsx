@@ -2,18 +2,43 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CalendarPlus, Check, CalendarClock, Copy, HelpCircle, KeyRound, Loader2, Plus, Trash2, Video, X, XCircle } from "lucide-react";
+import {
+  CalendarClock,
+  CalendarPlus,
+  Check,
+  Copy,
+  FileText,
+  HelpCircle,
+  KeyRound,
+  Link2,
+  Loader2,
+  Plus,
+  Trash2,
+  UsersRound,
+  Video,
+  X,
+  XCircle
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+type MeetingResponseStatus = "YES" | "MAYBE" | "NO";
+type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 type Meeting = {
   id: string;
   workspaceId: string;
   title: string;
   description?: string | null;
+  agenda?: string | null;
+  notes?: string | null;
+  actionItems?: string | null;
+  recordingUrl?: string | null;
+  approvalStatus?: ApprovalStatus;
+  rejectedReason?: string | null;
   startsAt: string;
   endsAt: string;
   passcode: string;
@@ -21,19 +46,31 @@ type Meeting = {
   inviteUrl: string;
   currentUserResponse?: MeetingResponseStatus | null;
   responseCounts: Record<MeetingResponseStatus, number>;
+  attendees?: Array<{
+    userId: string;
+    status: MeetingResponseStatus;
+    user?: {
+      name?: string | null;
+      email?: string | null;
+    } | null;
+  }>;
   createdBy: {
     name?: string | null;
     email?: string | null;
   };
 };
 
-type MeetingResponseStatus = "YES" | "MAYBE" | "NO";
-
 type MeetingsPanelProps = {
   workspaceId: string;
   meetings: Meeting[];
   canSchedule: boolean;
   canCancel: boolean;
+};
+
+const approvalClasses: Record<ApprovalStatus, string> = {
+  PENDING: "bg-wheat",
+  APPROVED: "bg-mint",
+  REJECTED: "bg-clay/10 text-clay"
 };
 
 function localDateTime(value: string) {
@@ -61,6 +98,16 @@ function DateTimeText({ value }: { value: string }) {
 }
 
 function meetingStatus(meeting: Meeting, now: number | null) {
+  const approvalStatus = meeting.approvalStatus ?? "APPROVED";
+
+  if (approvalStatus === "PENDING") {
+    return { label: "Pending approval", className: "bg-wheat text-ink" };
+  }
+
+  if (approvalStatus === "REJECTED") {
+    return { label: "Rejected", className: "bg-clay/10 text-clay" };
+  }
+
   const startsAt = new Date(meeting.startsAt).getTime();
   const endsAt = new Date(meeting.endsAt).getTime();
 
@@ -84,8 +131,9 @@ function toInviteText(meeting: Meeting) {
     `LETW video meeting: ${meeting.title}`,
     `Join link: ${meeting.inviteUrl}`,
     `Passcode: ${meeting.passcode}`,
-    `Time: ${localDateTime(meeting.startsAt)}`
-  ].join("\n");
+    `Time: ${localDateTime(meeting.startsAt)}`,
+    meeting.agenda ? `Agenda: ${meeting.agenda}` : ""
+  ].filter(Boolean).join("\n");
 }
 
 async function copyText(value: string) {
@@ -110,6 +158,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
   const [status, setStatus] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [busyMeetingId, setBusyMeetingId] = useState("");
+  const [detailsByMeeting, setDetailsByMeeting] = useState<Record<string, Pick<Meeting, "agenda" | "notes" | "actionItems" | "recordingUrl">>>({});
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -150,6 +199,8 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
       body: JSON.stringify({
         title: String(formData.get("title")),
         description: String(formData.get("description") ?? ""),
+        agenda: String(formData.get("agenda") ?? ""),
+        recordingUrl: String(formData.get("recordingUrl") ?? ""),
         startsAt: new Date(startsAt).toISOString(),
         endsAt: new Date(endsAt).toISOString()
       })
@@ -164,7 +215,11 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
     }
 
     setMeetings((current) => [data.meeting as Meeting, ...current]);
-    setStatus(`Meeting scheduled. Passcode: ${data.meeting.passcode}`);
+    setStatus(
+      data.meeting.approvalStatus === "PENDING"
+        ? "Meeting sent for approval."
+        : `Meeting scheduled. Passcode: ${data.meeting.passcode}`
+    );
     form.reset();
   }
 
@@ -243,6 +298,34 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
     setStatus("Your meeting response was saved.");
   }
 
+  async function saveDetails(meeting: Meeting) {
+    setError("");
+    setStatus("");
+    setBusyMeetingId(meeting.id);
+    const details = detailsByMeeting[meeting.id] ?? {};
+    const response = await fetch(`/api/meetings/${meeting.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        agenda: details.agenda ?? meeting.agenda ?? "",
+        notes: details.notes ?? meeting.notes ?? "",
+        actionItems: details.actionItems ?? meeting.actionItems ?? "",
+        recordingUrl: details.recordingUrl ?? meeting.recordingUrl ?? ""
+      })
+    });
+    setBusyMeetingId("");
+
+    const data = (await response.json().catch(() => null)) as { meeting?: Meeting; error?: string } | null;
+
+    if (!response.ok || !data?.meeting) {
+      setError(data?.error ?? "Meeting details could not be saved.");
+      return;
+    }
+
+    setMeetings((current) => current.map((item) => (item.id === meeting.id ? data.meeting as Meeting : item)));
+    setStatus("Meeting details saved.");
+  }
+
   return (
     <div className="rounded-lg border border-ink/10 bg-white p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -250,7 +333,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
           <Video className="h-4 w-4 text-moss" />
           <h2 className="text-sm font-semibold">Video meetings</h2>
         </div>
-        <Badge className="bg-mint">{meetings.filter((meeting) => !meeting.cancelledAt).length} active</Badge>
+        <Badge className="bg-mint">{meetings.filter((meeting) => !meeting.cancelledAt && meeting.approvalStatus !== "REJECTED").length} active</Badge>
       </div>
 
       {canSchedule ? (
@@ -258,7 +341,9 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
           <Input className="lg:col-span-2" name="title" placeholder="Meeting title" required />
           <Input name="startsAt" type="datetime-local" required />
           <Input name="endsAt" type="datetime-local" required />
-          <Textarea className="lg:col-span-2" name="description" placeholder="Agenda or meeting notes" rows={2} />
+          <Input className="lg:col-span-2" name="recordingUrl" placeholder="Recording link after the meeting" />
+          <Textarea className="lg:col-span-2" name="agenda" placeholder="Agenda" rows={2} />
+          <Textarea className="lg:col-span-2" name="description" placeholder="Meeting description" rows={2} />
           <div className="lg:col-span-2">
             <Button type="submit" disabled={isScheduling}>
               {isScheduling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -275,7 +360,10 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
         {sortedMeetings.length === 0 ? <p className="text-sm text-ink/55">No video meetings scheduled yet.</p> : null}
         {sortedMeetings.map((meeting) => {
           const statusInfo = meetingStatus(meeting, now);
+          const approvalStatus = meeting.approvalStatus ?? "APPROVED";
           const isCancelled = Boolean(meeting.cancelledAt);
+          const canJoin = !isCancelled && approvalStatus === "APPROVED";
+          const draftDetails = detailsByMeeting[meeting.id] ?? {};
 
           return (
             <article key={meeting.id} className="rounded-md border border-ink/10 bg-paper p-3">
@@ -283,6 +371,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
+                    <Badge className={approvalClasses[approvalStatus]}>{approvalStatus.toLowerCase()}</Badge>
                     <span className="inline-flex items-center gap-1 text-xs text-ink/55">
                       <CalendarClock className="h-3.5 w-3.5" />
                       <DateTimeText value={meeting.startsAt} />
@@ -290,6 +379,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                   </div>
                   <h3 className="text-sm font-semibold text-ink">{meeting.title}</h3>
                   {meeting.description ? <p className="mt-1 whitespace-pre-wrap text-sm text-ink/65">{meeting.description}</p> : null}
+                  {meeting.rejectedReason ? <p className="mt-2 rounded-md bg-clay/10 px-2 py-1 text-xs text-clay">{meeting.rejectedReason}</p> : null}
                   <p className="mt-2 text-xs text-ink/50">
                     Ends <DateTimeText value={meeting.endsAt} /> - scheduled by {meeting.createdBy.name ?? meeting.createdBy.email}
                   </p>
@@ -297,25 +387,46 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                     <KeyRound className="h-3.5 w-3.5 text-moss" />
                     Passcode <span className="font-semibold text-ink">{meeting.passcode}</span>
                   </p>
+                  {meeting.agenda ? (
+                    <p className="mt-3 whitespace-pre-wrap rounded-md bg-white px-3 py-2 text-sm text-ink/70">
+                      <span className="mb-1 block text-xs font-semibold uppercase text-ink/45">Agenda</span>
+                      {meeting.agenda}
+                    </p>
+                  ) : null}
+                  {meeting.recordingUrl ? (
+                    <a
+                      className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-moss hover:underline"
+                      href={meeting.recordingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Recording link
+                    </a>
+                  ) : null}
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <Badge className="bg-mint">
-                      Going {meeting.responseCounts.YES}
-                    </Badge>
-                    <Badge className="bg-wheat">
-                      Maybe {meeting.responseCounts.MAYBE}
-                    </Badge>
-                    <Badge className="bg-clay/10 text-clay">
-                      No {meeting.responseCounts.NO}
-                    </Badge>
+                    <Badge className="bg-mint">Going {meeting.responseCounts.YES}</Badge>
+                    <Badge className="bg-wheat">Maybe {meeting.responseCounts.MAYBE}</Badge>
+                    <Badge className="bg-clay/10 text-clay">No {meeting.responseCounts.NO}</Badge>
                   </div>
+                  {meeting.attendees?.length ? (
+                    <div className="mt-3 rounded-md bg-white px-3 py-2">
+                      <p className="mb-2 flex items-center gap-1 text-xs font-semibold uppercase text-ink/45">
+                        <UsersRound className="h-3.5 w-3.5" />
+                        Attendance
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {meeting.attendees.map((attendee) => (
+                          <Badge key={attendee.userId} className="bg-paper">
+                            {attendee.user?.name ?? attendee.user?.email ?? "Member"} - {attendee.status.toLowerCase()}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  {isCancelled ? (
-                    <Button className="h-9" variant="secondary" disabled>
-                      <Video className="h-4 w-4" />
-                      Join
-                    </Button>
-                  ) : (
+                  {canJoin ? (
                     <Link
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white transition hover:bg-[#185747]"
                       href={meeting.inviteUrl}
@@ -323,12 +434,17 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                       <Video className="h-4 w-4" />
                       Join
                     </Link>
+                  ) : (
+                    <Button className="h-9" variant="secondary" disabled>
+                      <Video className="h-4 w-4" />
+                      Join
+                    </Button>
                   )}
                   <Button className="h-9" variant="secondary" onClick={() => copyInvite(meeting)}>
                     <Copy className="h-4 w-4" />
                     Copy invite
                   </Button>
-                  {!isCancelled ? (
+                  {canJoin ? (
                     <a
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium text-ink transition hover:bg-mint/50"
                       href={`/api/meetings/${meeting.id}/calendar`}
@@ -337,7 +453,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                       Calendar
                     </a>
                   ) : null}
-                  {!isCancelled ? (
+                  {canJoin ? (
                     <div className="flex flex-wrap gap-1 rounded-md border border-ink/10 bg-white p-1">
                       <button
                         className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium transition ${
@@ -398,6 +514,87 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                   ) : null}
                 </div>
               </div>
+
+              {(meeting.notes || meeting.actionItems) ? (
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  {meeting.notes ? (
+                    <div className="rounded-md bg-white px-3 py-2 text-sm text-ink/70">
+                      <p className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase text-ink/45">
+                        <FileText className="h-3.5 w-3.5" />
+                        Notes
+                      </p>
+                      <p className="whitespace-pre-wrap">{meeting.notes}</p>
+                    </div>
+                  ) : null}
+                  {meeting.actionItems ? (
+                    <div className="rounded-md bg-white px-3 py-2 text-sm text-ink/70">
+                      <p className="mb-1 flex items-center gap-1 text-xs font-semibold uppercase text-ink/45">
+                        <Check className="h-3.5 w-3.5" />
+                        Action items
+                      </p>
+                      <p className="whitespace-pre-wrap">{meeting.actionItems}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {canCancel ? (
+                <div className="mt-4 grid gap-3 border-t border-ink/10 pt-3 lg:grid-cols-2">
+                  <Textarea
+                    className="bg-white"
+                    placeholder="Agenda"
+                    rows={2}
+                    value={draftDetails.agenda ?? meeting.agenda ?? ""}
+                    onChange={(event) =>
+                      setDetailsByMeeting((current) => ({
+                        ...current,
+                        [meeting.id]: { ...current[meeting.id], agenda: event.target.value }
+                      }))
+                    }
+                  />
+                  <Input
+                    className="bg-white"
+                    placeholder="Recording URL"
+                    value={draftDetails.recordingUrl ?? meeting.recordingUrl ?? ""}
+                    onChange={(event) =>
+                      setDetailsByMeeting((current) => ({
+                        ...current,
+                        [meeting.id]: { ...current[meeting.id], recordingUrl: event.target.value }
+                      }))
+                    }
+                  />
+                  <Textarea
+                    className="bg-white"
+                    placeholder="Meeting notes"
+                    rows={3}
+                    value={draftDetails.notes ?? meeting.notes ?? ""}
+                    onChange={(event) =>
+                      setDetailsByMeeting((current) => ({
+                        ...current,
+                        [meeting.id]: { ...current[meeting.id], notes: event.target.value }
+                      }))
+                    }
+                  />
+                  <Textarea
+                    className="bg-white"
+                    placeholder="Action items"
+                    rows={3}
+                    value={draftDetails.actionItems ?? meeting.actionItems ?? ""}
+                    onChange={(event) =>
+                      setDetailsByMeeting((current) => ({
+                        ...current,
+                        [meeting.id]: { ...current[meeting.id], actionItems: event.target.value }
+                      }))
+                    }
+                  />
+                  <div className="lg:col-span-2">
+                    <Button className="h-9" variant="secondary" disabled={busyMeetingId === meeting.id} onClick={() => saveDetails(meeting)}>
+                      {busyMeetingId === meeting.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                      Save meeting record
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </article>
           );
         })}

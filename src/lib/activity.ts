@@ -47,6 +47,7 @@ export const activityActions = {
   integrationDeleted: "integration.deleted",
   webhookReceived: "integration.webhook_received",
   announcementCreated: "announcement.created",
+  approvalReviewed: "approval.reviewed",
   taskCreated: "task.created",
   taskUpdated: "task.updated",
   taskDeleted: "task.deleted",

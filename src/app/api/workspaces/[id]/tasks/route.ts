@@ -1,5 +1,6 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createTaskSchema } from "@/lib/validators";
@@ -17,9 +18,20 @@ export async function GET(_request: Request, context: RouteContext) {
     const user = await requireUser();
     const { id } = await context.params;
     await requireWorkspaceMembership(user.id, id);
+    const canApprove = await canApproveWorkspaceContent(user.id, id);
 
     const tasks = await prisma.workspaceTask.findMany({
-      where: { workspaceId: id },
+      where: canApprove
+        ? { workspaceId: id }
+        : {
+            workspaceId: id,
+            OR: [
+              { approvalStatus: "APPROVED" },
+              { createdById: user.id },
+              { assignedToId: user.id },
+              { assignees: { some: { userId: user.id } } }
+            ]
+          },
       include: {
         assignedTo: {
           select: {
@@ -33,6 +45,29 @@ export async function GET(_request: Request, context: RouteContext) {
             name: true,
             email: true
           }
+        },
+        assignees: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5
         }
       },
       orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
@@ -58,6 +93,23 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid task.");
     }
 
+    const assigneeIds = Array.from(new Set([...(parsed.data.assigneeIds ?? []), parsed.data.assignedToId || ""].filter(Boolean)));
+
+    if (assigneeIds.length) {
+      const assigneeCount = await prisma.workspaceMember.count({
+        where: {
+          workspaceId: id,
+          userId: {
+            in: assigneeIds
+          }
+        }
+      });
+
+      if (assigneeCount !== assigneeIds.length) {
+        throw new ApiError(404, "One or more assignees are not members of this workspace.");
+      }
+    }
+
     if (parsed.data.assignedToId) {
       const assignee = await prisma.workspaceMember.findUnique({
         where: {
@@ -74,6 +126,7 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
+    const approvalStatus = await initialApprovalStatus(user.id, id);
     const task = await prisma.workspaceTask.create({
       data: {
         workspaceId: id,
@@ -81,8 +134,20 @@ export async function POST(request: Request, context: RouteContext) {
         title: parsed.data.title,
         description: parsed.data.description || null,
         status: parsed.data.status ?? "TODO",
+        priority: parsed.data.priority ?? "NORMAL",
         dueDate: parseDueDate(parsed.data.dueDate),
-        assignedToId: parsed.data.assignedToId || null
+        reminderAt: parseDueDate(parsed.data.reminderAt),
+        assignedToId: parsed.data.assignedToId || assigneeIds[0] || null,
+        approvalStatus,
+        approvedById: approvalStatus === "APPROVED" ? user.id : null,
+        approvedAt: approvalStatus === "APPROVED" ? new Date() : null,
+        assignees: assigneeIds.length
+          ? {
+              create: assigneeIds.map((assigneeId) => ({
+                userId: assigneeId
+              }))
+            }
+          : undefined
       },
       include: {
         assignedTo: {
@@ -97,8 +162,39 @@ export async function POST(request: Request, context: RouteContext) {
             name: true,
             email: true
           }
+        },
+        assignees: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                name: true,
+                email: true
+              }
+            }
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5
         }
       }
+    });
+    await createApprovalRequestIfNeeded({
+      status: approvalStatus,
+      workspaceId: id,
+      requesterId: user.id,
+      targetType: "TASK",
+      targetId: task.id,
+      title: task.title
     });
 
     await logActivity({
@@ -106,7 +202,7 @@ export async function POST(request: Request, context: RouteContext) {
       workspaceId: id,
       action: activityActions.taskCreated,
       targetId: task.id,
-      metadata: { title: task.title, status: task.status }
+      metadata: { title: task.title, status: task.status, priority: task.priority, approvalStatus }
     });
 
     return ok({ task }, { status: 201 });

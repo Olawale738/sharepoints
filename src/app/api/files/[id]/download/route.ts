@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { ApiError, handleRouteError } from "@/lib/api";
+import { ensureCanSeeFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
 import { getDownloadResponse } from "@/lib/storage";
@@ -37,6 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     await requireWorkspaceMembership(session.user.id, file.workspaceId);
+    await ensureCanSeeFile(session.user.id, file);
 
     return getDownloadResponse(file.storageKey, file.fileName, file.fileType);
   } catch (error) {

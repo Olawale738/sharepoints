@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "crypto";
-import type { MeetingResponseStatus } from "@prisma/client";
+import type { ApprovalStatus, MeetingResponseStatus } from "@prisma/client";
 
 import { slugify } from "@/lib/utils";
 
@@ -19,7 +19,13 @@ export const meetingInclude = {
   responses: {
     select: {
       userId: true,
-      status: true
+      status: true,
+      user: {
+        select: {
+          name: true,
+          email: true
+        }
+      }
     }
   }
 };
@@ -29,6 +35,12 @@ type SerializableMeeting = {
   workspaceId: string;
   title: string;
   description: string | null;
+  agenda?: string | null;
+  notes?: string | null;
+  actionItems?: string | null;
+  recordingUrl?: string | null;
+  approvalStatus?: ApprovalStatus;
+  rejectedReason?: string | null;
   startsAt: Date;
   endsAt: Date;
   passcode: string;
@@ -37,7 +49,11 @@ type SerializableMeeting = {
   updatedAt?: Date;
   createdBy: { name?: string | null; email?: string | null };
   workspace?: { id: string; name: string };
-  responses?: Array<{ userId: string; status: MeetingResponseStatus }>;
+  responses?: Array<{
+    userId: string;
+    status: MeetingResponseStatus;
+    user?: { name?: string | null; email?: string | null } | null;
+  }>;
 };
 
 export function createMeetingPasscode() {
@@ -70,6 +86,12 @@ export function serializeMeeting(meeting: SerializableMeeting, userId: string, o
     workspaceId: meeting.workspaceId,
     title: meeting.title,
     description: meeting.description,
+    agenda: meeting.agenda ?? null,
+    notes: meeting.notes ?? null,
+    actionItems: meeting.actionItems ?? null,
+    recordingUrl: meeting.recordingUrl ?? null,
+    approvalStatus: meeting.approvalStatus ?? "APPROVED",
+    rejectedReason: meeting.rejectedReason ?? null,
     startsAt: meeting.startsAt.toISOString(),
     endsAt: meeting.endsAt.toISOString(),
     passcode: meeting.passcode,
@@ -80,6 +102,11 @@ export function serializeMeeting(meeting: SerializableMeeting, userId: string, o
     workspace: meeting.workspace,
     responseCounts,
     currentUserResponse: meeting.responses?.find((response) => response.userId === userId)?.status ?? null,
+    attendees: (meeting.responses ?? []).map((response) => ({
+      userId: response.userId,
+      status: response.status,
+      user: response.user ?? null
+    })),
     inviteUrl: meetingInviteUrl(meeting.id, origin)
   };
 }

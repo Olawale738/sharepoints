@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Folder, Link2, Trash2 } from "lucide-react";
+import { Download, Eye, FileText, Folder, Link2, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatBytes, formatDate } from "@/lib/utils";
 
@@ -20,10 +21,18 @@ type FileRow = {
   fileType: string;
   size: number;
   createdAt: string;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  rejectedReason?: string | null;
   uploadedBy: {
     name?: string | null;
     email?: string | null;
   };
+};
+
+const approvalClassName: Record<NonNullable<FileRow["approvalStatus"]>, string> = {
+  PENDING: "bg-wheat",
+  APPROVED: "bg-mint",
+  REJECTED: "bg-clay/10 text-clay"
 };
 
 type FileTableProps = {
@@ -99,7 +108,7 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
     <div className="overflow-hidden rounded-lg border border-ink/10 bg-white">
       {error ? <p className="border-b border-ink/10 bg-clay/10 px-4 py-2 text-sm text-clay">{error}</p> : null}
       {shareStatus ? <p className="border-b border-ink/10 bg-mint px-4 py-2 text-sm text-ink">{shareStatus}</p> : null}
-      <div className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_10rem] border-b border-ink/10 bg-ink/[0.03] px-4 py-3 text-xs font-semibold uppercase text-ink/60 max-md:hidden">
+      <div className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_12rem] border-b border-ink/10 bg-ink/[0.03] px-4 py-3 text-xs font-semibold uppercase text-ink/60 max-md:hidden">
         <span>Name</span>
         <span>Size</span>
         <span>Modified</span>
@@ -114,7 +123,7 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
         <Link
           key={folder.id}
           href={`/dashboard/workspaces/${workspaceId}?folder=${folder.id}`}
-          className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_10rem] items-center border-b border-ink/10 px-4 py-3 text-sm transition hover:bg-mint/35 max-md:grid-cols-1 max-md:gap-2"
+          className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_12rem] items-center border-b border-ink/10 px-4 py-3 text-sm transition hover:bg-mint/35 max-md:grid-cols-1 max-md:gap-2"
         >
           <span className="flex min-w-0 items-center gap-3 font-medium">
             <Folder className="h-5 w-5 shrink-0 text-moss" />
@@ -129,18 +138,32 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
       {files.map((file) => (
         <div
           key={file.id}
-          className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_10rem] items-center border-b border-ink/10 px-4 py-3 text-sm last:border-b-0 max-md:grid-cols-1 max-md:gap-2"
+          className="grid grid-cols-[minmax(0,1fr)_9rem_10rem_12rem] items-center border-b border-ink/10 px-4 py-3 text-sm last:border-b-0 max-md:grid-cols-1 max-md:gap-2"
         >
           <div className="flex min-w-0 items-center gap-3">
             <FileText className="h-5 w-5 shrink-0 text-clay" />
             <div className="min-w-0">
-              <p className="truncate font-medium">{file.fileName}</p>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <p className="truncate font-medium">{file.fileName}</p>
+                {file.approvalStatus ? (
+                  <Badge className={approvalClassName[file.approvalStatus]}>{file.approvalStatus.toLowerCase()}</Badge>
+                ) : null}
+              </div>
               <p className="truncate text-xs text-ink/50">{file.uploadedBy.name ?? file.uploadedBy.email}</p>
+              {file.rejectedReason ? <p className="mt-1 text-xs text-clay">{file.rejectedReason}</p> : null}
             </div>
           </div>
           <span className="text-ink/60">{formatBytes(file.size)}</span>
           <span className="text-ink/60">{formatDate(file.createdAt)}</span>
           <div className="flex justify-end gap-2 max-md:justify-start">
+            <Button
+              aria-label={`Preview ${file.fileName}`}
+              className="h-9 w-9 px-0"
+              variant="secondary"
+              onClick={() => window.open(`/api/files/${file.id}/preview`, "_blank", "noopener,noreferrer")}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
             <Button
               aria-label={`Download ${file.fileName}`}
               className="h-9 w-9 px-0"

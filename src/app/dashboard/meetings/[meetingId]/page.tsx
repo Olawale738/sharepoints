@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CalendarClock, CalendarPlus, KeyRound, UsersRound } from "lucide-react";
+import { CalendarClock, CalendarPlus, FileText, KeyRound, Link2, UsersRound } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CopyTextButton } from "@/components/dashboard/copy-text-button";
@@ -64,6 +64,7 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
   const displayName = session.user.name ?? session.user.email ?? "LETW member";
   const hasValidPasscode = passcode?.trim() === meeting.passcode;
   const isCancelled = Boolean(meeting.cancelledAt);
+  const isApproved = meeting.approvalStatus === "APPROVED";
 
   return (
     <div className="space-y-6">
@@ -71,7 +72,9 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge className={isCancelled ? "bg-clay/10 text-clay" : "bg-mint"}>{isCancelled ? "Cancelled" : "Video meeting"}</Badge>
+              <Badge className={isCancelled ? "bg-clay/10 text-clay" : isApproved ? "bg-mint" : "bg-wheat"}>
+                {isCancelled ? "Cancelled" : isApproved ? "Video meeting" : meeting.approvalStatus.toLowerCase()}
+              </Badge>
               <span className="inline-flex items-center gap-1 text-xs text-ink/55">
                 <UsersRound className="h-3.5 w-3.5" />
                 {meeting.workspace.name}
@@ -79,6 +82,7 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
             </div>
             <h1 className="text-3xl font-semibold text-ink">{meeting.title}</h1>
             {meeting.description ? <p className="mt-2 max-w-3xl whitespace-pre-wrap text-sm text-ink/60">{meeting.description}</p> : null}
+            {meeting.rejectedReason ? <p className="mt-2 max-w-3xl rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{meeting.rejectedReason}</p> : null}
             <p className="mt-3 inline-flex items-center gap-2 text-sm text-ink/55">
               <CalendarClock className="h-4 w-4 text-moss" />
               {formatDateTime(meeting.startsAt)} - {formatDateTime(meeting.endsAt)}
@@ -97,9 +101,50 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
         </div>
       </section>
 
+      {(meeting.agenda || meeting.recordingUrl || meeting.notes || meeting.actionItems) ? (
+        <section className="grid gap-3 lg:grid-cols-2">
+          {meeting.agenda ? (
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+                <FileText className="h-4 w-4 text-moss" />
+                Agenda
+              </p>
+              <p className="whitespace-pre-wrap text-sm text-ink/65">{meeting.agenda}</p>
+            </div>
+          ) : null}
+          {meeting.recordingUrl ? (
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
+                <Link2 className="h-4 w-4 text-moss" />
+                Recording
+              </p>
+              <a className="text-sm font-medium text-moss hover:underline" href={meeting.recordingUrl} target="_blank" rel="noreferrer">
+                Open recording link
+              </a>
+            </div>
+          ) : null}
+          {meeting.notes ? (
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="mb-2 text-sm font-semibold text-ink">Notes</p>
+              <p className="whitespace-pre-wrap text-sm text-ink/65">{meeting.notes}</p>
+            </div>
+          ) : null}
+          {meeting.actionItems ? (
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="mb-2 text-sm font-semibold text-ink">Action items</p>
+              <p className="whitespace-pre-wrap text-sm text-ink/65">{meeting.actionItems}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       {isCancelled ? (
         <div className="rounded-lg border border-clay/20 bg-clay/10 p-5 text-sm text-clay">
           This meeting was cancelled on {formatDate(meeting.cancelledAt as Date)}.
+        </div>
+      ) : !isApproved ? (
+        <div className="rounded-lg border border-wheat bg-white p-5 text-sm text-ink/70">
+          This meeting is not approved yet. It will open after an admin or approved leader accepts it.
         </div>
       ) : hasValidPasscode ? (
         <VideoMeetingRoom displayName={displayName} roomName={meeting.roomName} title={meeting.title} />

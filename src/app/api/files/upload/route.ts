@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
       contentLength: body.length
     });
 
+    const approvalStatus = await initialApprovalStatus(user.id, parsed.data.workspaceId);
     const createdFile = await prisma.file.create({
       data: {
         workspaceId: parsed.data.workspaceId,
@@ -81,7 +83,10 @@ export async function POST(request: Request) {
         storageKey,
         fileName,
         fileType: contentType,
-        size: file.size
+        size: file.size,
+        approvalStatus,
+        approvedById: approvalStatus === "APPROVED" ? user.id : null,
+        approvedAt: approvalStatus === "APPROVED" ? new Date() : null
       },
       include: {
         uploadedBy: {
@@ -94,6 +99,14 @@ export async function POST(request: Request) {
         }
       }
     });
+    await createApprovalRequestIfNeeded({
+      status: approvalStatus,
+      workspaceId: parsed.data.workspaceId,
+      requesterId: user.id,
+      targetType: "FILE",
+      targetId: createdFile.id,
+      title: createdFile.fileName
+    });
 
     await logActivity({
       userId: user.id,
@@ -103,7 +116,8 @@ export async function POST(request: Request) {
       metadata: {
         fileName: createdFile.fileName,
         size: createdFile.size,
-        folderId: createdFile.folderId
+        folderId: createdFile.folderId,
+        approvalStatus: createdFile.approvalStatus
       }
     });
 

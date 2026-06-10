@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { Megaphone, Pin, Send } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,11 +14,19 @@ type Announcement = {
   title: string;
   body: string;
   pinned: boolean;
+  approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
+  rejectedReason?: string | null;
   createdAt: string;
   author: {
     name?: string | null;
     email?: string | null;
   };
+};
+
+const approvalClassName: Record<NonNullable<Announcement["approvalStatus"]>, string> = {
+  PENDING: "bg-wheat",
+  APPROVED: "bg-mint",
+  REJECTED: "bg-clay/10 text-clay"
 };
 
 type AnnouncementsPanelProps = {
@@ -101,8 +110,18 @@ export function AnnouncementsPanel({
                   {announcement.author.name ?? announcement.author.email} - {formatDate(announcement.createdAt)}
                 </p>
               </div>
-              {announcement.pinned ? <Pin className="h-4 w-4 shrink-0 text-moss" /> : null}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {announcement.approvalStatus ? (
+                  <Badge className={approvalClassName[announcement.approvalStatus]}>
+                    {announcement.approvalStatus.toLowerCase()}
+                  </Badge>
+                ) : null}
+                {announcement.pinned ? <Pin className="h-4 w-4 text-moss" /> : null}
+              </div>
             </div>
+            {announcement.rejectedReason ? (
+              <p className="mb-2 rounded-md bg-clay/10 px-2 py-1 text-xs text-clay">{announcement.rejectedReason}</p>
+            ) : null}
             <p className="whitespace-pre-wrap text-ink/75">{announcement.body}</p>
           </article>
         ))}

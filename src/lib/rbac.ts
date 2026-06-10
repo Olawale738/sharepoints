@@ -120,7 +120,103 @@ export async function requireWorkspaceMembership(userId: string, workspaceId: st
     throw new ApiError(403, "You are not a member of this workspace.");
   }
 
+  if (membership.role !== WorkspaceRole.ADMIN && !(await hasAnyWorkspaceAdminRole(userId))) {
+    await requireWorkspaceDepartmentAccess(userId, workspaceId);
+  }
+
   return membership;
+}
+
+export async function requireWorkspaceDepartmentAccess(userId: string, workspaceId: string) {
+  const restrictedDepartmentsCount = await prisma.workspaceDepartmentAccess.count({
+    where: {
+      workspaceId,
+      canAccessWorkspace: true
+    }
+  });
+
+  if (!restrictedDepartmentsCount) {
+    return true;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId
+    },
+    select: {
+      departmentId: true
+    }
+  });
+
+  if (!user?.departmentId) {
+    throw new ApiError(403, "Your department has not been granted access to this workspace.");
+  }
+
+  const access = await prisma.workspaceDepartmentAccess.findUnique({
+    where: {
+      workspaceId_departmentId: {
+        workspaceId,
+        departmentId: user.departmentId
+      }
+    },
+    select: {
+      canAccessWorkspace: true
+    }
+  });
+
+  if (!access?.canAccessWorkspace) {
+    throw new ApiError(403, "Your department has not been granted access to this workspace.");
+  }
+
+  return true;
+}
+
+export async function requireWorkspaceDepartmentChatAccess(userId: string, workspaceId: string) {
+  if (await hasAnyWorkspaceAdminRole(userId)) {
+    return true;
+  }
+
+  const restrictedDepartmentsCount = await prisma.workspaceDepartmentAccess.count({
+    where: {
+      workspaceId,
+      canAccessChat: true
+    }
+  });
+
+  if (!restrictedDepartmentsCount) {
+    return true;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId
+    },
+    select: {
+      departmentId: true
+    }
+  });
+
+  if (!user?.departmentId) {
+    throw new ApiError(403, "Your department has not been granted chat access in this workspace.");
+  }
+
+  const access = await prisma.workspaceDepartmentAccess.findUnique({
+    where: {
+      workspaceId_departmentId: {
+        workspaceId,
+        departmentId: user.departmentId
+      }
+    },
+    select: {
+      canAccessChat: true
+    }
+  });
+
+  if (!access?.canAccessChat) {
+    throw new ApiError(403, "Your department has not been granted chat access in this workspace.");
+  }
+
+  return true;
 }
 
 export async function getRolePermissions(workspaceId: string, role: WorkspaceRole | string) {

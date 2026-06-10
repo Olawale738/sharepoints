@@ -1,5 +1,6 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createAnnouncementSchema } from "@/lib/validators";
@@ -13,9 +14,15 @@ export async function GET(_request: Request, context: RouteContext) {
     const user = await requireUser();
     const { id } = await context.params;
     await requireWorkspaceMembership(user.id, id);
+    const canApprove = await canApproveWorkspaceContent(user.id, id);
 
     const announcements = await prisma.workspaceAnnouncement.findMany({
-      where: { workspaceId: id },
+      where: canApprove
+        ? { workspaceId: id }
+        : {
+            workspaceId: id,
+            OR: [{ approvalStatus: "APPROVED" }, { authorId: user.id }]
+          },
       include: {
         author: {
           select: {
@@ -47,13 +54,17 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid announcement.");
     }
 
+    const approvalStatus = await initialApprovalStatus(user.id, id);
     const announcement = await prisma.workspaceAnnouncement.create({
       data: {
         workspaceId: id,
         authorId: user.id,
         title: parsed.data.title,
         body: parsed.data.body,
-        pinned: parsed.data.pinned ?? false
+        pinned: parsed.data.pinned ?? false,
+        approvalStatus,
+        approvedById: approvalStatus === "APPROVED" ? user.id : null,
+        approvedAt: approvalStatus === "APPROVED" ? new Date() : null
       },
       include: {
         author: {
@@ -64,13 +75,21 @@ export async function POST(request: Request, context: RouteContext) {
         }
       }
     });
+    await createApprovalRequestIfNeeded({
+      status: approvalStatus,
+      workspaceId: id,
+      requesterId: user.id,
+      targetType: "ANNOUNCEMENT",
+      targetId: announcement.id,
+      title: announcement.title
+    });
 
     await logActivity({
       userId: user.id,
       workspaceId: id,
       action: activityActions.announcementCreated,
       targetId: announcement.id,
-      metadata: { title: announcement.title, pinned: announcement.pinned }
+      metadata: { title: announcement.title, pinned: announcement.pinned, approvalStatus }
     });
 
     return ok({ announcement }, { status: 201 });

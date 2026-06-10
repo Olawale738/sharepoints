@@ -19,5 +19,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     companyAccessBlocked?: boolean;
+    sessionVersion?: number;
   }
 }

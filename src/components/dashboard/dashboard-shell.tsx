@@ -1,9 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { ShieldCheck, UserRound } from "lucide-react";
+import { ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 
@@ -26,6 +27,8 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ user, workspaces, canCreateWorkspace, children }: DashboardShellProps) {
+  const canOpenAdminCenter = workspaces.some((workspace) => workspace.role === "ADMIN");
+
   return (
     <div className="min-h-screen bg-paper">
       <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-ink/10 bg-white px-4 py-5 lg:block">
@@ -70,7 +73,19 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
               </p>
               <p className="truncate text-sm text-ink/60">{user.name ?? user.email}</p>
             </div>
+            <div className="hidden min-w-0 flex-1 justify-center xl:flex">
+              <GlobalSearch />
+            </div>
             <div className="flex items-center gap-2">
+              {canOpenAdminCenter ? (
+                <Link
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                  href="/dashboard/admin"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Admin
+                </Link>
+              ) : null}
               <Link
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
                 href="/dashboard/profile"
@@ -80,6 +95,9 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
               </Link>
               <SignOutButton />
             </div>
+          </div>
+          <div className="mt-3 xl:hidden">
+            <GlobalSearch />
           </div>
           <details className="mt-3 rounded-md border border-ink/10 bg-white p-3 lg:hidden">
             <summary className="cursor-pointer text-sm font-medium">Workspaces</summary>
