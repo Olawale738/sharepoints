@@ -17,7 +17,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect("/login");
   }
 
-  const ownMemberships = await prisma.workspaceMember.findMany({
+  const [ownMemberships, currentUser] = await Promise.all([
+    prisma.workspaceMember.findMany({
     where: { userId: session.user.id, workspace: { deletedAt: null } },
     include: {
       workspace: {
@@ -34,7 +35,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     orderBy: {
       joinedAt: "asc"
     }
-  });
+    }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { locale: true }
+    })
+  ]);
   const isGlobalAdmin = ownMemberships.some((membership) => membership.role === WorkspaceRole.ADMIN);
   const globalWorkspaces = isGlobalAdmin
     ? await prisma.workspace.findMany({
@@ -80,7 +86,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     isGlobalAdmin || ownMemberships.some((membership) => canCreateWorkspaceFromRole(membership.role));
 
   return (
-    <DashboardShell user={session.user} workspaces={workspaces} canCreateWorkspace={canCreateWorkspace}>
+    <DashboardShell
+      user={session.user}
+      locale={currentUser?.locale ?? "en"}
+      workspaces={workspaces}
+      canCreateWorkspace={canCreateWorkspace}
+    >
       {children}
     </DashboardShell>
   );

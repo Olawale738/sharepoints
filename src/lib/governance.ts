@@ -130,6 +130,16 @@ export async function applyApprovalDecision(input: {
       await tx.workspaceTask.update({ where: { id: request.targetId }, data: reviewData });
     } else if (request.targetType === "MEETING") {
       await tx.workspaceMeeting.update({ where: { id: request.targetId }, data: reviewData });
+    } else if (request.targetType === "FORM_RESPONSE") {
+      await tx.workspaceFormResponse.update({
+        where: { id: request.targetId },
+        data: {
+          approvalStatus: input.status,
+          reviewedById: input.reviewerId,
+          reviewedAt: now,
+          rejectedReason: input.status === ApprovalStatus.REJECTED ? input.reason ?? "Rejected by reviewer." : null
+        }
+      });
     } else {
       throw new ApiError(422, "Unsupported approval target.");
     }

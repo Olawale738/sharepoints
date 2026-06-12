@@ -30,7 +30,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         title: parsed.data.title,
         description: parsed.data.description === undefined ? undefined : parsed.data.description || null,
         status: parsed.data.status,
-        fields: parsed.data.fields
+        fields: parsed.data.fields,
+        requiresApproval: parsed.data.requiresApproval,
+        signatureRequired: parsed.data.signatureRequired,
+        paymentRequired: parsed.data.paymentRequired,
+        paymentAmount: parsed.data.paymentAmount,
+        paymentCurrency: parsed.data.paymentCurrency?.toUpperCase(),
+        paymentUrl: parsed.data.paymentUrl === undefined ? undefined : parsed.data.paymentUrl || null
       }
     });
 

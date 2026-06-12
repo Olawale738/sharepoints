@@ -24,6 +24,7 @@ import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitati
 import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command-center";
 import { DashboardGovernanceCenter } from "@/components/dashboard/dashboard-governance-center";
 import { OrganizationChatPanel } from "@/components/dashboard/organization-chat-panel";
+import { PersonalizedHome } from "@/components/dashboard/personalized-home";
 import { UserAccessPassport } from "@/components/dashboard/user-access-passport";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 import { Badge } from "@/components/ui/badge";
@@ -453,6 +454,79 @@ export default async function DashboardPage() {
         })
       ])
     : [[], [], { _sum: { size: null }, _count: { id: 0 } }, 0, 0, [], [], [], [], [], 0, 0, 0, 0];
+  const [
+    personalMeetings,
+    personalNotifications,
+    personalTasks,
+    personalApprovalCount,
+    personalPolicyCount,
+    personalHelpDeskCount,
+    personalDuties,
+    personalEvents
+  ] = await Promise.all([
+    workspaceIds.length
+      ? prisma.workspaceMeeting.findMany({
+          where: {
+            workspaceId: { in: workspaceIds },
+            startsAt: { gte: now },
+            cancelledAt: null,
+            approvalStatus: "APPROVED"
+          },
+          include: { workspace: { select: { name: true } } },
+          orderBy: { startsAt: "asc" },
+          take: 6
+        })
+      : [],
+    prisma.notification.findMany({
+      where: { userId: session.user.id, readAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 8
+    }),
+    workspaceIds.length
+      ? prisma.workspaceTask.findMany({
+          where: {
+            workspaceId: { in: workspaceIds },
+            status: { not: TaskStatus.DONE },
+            OR: [
+              { assignedToId: session.user.id },
+              { assignees: { some: { userId: session.user.id } } }
+            ]
+          },
+          include: { workspace: { select: { name: true } } },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+          take: 6
+        })
+      : [],
+    prisma.approvalRequest.count({
+      where: { requesterId: session.user.id, status: "PENDING" }
+    }),
+    prisma.policyAssignment.count({
+      where: { userId: session.user.id, acknowledgedAt: null }
+    }),
+    prisma.helpDeskTicket.count({
+      where: {
+        requesterId: session.user.id,
+        status: { notIn: ["RESOLVED", "CLOSED"] }
+      }
+    }),
+    prisma.dutySchedule.findMany({
+      where: {
+        OR: [{ assignedToId: session.user.id }, { substituteUserId: session.user.id }],
+        endsAt: { gte: now },
+        status: { not: "CANCELLED" }
+      },
+      orderBy: { startsAt: "asc" },
+      take: 6
+    }),
+    prisma.churchEvent.findMany({
+      where: {
+        startsAt: { gte: now },
+        OR: [{ workspaceId: null }, { workspaceId: { in: workspaceIds } }]
+      },
+      orderBy: { startsAt: "asc" },
+      take: 6
+    })
+  ]);
   const [{ readable: orgChatAudiences, sendable: sendableOrgChatAudiences }, orgChatAudienceCounts] =
     await Promise.all([getUserOrgChatAudiences(session.user.id), getOrgChatAudienceCounts()]);
   const orgChatRooms = orgChatAudiences.length
@@ -783,6 +857,46 @@ export default async function DashboardPage() {
         workspaceCount={memberships.length}
         assignedOpenTasksCount={assignedOpenTasksCount}
         uploadedFilesCount={currentUserRecord?._count.uploadedFiles ?? 0}
+      />
+
+      <PersonalizedHome
+        meetings={personalMeetings.map((meeting) => ({
+          id: meeting.id,
+          title: meeting.title,
+          detail: `${meeting.workspace.name} · ${formatDate(meeting.startsAt)}`,
+          href: `/dashboard/meetings/${meeting.id}`
+        }))}
+        notifications={personalNotifications.map((notification) => ({
+          id: notification.id,
+          title: notification.title,
+          detail: notification.body ?? formatDate(notification.createdAt),
+          href: notification.href ?? "/dashboard"
+        }))}
+        tasks={personalTasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          detail: `${task.workspace.name} · ${task.dueDate ? formatDate(task.dueDate) : "No due date"}`,
+          href: `/dashboard/workspaces/${task.workspaceId}#tasks`
+        }))}
+        recentFiles={recentFiles.slice(0, 6).map((file) => ({
+          id: file.id,
+          title: file.fileName,
+          detail: `${file.workspace.name} · ${formatDate(file.createdAt)}`,
+          href: `/dashboard/files/${file.id}`
+        }))}
+        upcomingEvents={personalEvents.map((event) => ({
+          id: event.id,
+          title: event.title,
+          detail: `${formatDate(event.startsAt)} · ${event.location ?? "Location pending"}`,
+          href: "/dashboard/operations?tab=events"
+        }))}
+        counts={{
+          unread: personalNotifications.length,
+          approvals: personalApprovalCount,
+          policies: personalPolicyCount,
+          helpdesk: personalHelpDeskCount,
+          duties: personalDuties.length
+        }}
       />
 
       {isGlobalAdmin ? (

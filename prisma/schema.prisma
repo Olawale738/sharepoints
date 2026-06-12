@@ -192,6 +192,87 @@ enum ResourceBookingStatus {
   CANCELLED
 }
 
+enum VisitorJourneyType {
+  VISITOR
+  NEW_CONVERT
+}
+
+enum VisitorJourneyStage {
+  REGISTERED
+  CONTACTED
+  COUNSELLING
+  FOUNDATION_CLASS
+  MEMBERSHIP_ONBOARDING
+  COMPLETED
+  INACTIVE
+}
+
+enum HelpDeskCategory {
+  IT
+  FACILITY
+  FINANCE
+  ADMINISTRATION
+  OTHER
+}
+
+enum HelpDeskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum HelpDeskStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum FormPaymentStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  FAILED
+  WAIVED
+}
+
+enum EventRegistrationStatus {
+  REGISTERED
+  WAITLISTED
+  APPROVED
+  CHECKED_IN
+  CANCELLED
+}
+
+enum PolicyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  LIMITED
+  UNAVAILABLE
+}
+
+enum DutyScheduleStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id                         String                     @id @default(cuid())
   name                       String?
@@ -209,6 +290,7 @@ model User {
   suspendedAt                DateTime?
   accessRevokedAt            DateTime?
   deletedAt                  DateTime?
+  locale                     String                     @default("en")
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
   accounts                   Account[]
@@ -1027,31 +1109,45 @@ model WikiPage {
 }
 
 model WorkspaceForm {
-  id          String                  @id @default(cuid())
-  workspaceId String
-  title       String
-  description String?
-  status      WorkspaceFormStatus     @default(DRAFT)
-  fields      Json
-  createdById String
-  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy   User                    @relation("FormCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  responses   WorkspaceFormResponse[]
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  id                String                  @id @default(cuid())
+  workspaceId       String
+  title             String
+  description       String?
+  status            WorkspaceFormStatus     @default(DRAFT)
+  fields            Json
+  requiresApproval  Boolean                 @default(false)
+  signatureRequired Boolean                 @default(false)
+  paymentRequired   Boolean                 @default(false)
+  paymentAmount     Int?
+  paymentCurrency   String                  @default("GBP")
+  paymentUrl        String?
+  createdById       String
+  workspace         Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy         User                    @relation("FormCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  responses         WorkspaceFormResponse[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   @@index([workspaceId, status, updatedAt])
 }
 
 model WorkspaceFormResponse {
-  id           String        @id @default(cuid())
-  formId       String
-  respondentId String
-  answers      Json
-  form         WorkspaceForm @relation(fields: [formId], references: [id], onDelete: Cascade)
-  respondent   User          @relation(fields: [respondentId], references: [id], onDelete: Cascade)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id               String            @id @default(cuid())
+  formId           String
+  respondentId     String
+  answers          Json
+  approvalStatus   ApprovalStatus    @default(APPROVED)
+  reviewedById     String?
+  reviewedAt       DateTime?
+  rejectedReason   String?
+  paymentStatus    FormPaymentStatus @default(NOT_REQUIRED)
+  paymentReference String?
+  signatureName    String?
+  signedAt         DateTime?
+  form             WorkspaceForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  respondent       User              @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@unique([formId, respondentId])
   @@index([formId, createdAt])
@@ -1381,4 +1477,227 @@ model ResourceBooking {
 
   @@index([resourceId, startsAt, endsAt])
   @@index([workspaceId, status])
+}
+
+model VisitorJourney {
+  id                  String              @id @default(cuid())
+  workspaceId         String?
+  journeyType         VisitorJourneyType
+  firstName           String
+  lastName            String
+  email               String?
+  phone               String?
+  source              String?
+  firstVisitAt        DateTime?
+  stage               VisitorJourneyStage @default(REGISTERED)
+  assignedToId        String?
+  membershipUserId    String?
+  nextContactAt       DateTime?
+  reminderAt          DateTime?
+  onboardingChecklist Json?
+  createdById         String
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([workspaceId, stage, nextContactAt])
+  @@index([assignedToId, stage, reminderAt])
+  @@index([email])
+  @@index([phone])
+}
+
+model VisitorJourneyNote {
+  id            String    @id @default(cuid())
+  journeyId     String
+  authorId      String
+  noteType      String    @default("GENERAL")
+  content       String    @db.Text
+  confidential  Boolean   @default(true)
+  nextContactAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([journeyId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model VisitorStageHistory {
+  id          String               @id @default(cuid())
+  journeyId   String
+  fromStage   VisitorJourneyStage?
+  toStage     VisitorJourneyStage
+  changedById String
+  note        String?
+  createdAt   DateTime             @default(now())
+
+  @@index([journeyId, createdAt])
+}
+
+model HelpDeskTicket {
+  id                   String           @id @default(cuid())
+  workspaceId          String?
+  requesterId          String
+  category             HelpDeskCategory
+  priority             HelpDeskPriority @default(NORMAL)
+  status               HelpDeskStatus   @default(OPEN)
+  subject              String
+  description          String           @db.Text
+  assigneeId           String?
+  responseDueAt        DateTime?
+  firstRespondedAt     DateTime?
+  firstResponseMinutes Int?
+  resolvedAt           DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@index([requesterId, status, createdAt])
+  @@index([assigneeId, status, responseDueAt])
+  @@index([workspaceId, category, status])
+}
+
+model HelpDeskComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String   @db.Text
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model EventTicketConfiguration {
+  id                   String    @id @default(cuid())
+  eventId              String    @unique
+  capacity             Int?
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+  invitationCode       String?
+  requireApproval      Boolean   @default(false)
+  badgeEnabled         Boolean   @default(true)
+  certificateEnabled   Boolean   @default(false)
+  paymentRequired      Boolean   @default(false)
+  paymentAmount        Int?
+  paymentCurrency      String    @default("GBP")
+  paymentUrl           String?
+  createdById          String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([registrationClosesAt])
+}
+
+model EventRegistration {
+  id                  String                  @id @default(cuid())
+  eventId             String
+  userId              String?
+  displayName         String
+  email               String?
+  phone               String?
+  ticketCode          String                  @unique
+  qrToken             String                  @unique
+  invitationCodeUsed  String?
+  status              EventRegistrationStatus @default(REGISTERED)
+  paymentStatus       FormPaymentStatus       @default(NOT_REQUIRED)
+  paymentReference    String?
+  checkedInAt         DateTime?
+  checkedInById       String?
+  badgePrintedAt      DateTime?
+  certificateIssuedAt DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId, status, createdAt])
+  @@index([email, eventId])
+}
+
+model PolicyDocument {
+  id           String       @id @default(cuid())
+  workspaceId  String?
+  title        String
+  summary      String?
+  content      String       @db.Text
+  fileId       String?
+  version      Int          @default(1)
+  status       PolicyStatus @default(DRAFT)
+  dueDays      Int          @default(14)
+  reminderDays Json?
+  createdById  String
+  publishedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([workspaceId, status, publishedAt])
+}
+
+model PolicyAssignment {
+  id             String    @id @default(cuid())
+  policyId       String
+  userId         String
+  assignedAt     DateTime  @default(now())
+  dueAt          DateTime?
+  acknowledgedAt DateTime?
+  signatureName  String?
+  signatureIp    String?
+  reminderSentAt DateTime?
+
+  @@unique([policyId, userId])
+  @@index([userId, acknowledgedAt, dueAt])
+  @@index([policyId, acknowledgedAt])
+}
+
+model LeaveRequest {
+  id          String             @id @default(cuid())
+  userId      String
+  workspaceId String?
+  leaveType   String
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String?
+  status      LeaveRequestStatus @default(PENDING)
+  reviewerId  String?
+  reviewedAt  DateTime?
+  reviewNote  String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([userId, startsAt, endsAt])
+  @@index([workspaceId, status, startsAt])
+  @@index([reviewerId, status])
+}
+
+model StaffAvailability {
+  id        String             @id @default(cuid())
+  userId    String
+  weekday   Int
+  startTime String?
+  endTime   String?
+  status    AvailabilityStatus @default(AVAILABLE)
+  note      String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([userId, weekday])
+  @@index([status, weekday])
+}
+
+model DutySchedule {
+  id               String             @id @default(cuid())
+  workspaceId      String?
+  title            String
+  role             String?
+  startsAt         DateTime
+  endsAt           DateTime
+  assignedToId     String
+  substituteUserId String?
+  status           DutyScheduleStatus @default(SCHEDULED)
+  notes            String?
+  createdById      String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([assignedToId, startsAt])
+  @@index([substituteUserId, startsAt])
+  @@index([workspaceId, status, startsAt])
 }

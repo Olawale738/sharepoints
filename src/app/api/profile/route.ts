@@ -12,6 +12,7 @@ export async function GET() {
         name: true,
         email: true,
         image: true,
+        locale: true,
         createdAt: true
       }
     });
@@ -36,13 +37,15 @@ export async function PATCH(request: Request) {
       where: { id: user.id },
       data: {
         name: parsed.data.name,
-        image: parsed.data.image || null
+        image: parsed.data.image || null,
+        locale: parsed.data.locale
       },
       select: {
         id: true,
         name: true,
         email: true,
-        image: true
+        image: true,
+        locale: true
       }
     });
 
@@ -51,4 +54,3 @@ export async function PATCH(request: Request) {
     return handleRouteError(error);
   }
 }
-

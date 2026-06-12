@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { TranslateTextButton } from "@/components/dashboard/translate-text-button";
 import { formatDate } from "@/lib/utils";
 
 type Announcement = {
@@ -123,6 +124,7 @@ export function AnnouncementsPanel({
               <p className="mb-2 rounded-md bg-clay/10 px-2 py-1 text-xs text-clay">{announcement.rejectedReason}</p>
             ) : null}
             <p className="whitespace-pre-wrap text-ink/75">{announcement.body}</p>
+            <TranslateTextButton text={`${announcement.title}\n\n${announcement.body}`} />
           </article>
         ))}
       </div>

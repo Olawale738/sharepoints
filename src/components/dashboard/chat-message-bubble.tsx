@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { VoiceNotePlayer } from "@/components/dashboard/voice-note-player";
+import { TranslateTextButton } from "@/components/dashboard/translate-text-button";
 import { Button } from "@/components/ui/button";
 import { messageDeleteWindowMs } from "@/lib/message-constants";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -227,9 +228,12 @@ export function ChatMessageBubble({
                 />
               ) : null}
               {!isDeleted && message.body ? (
-                <p className={`whitespace-pre-wrap break-words text-sm ${hasVoiceNote ? "mt-2" : ""}`}>
-                  {message.body}
-                </p>
+                <>
+                  <p className={`whitespace-pre-wrap break-words text-sm ${hasVoiceNote ? "mt-2" : ""}`}>
+                    {message.body}
+                  </p>
+                  <TranslateTextButton text={message.body} />
+                </>
               ) : null}
               {!isDeleted && message.attachmentFile ? (
                 <a

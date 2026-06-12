@@ -48,7 +48,14 @@ async function getWorkspaceBackupPayload(workspaceId: string) {
     meetingActionItems,
     churchAttendance,
     volunteerAssignments,
-    pastoralFollowUps
+    pastoralFollowUps,
+    visitorJourneys,
+    helpDeskTickets,
+    eventTicketConfigurations,
+    eventRegistrations,
+    policies,
+    leaveRequests,
+    dutySchedules
   ] = await Promise.all([
     prisma.workflowRun.findMany({ where: { workflowId: { in: workflowIds } } }),
     prisma.recycleBinItem.findMany({ where: { workspaceId } }),
@@ -58,7 +65,24 @@ async function getWorkspaceBackupPayload(workspaceId: string) {
     prisma.meetingActionItem.findMany({ where: { meetingId: { in: meetingIds } } }),
     prisma.churchAttendance.findMany({ where: { eventId: { in: churchEventIds } } }),
     prisma.volunteerAssignment.findMany({ where: { eventId: { in: churchEventIds } } }),
-    prisma.pastoralFollowUp.findMany({ where: { workspaceId } })
+    prisma.pastoralFollowUp.findMany({ where: { workspaceId } }),
+    prisma.visitorJourney.findMany({ where: { workspaceId } }),
+    prisma.helpDeskTicket.findMany({ where: { workspaceId } }),
+    prisma.eventTicketConfiguration.findMany({ where: { eventId: { in: churchEventIds } } }),
+    prisma.eventRegistration.findMany({ where: { eventId: { in: churchEventIds } } }),
+    prisma.policyDocument.findMany({ where: { workspaceId } }),
+    prisma.leaveRequest.findMany({ where: { workspaceId } }),
+    prisma.dutySchedule.findMany({ where: { workspaceId } })
+  ]);
+
+  const visitorJourneyIds = visitorJourneys.map((journey) => journey.id);
+  const helpDeskTicketIds = helpDeskTickets.map((ticket) => ticket.id);
+  const policyIds = policies.map((policy) => policy.id);
+  const [visitorNotes, visitorStageHistory, helpDeskComments, policyAssignments] = await Promise.all([
+    prisma.visitorJourneyNote.findMany({ where: { journeyId: { in: visitorJourneyIds } } }),
+    prisma.visitorStageHistory.findMany({ where: { journeyId: { in: visitorJourneyIds } } }),
+    prisma.helpDeskComment.findMany({ where: { ticketId: { in: helpDeskTicketIds } } }),
+    prisma.policyAssignment.findMany({ where: { policyId: { in: policyIds } } })
   ]);
 
   return {
@@ -76,7 +100,18 @@ async function getWorkspaceBackupPayload(workspaceId: string) {
     volunteerAssignments,
     pastoralFollowUps,
     resources,
-    resourceBookings
+    resourceBookings,
+    visitorJourneys,
+    visitorNotes,
+    visitorStageHistory,
+    helpDeskTickets,
+    helpDeskComments,
+    eventTicketConfigurations,
+    eventRegistrations,
+    policies,
+    policyAssignments,
+    leaveRequests,
+    dutySchedules
   };
 }
 
@@ -106,6 +141,7 @@ export async function createWorkspaceBackup(workspaceId: string | null, createdB
           pushSubscriptions: await prisma.pushSubscription.findMany(),
           securityEvents: await prisma.securityEvent.findMany(),
           adminRolePreviews: await prisma.adminRolePreview.findMany(),
+          staffAvailability: await prisma.staffAvailability.findMany(),
           globalDlpRules: await prisma.dlpRule.findMany({ where: { workspaceId: null } }),
           workspaces: await Promise.all(
             (await prisma.workspace.findMany({ select: { id: true } })).map((workspace) =>

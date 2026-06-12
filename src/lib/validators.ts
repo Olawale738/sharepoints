@@ -79,8 +79,9 @@ export const updateWorkspaceRolePermissionSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  name: z.string().trim().min(2).max(80),
-  image: z.string().url().max(2048).optional().or(z.literal(""))
+  name: z.string().trim().min(2).max(80).optional(),
+  image: z.string().url().max(2048).optional().or(z.literal("")),
+  locale: z.enum(["en", "yo", "fr"]).optional()
 });
 
 export const inviteCompanyEmailSchema = z.object({
@@ -259,18 +260,34 @@ export const formFieldSchema = z.object({
   label: z.string().trim().min(1).max(160),
   type: z.enum(["TEXT", "LONG_TEXT", "EMAIL", "NUMBER", "DATE", "CHOICE", "CHECKBOX"]),
   required: z.boolean().optional(),
-  options: z.array(z.string().trim().min(1).max(120)).max(30).optional()
+  options: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
+  placeholder: z.string().trim().max(160).optional(),
+  condition: z
+    .object({
+      fieldId: z.string().trim().min(1).max(80),
+      operator: z.enum(["EQUALS", "NOT_EQUALS", "CONTAINS", "CHECKED"]),
+      value: z.union([z.string().max(500), z.boolean()]).optional()
+    })
+    .optional()
 });
 
 export const createWorkspaceFormSchema = z.object({
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(1000).optional().or(z.literal("")),
   status: z.enum(["DRAFT", "OPEN", "CLOSED"]).optional(),
-  fields: z.array(formFieldSchema).min(1).max(40)
+  fields: z.array(formFieldSchema).min(1).max(40),
+  requiresApproval: z.boolean().optional(),
+  signatureRequired: z.boolean().optional(),
+  paymentRequired: z.boolean().optional(),
+  paymentAmount: z.number().int().nonnegative().optional().nullable(),
+  paymentCurrency: z.string().trim().length(3).optional(),
+  paymentUrl: z.string().url().optional().nullable().or(z.literal(""))
 });
 
 export const submitWorkspaceFormSchema = z.object({
-  answers: z.record(z.union([z.string().max(5000), z.number(), z.boolean(), z.array(z.string().max(500))]))
+  answers: z.record(z.union([z.string().max(5000), z.number(), z.boolean(), z.array(z.string().max(500))])),
+  signatureName: z.string().trim().max(120).optional().nullable(),
+  paymentReference: z.string().trim().max(160).optional().nullable()
 });
 
 export const fileGovernanceSchema = z.object({

@@ -13,6 +13,7 @@ type ProfileFormProps = {
     name?: string | null;
     email?: string | null;
     image?: string | null;
+    locale?: string | null;
   };
 };
 
@@ -34,7 +35,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: String(formData.get("name")),
-        image: String(formData.get("image") ?? "")
+        image: String(formData.get("image") ?? ""),
+        locale: String(formData.get("locale") ?? "en")
       })
     });
 
@@ -64,6 +66,19 @@ export function ProfileForm({ user }: ProfileFormProps) {
         <Label htmlFor="profile-image">Image URL</Label>
         <Input id="profile-image" name="image" type="url" defaultValue={user.image ?? ""} />
       </div>
+      <div className="space-y-2">
+        <Label htmlFor="profile-locale">Interface language</Label>
+        <select
+          id="profile-locale"
+          name="locale"
+          className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm"
+          defaultValue={user.locale ?? "en"}
+        >
+          <option value="en">English</option>
+          <option value="yo">Yoruba</option>
+          <option value="fr">Français</option>
+        </select>
+      </div>
       {error ? <p className="rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
       {saved ? <p className="rounded-md bg-mint px-3 py-2 text-sm text-ink">Profile saved.</p> : null}
       <Button type="submit" disabled={isSaving}>
@@ -73,4 +88,3 @@ export function ProfileForm({ user }: ProfileFormProps) {
     </form>
   );
 }
-

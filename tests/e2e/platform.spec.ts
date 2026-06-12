@@ -18,6 +18,16 @@ test("registration clearly requires an invitation", async ({ page }) => {
   await expect(page.getByLabel(/email/i)).toBeVisible();
 });
 
+test("people operations and its APIs require authentication", async ({ page, request }) => {
+  await page.goto("/dashboard/operations");
+  await expect(page).toHaveURL(/\/login/);
+
+  for (const path of ["/api/visitors", "/api/help-desk", "/api/event-ticketing", "/api/policies", "/api/staff"]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(401);
+  }
+});
+
 test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
   test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
   await page.goto("/login");

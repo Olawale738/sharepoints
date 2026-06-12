@@ -23,7 +23,12 @@ export async function GET(_request: Request, context: RouteContext) {
         },
         responses: {
           where: { respondentId: user.id },
-          select: { id: true, createdAt: true }
+          select: {
+            id: true,
+            createdAt: true,
+            approvalStatus: true,
+            paymentStatus: true
+          }
         },
         _count: {
           select: { responses: true }
@@ -56,7 +61,13 @@ export async function POST(request: Request, context: RouteContext) {
         title: parsed.data.title,
         description: parsed.data.description || null,
         status: parsed.data.status ?? "DRAFT",
-        fields: parsed.data.fields
+        fields: parsed.data.fields,
+        requiresApproval: parsed.data.requiresApproval ?? false,
+        signatureRequired: parsed.data.signatureRequired ?? false,
+        paymentRequired: parsed.data.paymentRequired ?? false,
+        paymentAmount: parsed.data.paymentAmount,
+        paymentCurrency: parsed.data.paymentCurrency?.toUpperCase() ?? "GBP",
+        paymentUrl: parsed.data.paymentUrl || null
       },
       include: {
         createdBy: { select: { name: true, email: true } },
