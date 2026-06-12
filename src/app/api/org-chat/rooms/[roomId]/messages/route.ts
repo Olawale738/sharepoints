@@ -3,6 +3,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { requireOrgChatRoomAccess, requireOrgChatRoomSendAccess } from "@/lib/org-chat";
 import { notifyMentionedUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { publishRealtime } from "@/lib/realtime";
 import { createDirectMessageSchema } from "@/lib/validators";
 import {
   isMultipartRequest,
@@ -142,6 +143,7 @@ export async function POST(request: Request, context: RouteContext) {
       title: `You were mentioned in ${room.name}`,
       href: "/dashboard"
     });
+    await publishRealtime("organization", roomId, "message.created", message);
 
     return ok({ message }, { status: 201 });
   } catch (error) {

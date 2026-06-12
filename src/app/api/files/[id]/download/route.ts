@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanSeeFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceMembership } from "@/lib/rbac";
+import { hasWorkspaceAdminAccess, requireWorkspaceMembership } from "@/lib/rbac";
 import { getDownloadResponse } from "@/lib/storage";
 
 type RouteContext = {
@@ -33,7 +33,7 @@ export async function GET(request: Request, context: RouteContext) {
       where: { id }
     });
 
-    if (!file) {
+    if (!file || file.deletedAt) {
       throw new ApiError(404, "File not found.");
     }
 
@@ -42,6 +42,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     if (file.scanStatus === "INFECTED") {
       throw new ApiError(423, "This document was blocked by security screening.");
+    }
+    if (file.dlpRestricted && !(await hasWorkspaceAdminAccess(session.user.id, file.workspaceId))) {
+      throw new ApiError(403, "Download restricted by the organization data-loss prevention policy.");
     }
 
     return getDownloadResponse(file.storageKey, file.fileName, file.fileType);

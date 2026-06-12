@@ -4,11 +4,13 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { scanUploadedFile } from "@/lib/file-security";
+import { inspectForDlp, recordDlpIncidents } from "@/lib/dlp";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
 import { sanitizeFileName } from "@/lib/utils";
 import { uploadFileSchema } from "@/lib/validators";
+import { runWorkspaceWorkflows } from "@/lib/workflows";
 
 export const runtime = "nodejs";
 
@@ -68,9 +70,19 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const body = Buffer.from(arrayBuffer);
     const scan = scanUploadedFile(fileName, body);
+    const dlp = await inspectForDlp(parsed.data.workspaceId, body);
 
     if (scan.status === "INFECTED") {
       throw new ApiError(415, scan.details);
+    }
+
+    if (dlp.action === "BLOCK") {
+      await recordDlpIncidents({
+        workspaceId: parsed.data.workspaceId,
+        userId: user.id,
+        result: dlp
+      });
+      throw new ApiError(422, `Upload blocked by data-loss prevention: ${dlp.classification}.`);
     }
 
     const fileUrl = await uploadObject({
@@ -93,6 +105,8 @@ export async function POST(request: Request) {
         size: file.size,
         scanStatus: scan.status,
         scanDetails: scan.details,
+        dlpRestricted: dlp.action === "RESTRICT",
+        dlpClassification: dlp.classification,
         approvalStatus,
         approvedById: approvalStatus === "APPROVED" ? user.id : null,
         approvedAt: approvalStatus === "APPROVED" ? new Date() : null,
@@ -127,6 +141,23 @@ export async function POST(request: Request) {
       targetType: "FILE",
       targetId: createdFile.id,
       title: createdFile.fileName
+    });
+    await recordDlpIncidents({
+      workspaceId: parsed.data.workspaceId,
+      fileId: createdFile.id,
+      userId: user.id,
+      result: dlp
+    });
+    await runWorkspaceWorkflows({
+      workspaceId: parsed.data.workspaceId,
+      trigger: "FILE_UPLOADED",
+      triggerId: createdFile.id,
+      actorId: user.id,
+      payload: {
+        fileName: createdFile.fileName,
+        size: createdFile.size,
+        dlpRestricted: createdFile.dlpRestricted
+      }
     });
 
     await logActivity({

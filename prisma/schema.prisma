@@ -100,6 +100,98 @@ enum WorkspaceFormStatus {
   CLOSED
 }
 
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum NotificationDigest {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  NEVER
+}
+
+enum WorkflowTrigger {
+  FILE_UPLOADED
+  FILE_APPROVED
+  TASK_CREATED
+  MEETING_ENDED
+  FORM_SUBMITTED
+  SCHEDULED
+}
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum RecycleItemType {
+  FILE
+  FOLDER
+  WORKSPACE
+  CHANNEL_MESSAGE
+  DIRECT_MESSAGE
+  ORG_MESSAGE
+}
+
+enum DlpAction {
+  WARN
+  RESTRICT
+  BLOCK
+}
+
+enum DlpIncidentStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+enum BackupStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum TranscriptStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ChurchEventType {
+  SERVICE
+  EVENT
+  OUTREACH
+  MEETING
+  TRAINING
+}
+
+enum FollowUpStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+  CLOSED
+}
+
+enum VolunteerStatus {
+  INVITED
+  CONFIRMED
+  DECLINED
+  COMPLETED
+}
+
+enum ResourceBookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id                         String                     @id @default(cuid())
   name                       String?
@@ -305,10 +397,16 @@ model Workspace {
   forms               WorkspaceForm[]
   notifications       Notification[]
   messagePins         MessagePin[]
+  templateId          String?
+  deletedAt           DateTime?
+  deletedById         String?
+  restoreUntil        DateTime?
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
   @@index([createdById])
+  @@index([deletedAt, restoreUntil])
+  @@index([templateId])
 }
 
 model WorkspaceDepartmentAccess {
@@ -351,6 +449,10 @@ model WorkspaceMeeting {
   approvedById       String?
   approvedAt         DateTime?
   rejectedReason     String?
+  transcriptStatus   TranscriptStatus           @default(PENDING)
+  transcript         String?                    @db.Text
+  transcriptSummary  String?                    @db.Text
+  transcriptLanguage String?
   workspace          Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy          User                       @relation("CreatedMeetings", fields: [createdById], references: [id], onDelete: Restrict)
   responses          WorkspaceMeetingResponse[]
@@ -495,20 +597,24 @@ model WorkspaceTaskComment {
 }
 
 model Folder {
-  id          String    @id @default(cuid())
-  workspaceId String
-  parentId    String?
-  name        String
-  createdById String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  parent      Folder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children    Folder[]  @relation("FolderTree")
-  createdBy   User      @relation("CreatedFolders", fields: [createdById], references: [id], onDelete: Restrict)
-  files       File[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  workspaceId  String
+  parentId     String?
+  name         String
+  createdById  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent       Folder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children     Folder[]  @relation("FolderTree")
+  createdBy    User      @relation("CreatedFolders", fields: [createdById], references: [id], onDelete: Restrict)
+  files        File[]
+  deletedAt    DateTime?
+  deletedById  String?
+  restoreUntil DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([workspaceId, parentId])
+  @@index([deletedAt, restoreUntil])
 }
 
 model File {
@@ -532,6 +638,11 @@ model File {
   legalHold            Boolean         @default(false)
   scanStatus           FileScanStatus  @default(SKIPPED)
   scanDetails          String?
+  dlpRestricted        Boolean         @default(false)
+  dlpClassification    String?
+  deletedAt            DateTime?
+  deletedById          String?
+  restoreUntil         DateTime?
   workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   folder               Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy           User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
@@ -550,6 +661,8 @@ model File {
   @@index([scanStatus])
   @@index([retentionUntil])
   @@index([legalHold])
+  @@index([deletedAt, restoreUntil])
+  @@index([dlpRestricted])
 }
 
 model FileVersion {
@@ -763,7 +876,7 @@ model ActivityLog {
 }
 
 model Notification {
-  id          String     @id @default(cuid())
+  id          String               @id @default(cuid())
   userId      String
   workspaceId String?
   type        String
@@ -771,25 +884,37 @@ model Notification {
   body        String?
   href        String?
   readAt      DateTime?
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt   DateTime   @default(now())
+  priority    NotificationPriority @default(NORMAL)
+  deliverAt   DateTime?
+  deliveredAt DateTime?
+  emailSentAt DateTime?
+  pushSentAt  DateTime?
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime             @default(now())
 
   @@index([userId, readAt, createdAt])
   @@index([workspaceId, createdAt])
+  @@index([deliverAt, deliveredAt])
+  @@index([priority, createdAt])
 }
 
 model NotificationPreference {
-  id             String   @id @default(cuid())
-  userId         String   @unique
-  inAppEnabled   Boolean  @default(true)
-  browserEnabled Boolean  @default(false)
-  emailMentions  Boolean  @default(true)
-  emailTasks     Boolean  @default(true)
-  emailMeetings  Boolean  @default(true)
-  emailApprovals Boolean  @default(true)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  updatedAt      DateTime @updatedAt
+  id              String             @id @default(cuid())
+  userId          String             @unique
+  inAppEnabled    Boolean            @default(true)
+  browserEnabled  Boolean            @default(false)
+  emailMentions   Boolean            @default(true)
+  emailTasks      Boolean            @default(true)
+  emailMeetings   Boolean            @default(true)
+  emailApprovals  Boolean            @default(true)
+  pushEnabled     Boolean            @default(true)
+  digest          NotificationDigest @default(IMMEDIATE)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  timeZone        String             @default("Europe/London")
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt       DateTime           @updatedAt
 }
 
 model UserPresence {
@@ -970,4 +1095,290 @@ model SecurityEvent {
   @@index([userId, createdAt])
   @@index([email, createdAt])
   @@index([type, createdAt])
+}
+
+model WorkflowDefinition {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  trigger     WorkflowTrigger
+  conditions  Json?
+  actions     Json
+  enabled     Boolean         @default(true)
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([workspaceId, enabled, trigger])
+  @@index([createdById, createdAt])
+}
+
+model WorkflowRun {
+  id           String            @id @default(cuid())
+  workflowId   String
+  workspaceId  String
+  trigger      WorkflowTrigger
+  triggerId    String?
+  status       WorkflowRunStatus @default(RUNNING)
+  input        Json?
+  output       Json?
+  errorMessage String?
+  startedAt    DateTime          @default(now())
+  completedAt  DateTime?
+
+  @@index([workflowId, startedAt])
+  @@index([workspaceId, status, startedAt])
+}
+
+model RecycleBinItem {
+  id           String          @id @default(cuid())
+  workspaceId  String?
+  itemType     RecycleItemType
+  itemId       String
+  displayName  String
+  snapshot     Json?
+  deletedById  String
+  deletedAt    DateTime        @default(now())
+  restoreUntil DateTime
+  restoredAt   DateTime?
+  restoredById String?
+  purgedAt     DateTime?
+
+  @@unique([itemType, itemId, deletedAt])
+  @@index([workspaceId, deletedAt])
+  @@index([restoreUntil, purgedAt])
+}
+
+model BackupSnapshot {
+  id           String       @id @default(cuid())
+  workspaceId  String?
+  createdById  String
+  name         String
+  status       BackupStatus @default(PENDING)
+  storageKey   String?      @unique
+  size         Int?
+  checksum     String?
+  errorMessage String?
+  createdAt    DateTime     @default(now())
+  completedAt  DateTime?
+
+  @@index([workspaceId, createdAt])
+  @@index([status, createdAt])
+}
+
+model DlpRule {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  pattern     String
+  action      DlpAction @default(RESTRICT)
+  enabled     Boolean   @default(true)
+  workspaceId String?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, enabled])
+}
+
+model DlpIncident {
+  id             String            @id @default(cuid())
+  workspaceId    String
+  fileId         String?
+  ruleId         String?
+  detectedById   String?
+  classification String
+  action         DlpAction
+  status         DlpIncidentStatus @default(OPEN)
+  details        Json?
+  createdAt      DateTime          @default(now())
+  resolvedAt     DateTime?
+  resolvedById   String?
+
+  @@index([workspaceId, status, createdAt])
+  @@index([fileId, createdAt])
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique
+  platform   String
+  deviceName String?
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, enabled])
+}
+
+model MeetingAttendance {
+  id          String    @id @default(cuid())
+  meetingId   String
+  userId      String?
+  displayName String
+  joinedAt    DateTime
+  leftAt      DateTime?
+  durationSec Int?
+  createdAt   DateTime  @default(now())
+
+  @@index([meetingId, joinedAt])
+  @@index([userId, joinedAt])
+}
+
+model MeetingActionItem {
+  id          String    @id @default(cuid())
+  meetingId   String
+  title       String
+  assigneeId  String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([meetingId, completedAt])
+  @@index([assigneeId, dueAt])
+}
+
+model WorkspaceTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String
+  definition  Json
+  system      Boolean  @default(false)
+  enabled     Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, category])
+  @@index([enabled, category])
+}
+
+model AdminRolePreview {
+  id          String        @id @default(cuid())
+  adminId     String
+  workspaceId String
+  previewRole WorkspaceRole
+  createdAt   DateTime      @default(now())
+  endedAt     DateTime?
+
+  @@index([adminId, createdAt])
+  @@index([workspaceId, previewRole])
+}
+
+model Ministry {
+  id          String   @id @default(cuid())
+  workspaceId String?
+  name        String
+  description String?
+  leaderId    String?
+  active      Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, name])
+  @@index([leaderId, active])
+}
+
+model ChurchEvent {
+  id          String          @id @default(cuid())
+  workspaceId String?
+  ministryId  String?
+  title       String
+  description String?
+  eventType   ChurchEventType
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime
+  capacity    Int?
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([workspaceId, startsAt])
+  @@index([ministryId, startsAt])
+}
+
+model ChurchAttendance {
+  id          String   @id @default(cuid())
+  eventId     String
+  userId      String?
+  displayName String
+  email       String?
+  checkedInAt DateTime @default(now())
+  notes       String?
+
+  @@unique([eventId, userId])
+  @@index([eventId, checkedInAt])
+}
+
+model VolunteerAssignment {
+  id          String          @id @default(cuid())
+  eventId     String
+  ministryId  String?
+  userId      String
+  role        String
+  status      VolunteerStatus @default(INVITED)
+  notes       String?
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([eventId, userId, role])
+  @@index([userId, status])
+}
+
+model PastoralFollowUp {
+  id            String         @id @default(cuid())
+  workspaceId   String?
+  personName    String
+  email         String?
+  phone         String?
+  reason        String
+  notes         String?        @db.Text
+  assignedToId  String?
+  status        FollowUpStatus @default(NEW)
+  nextContactAt DateTime?
+  createdById   String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([assignedToId, status, nextContactAt])
+  @@index([workspaceId, status])
+}
+
+model ChurchResource {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  description String?
+  location    String?
+  active      Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, location])
+}
+
+model ResourceBooking {
+  id            String                @id @default(cuid())
+  resourceId    String
+  workspaceId   String?
+  eventId       String?
+  title         String
+  startsAt      DateTime
+  endsAt        DateTime
+  status        ResourceBookingStatus @default(PENDING)
+  requestedById String
+  approvedById  String?
+  notes         String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([resourceId, startsAt, endsAt])
+  @@index([workspaceId, status])
 }

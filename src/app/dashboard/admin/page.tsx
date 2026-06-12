@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   UsersRound,
-  Workflow
+  Workflow,
+  ShieldAlert
 } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -156,6 +157,7 @@ export default async function AdminControlCenterPage() {
       take: 150
     }),
     prisma.workspace.findMany({
+      where: { deletedAt: null },
       include: {
         _count: {
           select: {
@@ -173,6 +175,7 @@ export default async function AdminControlCenterPage() {
       take: 100
     }),
     prisma.file.aggregate({
+      where: { deletedAt: null },
       _sum: {
         size: true
       },
@@ -295,6 +298,13 @@ export default async function AdminControlCenterPage() {
             href="/dashboard"
           >
             Back to dashboard
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-mint/40 px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/admin/enterprise"
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Enterprise controls
           </Link>
         </div>
       </section>

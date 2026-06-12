@@ -15,8 +15,8 @@ export async function POST(request: Request) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Enter a valid join code.");
     }
 
-    const workspace = await prisma.workspace.findUnique({
-      where: { joinCode: parsed.data.joinCode },
+    const workspace = await prisma.workspace.findFirst({
+      where: { joinCode: parsed.data.joinCode, deletedAt: null },
       select: {
         id: true,
         name: true

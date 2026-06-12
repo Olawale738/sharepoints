@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireWorkspaceCreatorRole } from "@/lib/rbac";
 import { createWorkspaceSchema } from "@/lib/validators";
 import { slugify } from "@/lib/utils";
+import { applyWorkspaceTemplate } from "@/lib/workspace-templates";
 
 export async function GET() {
   try {
@@ -15,6 +16,7 @@ export async function GET() {
 
     if (isGlobalAdmin) {
       const workspaces = await prisma.workspace.findMany({
+        where: { deletedAt: null },
         include: {
           _count: {
             select: {
@@ -44,7 +46,7 @@ export async function GET() {
     }
 
     const memberships = await prisma.workspaceMember.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, workspace: { deletedAt: null } },
       include: {
         workspace: {
           include: {
@@ -127,6 +129,9 @@ export async function POST(request: Request) {
       metadata: { name: workspace.name }
     });
     await getOrCreateGeneralChannel(workspace.id, user.id);
+    if (parsed.data.templateId) {
+      await applyWorkspaceTemplate(workspace.id, parsed.data.templateId, user.id);
+    }
 
     return ok({ workspace }, { status: 201 });
   } catch (error) {

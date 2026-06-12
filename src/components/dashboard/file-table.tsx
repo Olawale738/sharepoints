@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, Eye, FileClock, FileText, Folder, Link2, Lock, ShieldCheck, Trash2 } from "lucide-react";
+import { Download, Edit3, Eye, FileClock, FileText, Folder, Link2, Lock, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -192,6 +192,14 @@ export function FileTable({
               onClick={() => window.open(`/api/files/${file.id}/preview`, "_blank", "noopener,noreferrer")}
             >
               <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              aria-label={`Edit ${file.fileName}`}
+              className="h-9 w-9 px-0"
+              variant="secondary"
+              onClick={() => window.open(`/dashboard/files/${file.id}/edit`, "_blank", "noopener,noreferrer")}
+            >
+              <Edit3 className="h-4 w-4" />
             </Button>
             <Button
               aria-label={`Download ${file.fileName}`}

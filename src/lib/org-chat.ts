@@ -80,7 +80,10 @@ export async function ensureOrgChatRooms(createdById?: string) {
 async function getMemberships(userId: string) {
   return prisma.workspaceMember.findMany({
     where: {
-      userId
+      userId,
+      workspace: {
+        deletedAt: null
+      }
     },
     select: {
       role: true,
@@ -161,6 +164,26 @@ export async function requireOrgChatRoomSendAccess(userId: string, roomId: strin
   }
 
   return room;
+}
+
+export async function getAccessibleOrgChatRooms(userId: string) {
+  await ensureOrgChatRooms(userId);
+  const { readable, sendable } = await getUserOrgChatAudiences(userId);
+  const rooms = await prisma.orgChatRoom.findMany({
+    where: {
+      audience: {
+        in: readable
+      }
+    },
+    orderBy: {
+      createdAt: "asc"
+    }
+  });
+
+  return rooms.map((room) => ({
+    ...room,
+    canSendMessages: sendable.includes(room.audience)
+  }));
 }
 
 export function audienceRoles(audience: OrgChatAudience) {

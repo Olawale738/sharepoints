@@ -2,7 +2,7 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
-import { deleteObject } from "@/lib/storage";
+import { recycleFile } from "@/lib/recycle-bin";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,13 +16,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const { id } = await context.params;
     const file = await prisma.file.findUnique({
       where: { id },
-      include: {
-        versions: {
-          select: {
-            storageKey: true
-          }
-        }
-      }
+      include: { versions: { select: { storageKey: true } } }
     });
 
     if (!file) {
@@ -39,12 +33,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       throw new ApiError(409, `This document is retained until ${file.retentionUntil.toISOString()}.`);
     }
 
-    const storageKeys = Array.from(new Set([file.storageKey, ...file.versions.map((version) => version.storageKey)]));
-    await Promise.all(storageKeys.map((storageKey) => deleteObject(storageKey)));
-
-    await prisma.file.delete({
-      where: { id: file.id }
-    });
+    const recycled = await recycleFile(file.id, user.id);
 
     await logActivity({
       userId: user.id,
@@ -54,11 +43,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       metadata: {
         fileName: file.fileName,
         size: file.size,
-        folderId: file.folderId
+        folderId: file.folderId,
+        restoreUntil: recycled?.restoreUntil.toISOString()
       }
     });
 
-    return ok({ deleted: true });
+    return ok({ deleted: true, recycled: true, restoreUntil: recycled?.restoreUntil });
   } catch (error) {
     return handleRouteError(error);
   }

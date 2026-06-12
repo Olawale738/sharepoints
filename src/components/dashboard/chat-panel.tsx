@@ -5,9 +5,11 @@ import { CornerUpLeft, Hash, Loader2, MessageSquarePlus, Trash2, X } from "lucid
 
 import { ChatComposer } from "@/components/dashboard/chat-composer";
 import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
+import { ForwardMessageDialog } from "@/components/dashboard/forward-message-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useChatCollaboration } from "@/components/dashboard/use-chat-collaboration";
+import { useRealtimeScope } from "@/components/dashboard/use-realtime-scope";
 
 type Channel = {
   id: string;
@@ -68,10 +70,21 @@ export function ChatPanel({
   const [isSending, setIsSending] = useState(false);
   const [deletingChannelId, setDeletingChannelId] = useState("");
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const collaboration = useChatCollaboration({
     kind: "channel",
     scopeId: activeChannelId,
     messageIds: messages.map((message) => message.id)
+  });
+  const realtimeStatus = useRealtimeScope("channel", activeChannelId, (event, data) => {
+    if (event !== "message.created" && event !== "message.updated") return;
+    const incoming = data as Message;
+    setMessages((current) => {
+      const exists = current.some((message) => message.id === incoming.id);
+      return exists
+        ? current.map((message) => (message.id === incoming.id ? incoming : message))
+        : [...current, incoming];
+    });
   });
 
   useEffect(() => {
@@ -93,9 +106,10 @@ export function ChatPanel({
 
     setReplyingTo(null);
     void loadMessages(true);
-    const interval = window.setInterval(loadMessages, 4_000);
+    if (realtimeStatus !== "fallback") return;
+    const interval = window.setInterval(loadMessages, 15_000);
     return () => window.clearInterval(interval);
-  }, [activeChannelId]);
+  }, [activeChannelId, realtimeStatus]);
 
   async function sendMessage() {
     if (!activeChannelId || !body.trim()) {
@@ -155,26 +169,6 @@ export function ChatPanel({
     );
     setReplyingTo(null);
     return true;
-  }
-
-  async function forwardMessage(message: Message) {
-    if (!activeChannelId) return;
-    const response = await fetch(`/api/channels/${activeChannelId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        body: message.body || (message.voiceStorageKey ? "Forwarded voice note" : "Forwarded message"),
-        forwardedFromId: message.id
-      })
-    });
-    const data = (await response.json().catch(() => null)) as { message?: Message; error?: string } | null;
-
-    if (!response.ok || !data?.message) {
-      setError(data?.error ?? "Message could not be forwarded.");
-      return;
-    }
-
-    setMessages((current) => [...current, data.message as Message]);
   }
 
   function updateMessage(updatedMessage: Message) {
@@ -301,7 +295,12 @@ export function ChatPanel({
 
       <section className="flex min-h-[32rem] flex-col">
         <header className="border-b border-ink/10 px-4 py-3">
-          <h3 className="font-semibold"># {activeChannel?.name ?? "Channel"}</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-semibold"># {activeChannel?.name ?? "Channel"}</h3>
+            <span className={`text-xs ${realtimeStatus === "live" ? "text-moss" : "text-ink/45"}`}>
+              {realtimeStatus === "live" ? "Live" : realtimeStatus === "fallback" ? "Reconnecting" : "Connecting"}
+            </span>
+          </div>
           {activeChannel?.description ? <p className="text-sm text-ink/55">{activeChannel.description}</p> : null}
         </header>
 
@@ -329,7 +328,7 @@ export function ChatPanel({
               voiceKind="channel"
               onError={setError}
               onReply={(item) => setReplyingTo(item as Message)}
-              onForward={(item) => void forwardMessage(item as Message)}
+              onForward={(item) => setForwardingMessage(item as Message)}
               onReact={(messageId, emoji) => void collaboration.react(messageId, emoji)}
               onBookmark={(messageId) => void collaboration.toggleBookmark(messageId)}
               onPin={(messageId) => void collaboration.togglePin(messageId)}
@@ -370,6 +369,14 @@ export function ChatPanel({
           />
         </div>
       </section>
+      {forwardingMessage ? (
+        <ForwardMessageDialog
+          sourceKind="channel"
+          sourceMessageId={forwardingMessage.id}
+          onClose={() => setForwardingMessage(null)}
+          onError={setError}
+        />
+      ) : null}
     </div>
   );
 }

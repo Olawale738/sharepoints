@@ -112,6 +112,7 @@ export default async function DashboardPage() {
   ]);
   const globalWorkspaces = isGlobalAdmin
     ? await prisma.workspace.findMany({
+        where: { deletedAt: null },
         include: {
           members: {
             where: {
@@ -187,7 +188,8 @@ export default async function DashboardPage() {
           where: {
             workspaceId: {
               in: workspaceIds
-            }
+            },
+            deletedAt: null
           },
           include: {
             workspace: {

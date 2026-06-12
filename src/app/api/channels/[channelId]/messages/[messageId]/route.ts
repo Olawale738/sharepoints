@@ -1,3 +1,5 @@
+import { RecycleItemType } from "@prisma/client";
+
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import {
@@ -6,8 +8,9 @@ import {
   ensureMessageIsNotDeleted
 } from "@/lib/message-policy";
 import { prisma } from "@/lib/prisma";
+import { publishRealtime } from "@/lib/realtime";
+import { recycleRestoreUntil } from "@/lib/recycle-bin";
 import { updateMessageSchema } from "@/lib/validators";
-import { removeVoiceNote } from "@/lib/voice-notes";
 import { requireWorkspaceChannelMembership, requireWorkspaceChannelSendAccess } from "@/lib/workspace-chat-access";
 
 type RouteContext = {
@@ -82,6 +85,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       targetId: message.id,
       metadata: { channelId }
     });
+    await publishRealtime("channel", channelId, "message.updated", message);
 
     return ok({ message });
   } catch (error) {
@@ -102,6 +106,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
       select: {
         id: true,
         authorId: true,
+        body: true,
+        attachmentFileId: true,
+        voiceMimeType: true,
+        voiceSize: true,
+        voiceDurationMs: true,
+        replyToId: true,
+        forwardedFromId: true,
+        editedAt: true,
         createdAt: true,
         deletedAt: true,
         voiceStorageKey: true
@@ -116,22 +128,48 @@ export async function DELETE(_request: Request, context: RouteContext) {
     ensureMessageIsNotDeleted(existing.deletedAt);
     ensureMessageCanStillBeDeleted(existing.createdAt);
 
-    const message = await prisma.chatMessage.update({
-      where: {
-        id: messageId
-      },
-      data: {
-        body: "",
-        attachmentFileId: null,
-        voiceStorageKey: null,
-        voiceMimeType: null,
-        voiceSize: null,
-        voiceDurationMs: null,
-        deletedAt: new Date()
-      },
-      include: messageInclude
+    const deletedAt = new Date();
+    const restoreUntil = recycleRestoreUntil();
+    const message = await prisma.$transaction(async (transaction) => {
+      await transaction.recycleBinItem.create({
+        data: {
+          workspaceId: channel.workspaceId,
+          itemType: RecycleItemType.CHANNEL_MESSAGE,
+          itemId: existing.id,
+          displayName: existing.body.slice(0, 80) || "Channel message",
+          deletedById: user.id,
+          deletedAt,
+          restoreUntil,
+          snapshot: {
+            body: existing.body,
+            attachmentFileId: existing.attachmentFileId,
+            voiceStorageKey: existing.voiceStorageKey,
+            voiceMimeType: existing.voiceMimeType,
+            voiceSize: existing.voiceSize,
+            voiceDurationMs: existing.voiceDurationMs,
+            replyToId: existing.replyToId,
+            forwardedFromId: existing.forwardedFromId,
+            editedAt: existing.editedAt?.toISOString() ?? null
+          }
+        }
+      });
+
+      return transaction.chatMessage.update({
+        where: {
+          id: messageId
+        },
+        data: {
+          body: "",
+          attachmentFileId: null,
+          voiceStorageKey: null,
+          voiceMimeType: null,
+          voiceSize: null,
+          voiceDurationMs: null,
+          deletedAt
+        },
+        include: messageInclude
+      });
     });
-    await removeVoiceNote(existing.voiceStorageKey).catch(() => undefined);
 
     await logActivity({
       userId: user.id,
@@ -140,6 +178,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       targetId: message.id,
       metadata: { channelId }
     });
+    await publishRealtime("channel", channelId, "message.updated", message);
 
     return ok({ message });
   } catch (error) {

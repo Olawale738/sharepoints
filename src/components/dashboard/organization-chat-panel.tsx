@@ -5,7 +5,9 @@ import { Building2, CornerUpLeft, Loader2, UsersRound, X } from "lucide-react";
 
 import { ChatComposer } from "@/components/dashboard/chat-composer";
 import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
+import { ForwardMessageDialog } from "@/components/dashboard/forward-message-dialog";
 import { useChatCollaboration } from "@/components/dashboard/use-chat-collaboration";
+import { useRealtimeScope } from "@/components/dashboard/use-realtime-scope";
 
 type OrgChatMessage = BubbleMessage & {
   id: string;
@@ -53,6 +55,7 @@ export function OrganizationChatPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<OrgChatMessage | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<OrgChatMessage | null>(null);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId);
   const canSendMessages = Boolean(activeRoom?.canSendMessages);
@@ -60,6 +63,16 @@ export function OrganizationChatPanel({
     kind: "organization",
     scopeId: activeRoomId,
     messageIds: messages.map((message) => message.id)
+  });
+  const realtimeStatus = useRealtimeScope("organization", activeRoomId, (event, data) => {
+    if (event !== "message.created" && event !== "message.updated") return;
+    const incoming = data as OrgChatMessage;
+    setMessages((current) => {
+      const exists = current.some((message) => message.id === incoming.id);
+      return exists
+        ? current.map((message) => (message.id === incoming.id ? incoming : message))
+        : [...current, incoming];
+    });
   });
 
   useEffect(() => {
@@ -89,9 +102,10 @@ export function OrganizationChatPanel({
 
     setReplyingTo(null);
     void loadMessages(true);
-    const interval = window.setInterval(loadMessages, 4_000);
+    if (realtimeStatus !== "fallback") return;
+    const interval = window.setInterval(loadMessages, 15_000);
     return () => window.clearInterval(interval);
-  }, [activeRoomId]);
+  }, [activeRoomId, realtimeStatus]);
 
   async function sendMessage() {
     if (!activeRoomId || !body.trim()) {
@@ -176,29 +190,6 @@ export function OrganizationChatPanel({
     return true;
   }
 
-  async function forwardMessage(message: OrgChatMessage) {
-    if (!activeRoomId) return;
-    const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        body: message.body || (message.voiceStorageKey ? "Forwarded voice note" : "Forwarded message"),
-        forwardedFromId: message.id
-      })
-    });
-    const data = (await response.json().catch(() => null)) as {
-      message?: OrgChatMessage;
-      error?: string;
-    } | null;
-
-    if (!response.ok || !data?.message) {
-      setError(data?.error ?? "Message could not be forwarded.");
-      return;
-    }
-
-    setMessages((current) => [...current, data.message as OrgChatMessage]);
-  }
-
   function updateMessage(updatedMessage: OrgChatMessage) {
     setMessages((current) =>
       current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
@@ -238,7 +229,12 @@ export function OrganizationChatPanel({
 
       <section className="flex min-h-[34rem] flex-col">
         <header className="border-b border-ink/10 px-4 py-3">
-          <h3 className="font-semibold">{activeRoom?.name ?? "Organization chat"}</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-semibold">{activeRoom?.name ?? "Organization chat"}</h3>
+            <span className={`text-xs ${realtimeStatus === "live" ? "text-moss" : "text-ink/45"}`}>
+              {realtimeStatus === "live" ? "Live" : realtimeStatus === "fallback" ? "Reconnecting" : "Connecting"}
+            </span>
+          </div>
           {activeRoom?.description ? <p className="text-sm text-ink/55">{activeRoom.description}</p> : null}
         </header>
 
@@ -269,7 +265,7 @@ export function OrganizationChatPanel({
               voiceKind="organization"
               onError={setError}
               onReply={(item) => setReplyingTo(item as OrgChatMessage)}
-              onForward={(item) => void forwardMessage(item as OrgChatMessage)}
+              onForward={(item) => setForwardingMessage(item as OrgChatMessage)}
               onReact={(messageId, emoji) => void collaboration.react(messageId, emoji)}
               onBookmark={(messageId) => void collaboration.toggleBookmark(messageId)}
               onPin={(messageId) => void collaboration.togglePin(messageId)}
@@ -310,6 +306,14 @@ export function OrganizationChatPanel({
           />
         </div>
       </section>
+      {forwardingMessage ? (
+        <ForwardMessageDialog
+          sourceKind="organization"
+          sourceMessageId={forwardingMessage.id}
+          onClose={() => setForwardingMessage(null)}
+          onError={setError}
+        />
+      ) : null}
     </div>
   );
 }

@@ -172,3 +172,20 @@ inviting users or relying on password reset emails. In local development, the
 invitation form copies the registration link if email delivery is not configured,
 and the reset form shows a development reset link after a valid invited account
 requests one.
+
+## Enterprise Collaboration Suite
+
+- Ably WebSocket chat with scoped tokens and fallback refresh
+- Forwarding across authorized channels, direct chats, and organization rooms
+- OnlyOffice browser co-editing with signed save callbacks and file versions
+- Upload-triggered workflow automation and approval actions
+- Email digest, quiet-hour, priority, reminder, and Expo push preferences
+- Complete JSON backups plus restorable files, folders, workspaces, and messages
+- DLP scanning and download/share restrictions
+- Searchable meeting transcripts, summaries, attendance, and action items
+- Ministry, event, attendance, volunteer, follow-up, and resource-booking tools
+- Safe admin role preview, workspace templates, health checks, and Playwright E2E tests
+- Expo Android/iOS application shell in `mobile/`
+
+External service activation is documented in
+[`docs/ENTERPRISE_FEATURE_SETUP.md`](docs/ENTERPRISE_FEATURE_SETUP.md).

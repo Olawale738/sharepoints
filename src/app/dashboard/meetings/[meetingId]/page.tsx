@@ -5,10 +5,11 @@ import { CalendarClock, CalendarPlus, FileText, KeyRound, Link2, Phone, UsersRou
 import { auth } from "@/auth";
 import { CopyTextButton } from "@/components/dashboard/copy-text-button";
 import { MeetingPasscodeForm } from "@/components/dashboard/meeting-passcode-form";
+import { MeetingTranscriptPanel } from "@/components/dashboard/meeting-transcript-panel";
 import { VideoMeetingRoom } from "@/components/dashboard/video-meeting-room";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceMembership } from "@/lib/rbac";
+import { getRolePermissions, requireWorkspaceMembership } from "@/lib/rbac";
 import { formatDate } from "@/lib/utils";
 
 type MeetingPageProps = {
@@ -59,7 +60,12 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
     notFound();
   }
 
-  await requireWorkspaceMembership(session.user.id, meeting.workspaceId);
+  const membership = await requireWorkspaceMembership(session.user.id, meeting.workspaceId);
+  const permissions = await getRolePermissions(meeting.workspaceId, membership.role);
+  const attendance = await prisma.meetingAttendance.findMany({
+    where: { meetingId: meeting.id },
+    orderBy: { joinedAt: "asc" }
+  });
 
   const displayName = session.user.name ?? session.user.email ?? "LETW member";
   const hasValidPasscode = passcode?.trim() === meeting.passcode;
@@ -148,6 +154,20 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
           ) : null}
         </section>
       ) : null}
+
+      <MeetingTranscriptPanel
+        meetingId={meeting.id}
+        canManage={permissions.canScheduleMeetings}
+        initialTranscript={meeting.transcript}
+        initialSummary={meeting.transcriptSummary}
+        attendance={attendance.map((item) => ({
+          id: item.id,
+          displayName: item.displayName,
+          joinedAt: item.joinedAt.toISOString(),
+          leftAt: item.leftAt?.toISOString() ?? null,
+          durationSec: item.durationSec
+        }))}
+      />
 
       {isCancelled ? (
         <div className="rounded-lg border border-clay/20 bg-clay/10 p-5 text-sm text-clay">

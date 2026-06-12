@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test";
+
+test("health endpoint reports a connected database", async ({ request }) => {
+  const response = await request.get("/api/health");
+  expect(response.ok()).toBeTruthy();
+  await expect(response.json()).resolves.toMatchObject({ status: "healthy", database: "connected" });
+});
+
+test("protected dashboard redirects visitors to sign in", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+});
+
+test("registration clearly requires an invitation", async ({ page }) => {
+  await page.goto("/register");
+  await expect(page.getByText(/invitation-only/i)).toBeVisible();
+  await expect(page.getByLabel(/email/i)).toBeVisible();
+});
+
+test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
+  test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
+  await page.goto("/login");
+  await page.getByLabel(/email/i).fill(process.env.E2E_EMAIL!);
+  await page.getByLabel(/password/i).fill(process.env.E2E_PASSWORD!);
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page.getByText(/collaboration center/i)).toBeVisible();
+  await expect(page.getByText(/new workspace/i).first()).toBeVisible();
+});

@@ -23,11 +23,12 @@ export async function GET(request: Request) {
     }
 
     const approvalFilter = isGlobalAdmin ? {} : { approvalStatus: "APPROVED" as const };
-    const [workspaces, files, folders, tasks, members, messages, directMessages, orgMessages, wikiPages, forms] =
+    const [workspaces, files, folders, tasks, members, messages, directMessages, orgMessages, wikiPages, forms, meetings] =
       await Promise.all([
       prisma.workspace.findMany({
         where: {
           id: { in: workspaceIds },
+          deletedAt: null,
           OR: [{ name: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }]
         },
         select: { id: true, name: true },
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
       prisma.file.findMany({
         where: {
           workspaceId: { in: workspaceIds },
+          deletedAt: null,
           ...approvalFilter,
           fileName: { contains: q, mode: "insensitive" }
         },
@@ -45,6 +47,7 @@ export async function GET(request: Request) {
       prisma.folder.findMany({
         where: {
           workspaceId: { in: workspaceIds },
+          deletedAt: null,
           name: { contains: q, mode: "insensitive" }
         },
         select: { id: true, name: true, workspaceId: true, workspace: { select: { name: true } } },
@@ -144,6 +147,23 @@ export async function GET(request: Request) {
           workspace: { select: { name: true } }
         },
         take: 8
+      }),
+      prisma.workspaceMeeting.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { transcript: { contains: q, mode: "insensitive" } },
+            { transcriptSummary: { contains: q, mode: "insensitive" } }
+          ]
+        },
+        select: {
+          id: true,
+          title: true,
+          transcriptSummary: true,
+          workspace: { select: { name: true } }
+        },
+        take: 8
       })
     ]);
 
@@ -208,6 +228,12 @@ export async function GET(request: Request) {
           title: form.title,
           detail: form.workspace.name,
           href: `/dashboard/workspaces/${form.workspaceId}`
+        })),
+        ...meetings.map((meeting) => ({
+          type: "meeting transcript",
+          title: meeting.title,
+          detail: meeting.transcriptSummary?.slice(0, 120) ?? meeting.workspace.name,
+          href: `/dashboard/meetings/${meeting.id}`
         }))
       ].slice(0, 30)
     });

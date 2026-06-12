@@ -20,7 +20,7 @@ export default async function AnalyticsPage() {
       select: { userId: true }
     }),
     prisma.file.aggregate({
-      where: { workspaceId: { in: workspaceIds } },
+      where: { workspaceId: { in: workspaceIds }, deletedAt: null },
       _count: { id: true },
       _sum: { size: true }
     }),
@@ -52,7 +52,7 @@ export default async function AnalyticsPage() {
       select: { createdAt: true }
     }),
     prisma.workspace.findMany({
-      where: { id: { in: workspaceIds } },
+      where: { id: { in: workspaceIds }, deletedAt: null },
       include: {
         _count: {
           select: { members: true, files: true, tasks: true, meetings: true, chatChannels: true }

@@ -18,7 +18,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   const ownMemberships = await prisma.workspaceMember.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, workspace: { deletedAt: null } },
     include: {
       workspace: {
         include: {
@@ -38,6 +38,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const isGlobalAdmin = ownMemberships.some((membership) => membership.role === WorkspaceRole.ADMIN);
   const globalWorkspaces = isGlobalAdmin
     ? await prisma.workspace.findMany({
+        where: { deletedAt: null },
         include: {
           members: {
             where: {

@@ -23,12 +23,17 @@ export async function POST(request: Request, context: RouteContext) {
       select: {
         id: true,
         workspaceId: true,
-        fileName: true
+        fileName: true,
+        deletedAt: true,
+        dlpRestricted: true
       }
     });
 
-    if (!file) {
+    if (!file || file.deletedAt) {
       throw new ApiError(404, "File not found.");
+    }
+    if (file.dlpRestricted) {
+      throw new ApiError(403, "Share links are disabled for documents restricted by data-loss prevention.");
     }
 
     await requireWorkspacePermission(user.id, file.workspaceId, "canCreateShareLinks");

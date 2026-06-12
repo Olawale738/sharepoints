@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "LETW Collaboration",
+    "slug": "letw-collaboration",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "../public/letw-logo.png",
+    "scheme": "letw",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.letw.collaboration"
+    },
+    "android": {
+      "package": "org.letw.collaboration",
+      "adaptiveIcon": {
+        "foregroundImage": "../public/letw-logo.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EXPO_PROJECT_ID"
+      }
+    }
+  }
+}

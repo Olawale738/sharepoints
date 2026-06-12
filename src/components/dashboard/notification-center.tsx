@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useRealtimeScope } from "@/components/dashboard/use-realtime-scope";
 
 type NotificationItem = {
   id: string;
@@ -22,6 +23,10 @@ export function NotificationCenter() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [browserEnabled, setBrowserEnabled] = useState(false);
+  const [userId, setUserId] = useState("");
+  const realtimeStatus = useRealtimeScope("notifications", userId, () => {
+    void loadNotifications();
+  });
 
   async function loadNotifications() {
     setLoading(true);
@@ -36,10 +41,12 @@ export function NotificationCenter() {
       notifications: NotificationItem[];
       unreadCount: number;
       preference?: { browserEnabled?: boolean };
+      userId: string;
     };
     setNotifications(data.notifications);
     setUnreadCount(data.unreadCount);
     setBrowserEnabled(Boolean(data.preference?.browserEnabled));
+    setUserId(data.userId);
 
     if (
       data.unreadCount &&
@@ -57,9 +64,10 @@ export function NotificationCenter() {
 
   useEffect(() => {
     loadNotifications();
-    const interval = window.setInterval(loadNotifications, 15_000);
+    if (realtimeStatus !== "fallback") return;
+    const interval = window.setInterval(loadNotifications, 30_000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [realtimeStatus]);
 
   async function markAllRead() {
     await fetch("/api/notifications", {

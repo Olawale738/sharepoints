@@ -20,7 +20,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       const folder = await prisma.folder.findFirst({
         where: {
           id: folderId,
-          workspaceId: id
+          workspaceId: id,
+          deletedAt: null
         },
         select: { id: true }
       });
@@ -33,7 +34,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const files = await prisma.file.findMany({
       where: {
         workspaceId: id,
-        folderId: folderId || null
+        folderId: folderId || null,
+        deletedAt: null
       },
       include: {
         uploadedBy: {
@@ -61,4 +63,3 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return handleRouteError(error);
   }
 }
-

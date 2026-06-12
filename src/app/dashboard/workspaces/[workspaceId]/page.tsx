@@ -24,6 +24,7 @@ import { TasksPanel } from "@/components/dashboard/tasks-panel";
 import { WorkspaceDepartmentAccessPanel } from "@/components/dashboard/workspace-department-access-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
 import { WorkspacePresence } from "@/components/dashboard/workspace-presence";
+import { WorkflowBuilder } from "@/components/dashboard/workflow-builder";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
 import { canApproveWorkspaceContent } from "@/lib/governance";
@@ -49,7 +50,8 @@ async function getFolderTrail(folderId: string | null, workspaceId: string) {
     const folder: { id: string; name: string; parentId: string | null } | null = await prisma.folder.findFirst({
       where: {
         id: currentId,
-        workspaceId
+        workspaceId,
+        deletedAt: null
       },
       select: {
         id: true,
@@ -93,13 +95,17 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
   });
   const isGlobalAdmin = await hasAnyWorkspaceAdminRole(session.user.id);
 
+  if (membership?.workspace.deletedAt) {
+    notFound();
+  }
+
   if (!membership) {
     if (!isGlobalAdmin) {
       notFound();
     }
 
-    const workspace = await prisma.workspace.findUnique({
-      where: { id: workspaceId }
+    const workspace = await prisma.workspace.findFirst({
+      where: { id: workspaceId, deletedAt: null }
     });
 
     if (!workspace) {
@@ -133,7 +139,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
     prisma.folder.findMany({
       where: {
         workspaceId,
-        parentId: folderId
+        parentId: folderId,
+        deletedAt: null
       },
       orderBy: {
         name: "asc"
@@ -143,11 +150,13 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       where: canApproveContent
         ? {
             workspaceId,
-            folderId
+            folderId,
+            deletedAt: null
           }
         : {
             workspaceId,
             folderId,
+            deletedAt: null,
             OR: [{ approvalStatus: "APPROVED" }, { uploadedById: session.user.id }]
           },
       include: {
@@ -749,6 +758,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           {hasAdminAccess ? (
             <RolePermissionsPanel workspaceId={workspaceId} permissions={configurableRolePermissions} />
           ) : null}
+
+          {hasAdminAccess ? <WorkflowBuilder workspaceId={workspaceId} /> : null}
 
           {hasAdminAccess ? (
             <WorkspaceDepartmentAccessPanel

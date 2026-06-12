@@ -104,6 +104,13 @@ export async function getWorkspaceMembership(userId: string, workspaceId: string
 }
 
 export async function requireWorkspaceMembership(userId: string, workspaceId: string) {
+  const workspace = await prisma.workspace.findFirst({
+    where: { id: workspaceId, deletedAt: null },
+    select: { id: true }
+  });
+  if (!workspace) {
+    throw new ApiError(404, "Workspace not found.");
+  }
   const membership = await getWorkspaceMembership(userId, workspaceId);
 
   if (!membership) {
@@ -331,7 +338,10 @@ export async function hasAnyWorkspaceAdminRole(userId: string) {
   const adminMembership = await prisma.workspaceMember.findFirst({
     where: {
       userId,
-      role: WorkspaceRole.ADMIN
+      role: WorkspaceRole.ADMIN,
+      workspace: {
+        deletedAt: null
+      }
     },
     select: {
       id: true
@@ -347,6 +357,9 @@ export async function hasAnyWorkspaceCreatorRole(userId: string) {
       userId,
       role: {
         in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.EDITOR]
+      },
+      workspace: {
+        deletedAt: null
       }
     },
     select: {

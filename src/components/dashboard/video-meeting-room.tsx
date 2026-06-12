@@ -86,6 +86,7 @@ export function VideoMeetingRoom({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<JitsiApi | null>(null);
   const attemptedAutoRecordRef = useRef(false);
+  const attendanceIdRef = useRef("");
   const isAudioCall = meetingType === "AUDIO";
   const [status, setStatus] = useState(`Connecting to LETW ${isAudioCall ? "audio call" : "video room"}...`);
   const [recordingMessage, setRecordingMessage] = useState(
@@ -147,6 +148,16 @@ export function VideoMeetingRoom({
 
         api.addListener("videoConferenceJoined", () => {
           setStatus(isAudioCall ? "Joined audio call." : "Joined video meeting.");
+          void fetch(`/api/meetings/${meetingId}/attendance`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "JOIN" })
+          })
+            .then((response) => response.json())
+            .then((data: { attendance?: { id?: string } }) => {
+              attendanceIdRef.current = data.attendance?.id ?? "";
+            })
+            .catch(() => undefined);
 
           if (!autoRecord || attemptedAutoRecordRef.current) {
             return;
@@ -188,6 +199,17 @@ export function VideoMeetingRoom({
               }).catch(() => undefined);
             }
           }, 2500);
+        });
+
+        api.addListener("videoConferenceLeft", () => {
+          const attendanceId = attendanceIdRef.current;
+          if (!attendanceId) return;
+          void fetch(`/api/meetings/${meetingId}/attendance`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "LEAVE", attendanceId })
+          }).catch(() => undefined);
+          attendanceIdRef.current = "";
         });
 
         api.addListener("recordingStatusChanged", (payload) => {
@@ -240,6 +262,14 @@ export function VideoMeetingRoom({
 
     return () => {
       disposed = true;
+      if (attendanceIdRef.current) {
+        void fetch(`/api/meetings/${meetingId}/attendance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "LEAVE", attendanceId: attendanceIdRef.current }),
+          keepalive: true
+        }).catch(() => undefined);
+      }
       apiRef.current?.dispose();
       apiRef.current = null;
     };

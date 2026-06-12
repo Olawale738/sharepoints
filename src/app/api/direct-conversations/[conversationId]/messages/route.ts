@@ -3,6 +3,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { requireConversationParticipant } from "@/lib/direct-chat-access";
 import { createNotification, notifyMentionedUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { publishRealtime } from "@/lib/realtime";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { createDirectMessageSchema } from "@/lib/validators";
 import {
@@ -182,6 +183,7 @@ export async function POST(request: Request, context: RouteContext) {
       title: "You were mentioned in a direct message",
       href: `/dashboard/workspaces/${conversation.workspaceId}`
     });
+    await publishRealtime("direct", conversationId, "message.created", message);
 
     return ok({ message }, { status: 201 });
   } catch (error) {

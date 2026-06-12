@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FolderPlus, Loader2, Plus, UserRoundPlus } from "lucide-react";
-import { FormEvent, useId, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,17 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
   const [status, setStatus] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; category: string }>>([]);
+
+  useEffect(() => {
+    if (!canCreateWorkspace) return;
+    fetch("/api/workspace-templates")
+      .then((response) => response.json())
+      .then((data: { templates?: Array<{ id: string; name: string; category: string }> }) =>
+        setTemplates(data.templates ?? [])
+      )
+      .catch(() => undefined);
+  }, [canCreateWorkspace]);
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,7 +46,8 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: String(formData.get("name")),
-          description: String(formData.get("description") ?? "")
+          description: String(formData.get("description") ?? ""),
+          templateId: String(formData.get("templateId") ?? "") || null
         })
       });
 
@@ -114,6 +126,21 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
             <div className="space-y-2">
               <Label htmlFor={`${formId}-workspace-description`}>Description</Label>
               <Textarea id={`${formId}-workspace-description`} name="description" rows={3} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-workspace-template`}>Template</Label>
+              <select
+                id={`${formId}-workspace-template`}
+                name="templateId"
+                className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm outline-none focus:border-moss"
+              >
+                <option value="">Blank workspace</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.category.toLowerCase()})
+                  </option>
+                ))}
+              </select>
             </div>
             <Button className="w-full" type="submit" disabled={isCreating}>
               {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}

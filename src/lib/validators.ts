@@ -35,7 +35,8 @@ export const resetPasswordSchema = z
 
 export const createWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(80),
-  description: z.string().trim().max(240).optional().or(z.literal(""))
+  description: z.string().trim().max(240).optional().or(z.literal("")),
+  templateId: z.string().cuid().optional().nullable().or(z.literal(""))
 });
 
 export const joinWorkspaceSchema = z.object({
@@ -237,7 +238,12 @@ export const notificationPreferenceSchema = z.object({
   emailMentions: z.boolean().optional(),
   emailTasks: z.boolean().optional(),
   emailMeetings: z.boolean().optional(),
-  emailApprovals: z.boolean().optional()
+  emailApprovals: z.boolean().optional(),
+  pushEnabled: z.boolean().optional(),
+  digest: z.enum(["IMMEDIATE", "DAILY", "WEEKLY", "NEVER"]).optional(),
+  quietHoursStart: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable().or(z.literal("")),
+  quietHoursEnd: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable().or(z.literal("")),
+  timeZone: z.string().trim().min(1).max(80).optional()
 });
 
 export const createWikiPageSchema = z.object({

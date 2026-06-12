@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
+import { publishRealtime } from "@/lib/realtime";
 import { notifyMentionedUsers } from "@/lib/notifications";
 import { createChatMessageSchema } from "@/lib/validators";
 import {
@@ -169,6 +170,7 @@ export async function POST(request: Request, context: RouteContext) {
       title: "You were mentioned in a workspace channel",
       href: `/dashboard/workspaces/${channel.workspaceId}`
     });
+    await publishRealtime("channel", channelId, "message.created", message);
 
     return ok({ message }, { status: 201 });
   } catch (error) {

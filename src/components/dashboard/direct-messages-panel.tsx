@@ -5,7 +5,9 @@ import { CornerUpLeft, Loader2, MessageCircle, MessagesSquare, UserRound, X } fr
 
 import { ChatComposer } from "@/components/dashboard/chat-composer";
 import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
+import { ForwardMessageDialog } from "@/components/dashboard/forward-message-dialog";
 import { useChatCollaboration } from "@/components/dashboard/use-chat-collaboration";
+import { useRealtimeScope } from "@/components/dashboard/use-realtime-scope";
 import { Button } from "@/components/ui/button";
 
 type WorkspaceMember = {
@@ -93,10 +95,21 @@ export function DirectMessagesPanel({
   const [startingUserId, setStartingUserId] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<DirectMessage | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<DirectMessage | null>(null);
   const collaboration = useChatCollaboration({
     kind: "direct",
     scopeId: activeConversationId,
     messageIds: messages.map((message) => message.id)
+  });
+  const realtimeStatus = useRealtimeScope("direct", activeConversationId, (event, data) => {
+    if (event !== "message.created" && event !== "message.updated") return;
+    const incoming = data as DirectMessage;
+    setMessages((current) => {
+      const exists = current.some((message) => message.id === incoming.id);
+      return exists
+        ? current.map((message) => (message.id === incoming.id ? incoming : message))
+        : [...current, incoming];
+    });
   });
 
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId);
@@ -132,9 +145,10 @@ export function DirectMessagesPanel({
 
     setReplyingTo(null);
     void loadMessages(true);
-    const interval = window.setInterval(loadMessages, 4_000);
+    if (realtimeStatus !== "fallback") return;
+    const interval = window.setInterval(loadMessages, 15_000);
     return () => window.clearInterval(interval);
-  }, [activeConversationId]);
+  }, [activeConversationId, realtimeStatus]);
 
   async function startConversation(targetUserId: string) {
     setError("");
@@ -251,29 +265,6 @@ export function DirectMessagesPanel({
     return true;
   }
 
-  async function forwardMessage(message: DirectMessage) {
-    if (!activeConversationId) return;
-    const response = await fetch(`/api/direct-conversations/${activeConversationId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        body: message.body || (message.voiceStorageKey ? "Forwarded voice note" : "Forwarded message"),
-        forwardedFromId: message.id
-      })
-    });
-    const data = (await response.json().catch(() => null)) as {
-      message?: DirectMessage;
-      error?: string;
-    } | null;
-
-    if (!response.ok || !data?.message) {
-      setError(data?.error ?? "Message could not be forwarded.");
-      return;
-    }
-
-    setMessages((current) => [...current, data.message as DirectMessage]);
-  }
-
   function updateMessage(updatedMessage: DirectMessage) {
     setMessages((current) =>
       current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
@@ -359,9 +350,14 @@ export function DirectMessagesPanel({
 
       <section className="flex min-h-[30rem] flex-col">
         <header className="border-b border-ink/10 px-4 py-3">
-          <h3 className="font-semibold">
-            {activeConversation ? displayName(conversationPartner(activeConversation)) : "Select a member"}
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-semibold">
+              {activeConversation ? displayName(conversationPartner(activeConversation)) : "Select a member"}
+            </h3>
+            <span className={`text-xs ${realtimeStatus === "live" ? "text-moss" : "text-ink/45"}`}>
+              {realtimeStatus === "live" ? "Live" : realtimeStatus === "fallback" ? "Reconnecting" : "Connecting"}
+            </span>
+          </div>
           <p className="text-sm text-ink/55">Direct chat inside this workspace</p>
         </header>
 
@@ -392,7 +388,7 @@ export function DirectMessagesPanel({
                 voiceKind="direct"
                 onError={setError}
                 onReply={(item) => setReplyingTo(item as DirectMessage)}
-                onForward={(item) => void forwardMessage(item as DirectMessage)}
+                onForward={(item) => setForwardingMessage(item as DirectMessage)}
                 onReact={(messageId, emoji) => void collaboration.react(messageId, emoji)}
                 onBookmark={(messageId) => void collaboration.toggleBookmark(messageId)}
                 onPin={(messageId) => void collaboration.togglePin(messageId)}
@@ -433,6 +429,14 @@ export function DirectMessagesPanel({
           />
         </div>
       </section>
+      {forwardingMessage ? (
+        <ForwardMessageDialog
+          sourceKind="direct"
+          sourceMessageId={forwardingMessage.id}
+          onClose={() => setForwardingMessage(null)}
+          onError={setError}
+        />
+      ) : null}
     </div>
   );
 }

@@ -177,6 +177,7 @@ export async function applyApprovalDecision(input: {
 export async function getAdminVisibleWorkspaceIds(userId: string) {
   if (await hasAnyWorkspaceAdminRole(userId)) {
     const workspaces = await prisma.workspace.findMany({
+      where: { deletedAt: null },
       select: {
         id: true
       }
@@ -187,7 +188,8 @@ export async function getAdminVisibleWorkspaceIds(userId: string) {
 
   const memberships = await prisma.workspaceMember.findMany({
     where: {
-      userId
+      userId,
+      workspace: { deletedAt: null }
     },
     select: {
       workspaceId: true

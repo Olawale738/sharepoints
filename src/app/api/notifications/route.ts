@@ -24,7 +24,7 @@ export async function GET() {
       })
     ]);
 
-    return ok({ notifications, unreadCount, preference });
+    return ok({ notifications, unreadCount, preference, userId: user.id });
   } catch (error) {
     return handleRouteError(error);
   }

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { NotificationPriority } from "@prisma/client";
+import { publishRealtime } from "@/lib/realtime";
 
 type NotificationInput = {
   userId: string;
@@ -7,19 +9,25 @@ type NotificationInput = {
   title: string;
   body?: string | null;
   href?: string | null;
+  priority?: NotificationPriority;
+  deliverAt?: Date | null;
 };
 
 export async function createNotification(input: NotificationInput) {
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: {
       userId: input.userId,
       workspaceId: input.workspaceId ?? null,
       type: input.type,
       title: input.title,
       body: input.body ?? null,
-      href: input.href ?? null
+      href: input.href ?? null,
+      priority: input.priority ?? NotificationPriority.NORMAL,
+      deliverAt: input.deliverAt ?? null
     }
   });
+  await publishRealtime("notifications", input.userId, "notification.created", notification);
+  return notification;
 }
 
 export async function notifyUsers(userIds: string[], input: Omit<NotificationInput, "userId">) {
@@ -36,9 +44,16 @@ export async function notifyUsers(userIds: string[], input: Omit<NotificationInp
       type: input.type,
       title: input.title,
       body: input.body ?? null,
-      href: input.href ?? null
+      href: input.href ?? null,
+      priority: input.priority ?? NotificationPriority.NORMAL,
+      deliverAt: input.deliverAt ?? null
     }))
   });
+  await Promise.all(
+    uniqueUserIds.map((userId) =>
+      publishRealtime("notifications", userId, "notification.refresh", { userId })
+    )
+  );
 }
 
 export async function notifyWorkspaceMembers(

@@ -2,8 +2,7 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess } from "@/lib/rbac";
-import { deleteObject } from "@/lib/storage";
-import { removeVoiceNote } from "@/lib/voice-notes";
+import { recycleWorkspace } from "@/lib/recycle-bin";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -20,39 +19,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       select: {
         id: true,
         name: true,
-        files: {
-          select: {
-            storageKey: true
-          }
-        },
-        chatChannels: {
-          select: {
-            messages: {
-              where: {
-                voiceStorageKey: {
-                  not: null
-                }
-              },
-              select: {
-                voiceStorageKey: true
-              }
-            }
-          }
-        },
-        directConversations: {
-          select: {
-            messages: {
-              where: {
-                voiceStorageKey: {
-                  not: null
-                }
-              },
-              select: {
-                voiceStorageKey: true
-              }
-            }
-          }
-        }
+        _count: { select: { files: true } }
       }
     });
 
@@ -60,21 +27,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       throw new ApiError(404, "Workspace not found.");
     }
 
-    for (const file of workspace.files) {
-      await deleteObject(file.storageKey);
-    }
-    const voiceStorageKeys = [
-      ...workspace.chatChannels.flatMap((channel) => channel.messages.map((message) => message.voiceStorageKey)),
-      ...workspace.directConversations.flatMap((conversation) =>
-        conversation.messages.map((message) => message.voiceStorageKey)
-      )
-    ];
-
-    await Promise.all(voiceStorageKeys.map((storageKey) => removeVoiceNote(storageKey).catch(() => undefined)));
-
-    await prisma.workspace.delete({
-      where: { id }
-    });
+    const recycled = await recycleWorkspace(id, user.id);
 
     await logActivity({
       userId: user.id,
@@ -82,12 +35,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       targetId: workspace.id,
       metadata: {
         name: workspace.name,
-        filesDeleted: workspace.files.length,
-        voiceNotesDeleted: voiceStorageKeys.length
+        filesPreserved: workspace._count.files,
+        restoreUntil: recycled?.restoreUntil.toISOString()
       }
     });
 
-    return ok({ deleted: true });
+    return ok({ deleted: true, recycled: true, restoreUntil: recycled?.restoreUntil });
   } catch (error) {
     return handleRouteError(error);
   }

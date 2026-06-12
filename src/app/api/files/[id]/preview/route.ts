@@ -74,7 +74,7 @@ export async function GET(request: Request, context: RouteContext) {
       where: { id }
     });
 
-    if (!file) {
+    if (!file || file.deletedAt) {
       throw new ApiError(404, "File not found.");
     }
 

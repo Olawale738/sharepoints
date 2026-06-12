@@ -20,8 +20,8 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid join request.");
     }
 
-    const workspace = await prisma.workspace.findUnique({
-      where: { id }
+    const workspace = await prisma.workspace.findFirst({
+      where: { id, deletedAt: null }
     });
 
     if (!workspace) {
