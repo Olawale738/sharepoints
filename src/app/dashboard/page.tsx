@@ -1001,6 +1001,8 @@ export default async function DashboardPage() {
             voiceMimeType: message.voiceMimeType,
             voiceSize: message.voiceSize,
             voiceDurationMs: message.voiceDurationMs,
+            replyToId: message.replyToId,
+            forwardedFromId: message.forwardedFromId,
             author: message.author
           }))}
         />

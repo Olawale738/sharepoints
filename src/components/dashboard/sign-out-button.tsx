@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button";
 
 export function SignOutButton() {
   return (
-    <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
+    <Button aria-label="Sign out" variant="ghost" onClick={() => signOut({ callbackUrl: "/login" })}>
       <LogOut className="h-4 w-4" />
-      Sign out
+      <span className="hidden xl:inline">Sign out</span>
     </Button>
   );
 }
-

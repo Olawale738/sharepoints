@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
+import { notifyMentionedUsers } from "@/lib/notifications";
 import { createChatMessageSchema } from "@/lib/validators";
 import {
   isMultipartRequest,
@@ -61,6 +62,8 @@ export async function POST(request: Request, context: RouteContext) {
     let messageBody = "";
     let attachmentFileId: string | null = null;
     let voiceData: StoredVoiceNote | null = null;
+    let replyToId: string | null = null;
+    let forwardedFromId: string | null = null;
 
     if (isMultipartRequest(request)) {
       const voiceRequest = await parseVoiceNoteRequest(request);
@@ -72,6 +75,8 @@ export async function POST(request: Request, context: RouteContext) {
         scope: "channels",
         scopeId: channelId
       });
+      replyToId = voiceRequest.replyToId;
+      forwardedFromId = voiceRequest.forwardedFromId;
     } else {
       const body = await request.json();
       const parsed = createChatMessageSchema.safeParse(body);
@@ -82,6 +87,8 @@ export async function POST(request: Request, context: RouteContext) {
 
       messageBody = parsed.data.body;
       attachmentFileId = parsed.data.attachmentFileId || null;
+      replyToId = parsed.data.replyToId || null;
+      forwardedFromId = parsed.data.forwardedFromId || null;
 
       if (attachmentFileId) {
         const file = await prisma.file.findFirst({
@@ -98,6 +105,19 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
+    if (replyToId || forwardedFromId) {
+      const referenceCount = await prisma.chatMessage.count({
+        where: {
+          channelId,
+          id: { in: [replyToId, forwardedFromId].filter(Boolean) as string[] }
+        }
+      });
+
+      if (referenceCount !== new Set([replyToId, forwardedFromId].filter(Boolean)).size) {
+        throw new ApiError(404, "Referenced message was not found in this channel.");
+      }
+    }
+
     let message;
 
     try {
@@ -107,6 +127,8 @@ export async function POST(request: Request, context: RouteContext) {
           authorId: user.id,
           body: messageBody,
           attachmentFileId,
+          replyToId,
+          forwardedFromId,
           ...voiceData
         },
         include: {
@@ -139,6 +161,13 @@ export async function POST(request: Request, context: RouteContext) {
       action: activityActions.messageCreated,
       targetId: message.id,
       metadata: { channelId, voiceNote: Boolean(voiceData) }
+    });
+    await notifyMentionedUsers({
+      text: messageBody,
+      workspaceId: channel.workspaceId,
+      actorId: user.id,
+      title: "You were mentioned in a workspace channel",
+      href: `/dashboard/workspaces/${channel.workspaceId}`
     });
 
     return ok({ message }, { status: 201 });

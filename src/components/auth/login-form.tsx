@@ -28,6 +28,7 @@ export function LoginForm() {
     const result = await signIn("credentials", {
       email: String(formData.get("email")),
       password: String(formData.get("password")),
+      otp: String(formData.get("otp") ?? ""),
       redirect: false,
       callbackUrl
     });
@@ -71,6 +72,17 @@ export function LoginForm() {
             </Link>
           </div>
           <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="otp">Authenticator code</Label>
+          <Input
+            id="otp"
+            name="otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            placeholder="Only if two-factor authentication is enabled"
+          />
         </div>
         {resetSuccessful ? (
           <p className="rounded-md bg-mint/60 px-3 py-2 text-sm text-ink/80">

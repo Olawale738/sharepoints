@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
+import { scanUploadedFile } from "@/lib/file-security";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
@@ -66,6 +67,12 @@ export async function POST(request: Request) {
     ].join("/");
     const arrayBuffer = await file.arrayBuffer();
     const body = Buffer.from(arrayBuffer);
+    const scan = scanUploadedFile(fileName, body);
+
+    if (scan.status === "INFECTED") {
+      throw new ApiError(415, scan.details);
+    }
+
     const fileUrl = await uploadObject({
       key: storageKey,
       body,
@@ -84,9 +91,23 @@ export async function POST(request: Request) {
         fileName,
         fileType: contentType,
         size: file.size,
+        scanStatus: scan.status,
+        scanDetails: scan.details,
         approvalStatus,
         approvedById: approvalStatus === "APPROVED" ? user.id : null,
-        approvedAt: approvalStatus === "APPROVED" ? new Date() : null
+        approvedAt: approvalStatus === "APPROVED" ? new Date() : null,
+        versions: {
+          create: {
+            versionNumber: 1,
+            storageKey,
+            fileUrl,
+            fileName,
+            fileType: contentType,
+            size: file.size,
+            changeNote: "Initial upload",
+            uploadedById: user.id
+          }
+        }
       },
       include: {
         uploadedBy: {

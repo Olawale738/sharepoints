@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, Eye, FileText, Folder, Link2, Trash2 } from "lucide-react";
+import { Download, Eye, FileClock, FileText, Folder, Link2, Lock, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DocumentHistoryDialog } from "@/components/dashboard/document-history-dialog";
 import { formatBytes, formatDate } from "@/lib/utils";
 
 type FolderRow = {
@@ -23,6 +24,11 @@ type FileRow = {
   createdAt: string;
   approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
   rejectedReason?: string | null;
+  currentVersionNumber?: number;
+  checkedOutById?: string | null;
+  legalHold?: boolean;
+  retentionUntil?: string | null;
+  scanStatus?: "PENDING" | "CLEAN" | "INFECTED" | "SKIPPED";
   uploadedBy: {
     name?: string | null;
     email?: string | null;
@@ -41,14 +47,25 @@ type FileTableProps = {
   files: FileRow[];
   canDeleteFiles: boolean;
   canCreateShareLinks: boolean;
+  canUploadFiles: boolean;
+  canManageGovernance: boolean;
 };
 
-export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCreateShareLinks }: FileTableProps) {
+export function FileTable({
+  workspaceId,
+  folders,
+  files,
+  canDeleteFiles,
+  canCreateShareLinks,
+  canUploadFiles,
+  canManageGovernance
+}: FileTableProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState("");
   const [sharingId, setSharingId] = useState("");
   const [shareStatus, setShareStatus] = useState("");
   const [error, setError] = useState("");
+  const [historyFile, setHistoryFile] = useState<FileRow | null>(null);
   const hasRows = folders.length > 0 || files.length > 0;
 
   async function copyText(value: string) {
@@ -145,9 +162,13 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <p className="truncate font-medium">{file.fileName}</p>
+                <Badge>v{file.currentVersionNumber ?? 1}</Badge>
                 {file.approvalStatus ? (
                   <Badge className={approvalClassName[file.approvalStatus]}>{file.approvalStatus.toLowerCase()}</Badge>
                 ) : null}
+                {file.scanStatus === "CLEAN" ? <ShieldCheck className="h-4 w-4 text-moss" aria-label="Security screened" /> : null}
+                {file.checkedOutById ? <Lock className="h-4 w-4 text-clay" aria-label="Checked out" /> : null}
+                {file.legalHold ? <Badge className="bg-wheat">legal hold</Badge> : null}
               </div>
               <p className="truncate text-xs text-ink/50">{file.uploadedBy.name ?? file.uploadedBy.email}</p>
               {file.rejectedReason ? <p className="mt-1 text-xs text-clay">{file.rejectedReason}</p> : null}
@@ -156,6 +177,14 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
           <span className="text-ink/60">{formatBytes(file.size)}</span>
           <span className="text-ink/60">{formatDate(file.createdAt)}</span>
           <div className="flex justify-end gap-2 max-md:justify-start">
+            <Button
+              aria-label={`Version history for ${file.fileName}`}
+              className="h-9 w-9 px-0"
+              variant="secondary"
+              onClick={() => setHistoryFile(file)}
+            >
+              <FileClock className="h-4 w-4" />
+            </Button>
             <Button
               aria-label={`Preview ${file.fileName}`}
               className="h-9 w-9 px-0"
@@ -197,6 +226,15 @@ export function FileTable({ workspaceId, folders, files, canDeleteFiles, canCrea
           </div>
         </div>
       ))}
+      {historyFile ? (
+        <DocumentHistoryDialog
+          fileId={historyFile.id}
+          fileName={historyFile.fileName}
+          canUpload={canUploadFiles}
+          canManageGovernance={canManageGovernance}
+          onClose={() => setHistoryFile(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import { Providers } from "@/app/providers";
@@ -10,7 +10,17 @@ export const metadata: Metadata = {
   icons: {
     icon: "/letw-logo.png",
     apple: "/letw-logo.png"
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "LETW",
+    statusBarStyle: "default"
   }
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1F6F5B"
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

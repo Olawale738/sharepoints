@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { requireConversationParticipant } from "@/lib/direct-chat-access";
+import { createNotification, notifyMentionedUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { createDirectMessageSchema } from "@/lib/validators";
@@ -77,6 +78,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     let messageBody = "";
     let voiceData: StoredVoiceNote | null = null;
+    let replyToId: string | null = null;
+    let forwardedFromId: string | null = null;
 
     if (isMultipartRequest(request)) {
       const voiceRequest = await parseVoiceNoteRequest(request);
@@ -88,6 +91,8 @@ export async function POST(request: Request, context: RouteContext) {
         scope: "direct",
         scopeId: conversationId
       });
+      replyToId = voiceRequest.replyToId;
+      forwardedFromId = voiceRequest.forwardedFromId;
     } else {
       const body = await request.json();
       const parsed = createDirectMessageSchema.safeParse(body);
@@ -97,6 +102,21 @@ export async function POST(request: Request, context: RouteContext) {
       }
 
       messageBody = parsed.data.body;
+      replyToId = parsed.data.replyToId || null;
+      forwardedFromId = parsed.data.forwardedFromId || null;
+    }
+
+    if (replyToId || forwardedFromId) {
+      const referenceCount = await prisma.directMessage.count({
+        where: {
+          conversationId,
+          id: { in: [replyToId, forwardedFromId].filter(Boolean) as string[] }
+        }
+      });
+
+      if (referenceCount !== new Set([replyToId, forwardedFromId].filter(Boolean)).size) {
+        throw new ApiError(404, "Referenced direct message was not found.");
+      }
     }
 
     let message;
@@ -108,6 +128,8 @@ export async function POST(request: Request, context: RouteContext) {
             conversationId,
             authorId: user.id,
             body: messageBody,
+            replyToId,
+            forwardedFromId,
             ...voiceData
           },
           include: {
@@ -144,6 +166,21 @@ export async function POST(request: Request, context: RouteContext) {
       action: activityActions.directMessageCreated,
       targetId: message.id,
       metadata: { conversationId, voiceNote: Boolean(voiceData) }
+    });
+    await createNotification({
+      userId: recipientId,
+      workspaceId: conversation.workspaceId,
+      type: "DIRECT_MESSAGE",
+      title: `${user.name ?? user.email ?? "A member"} sent you a message`,
+      body: messageBody || "Voice note",
+      href: `/dashboard/workspaces/${conversation.workspaceId}`
+    });
+    await notifyMentionedUsers({
+      text: messageBody,
+      workspaceId: conversation.workspaceId,
+      actorId: user.id,
+      title: "You were mentioned in a direct message",
+      href: `/dashboard/workspaces/${conversation.workspaceId}`
     });
 
     return ok({ message }, { status: 201 });

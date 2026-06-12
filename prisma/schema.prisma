@@ -75,6 +75,29 @@ enum SecurityEventType {
   USER_RESTORED
   ACCESS_REVOKED
   USER_DELETED
+  TWO_FACTOR_ENABLED
+  TWO_FACTOR_DISABLED
+  DEVICE_REVOKED
+  FILE_BLOCKED
+}
+
+enum FileScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  SKIPPED
+}
+
+enum WikiPageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum WorkspaceFormStatus {
+  DRAFT
+  OPEN
+  CLOSED
 }
 
 model User {
@@ -89,6 +112,8 @@ model User {
   forcePasswordReset         Boolean                    @default(false)
   singleActiveSession        Boolean                    @default(false)
   sessionVersion             Int                        @default(0)
+  twoFactorSecret            String?
+  twoFactorEnabled           Boolean                    @default(false)
   suspendedAt                DateTime?
   accessRevokedAt            DateTime?
   deletedAt                  DateTime?
@@ -126,6 +151,22 @@ model User {
   meetingResponses           WorkspaceMeetingResponse[]
   createdShareLinks          FileShareLink[]            @relation("CreatedShareLinks")
   securityEvents             SecurityEvent[]
+  notifications              Notification[]
+  notificationPreference     NotificationPreference?
+  presence                   UserPresence?
+  typingStates               ChatTypingState[]
+  messageReactions           MessageReaction[]
+  messageReceipts            MessageReadReceipt[]
+  messageBookmarks           MessageBookmark[]
+  messagePins                MessagePin[]               @relation("MessagePinnedBy")
+  devices                    UserDevice[]
+  fileVersions               FileVersion[]              @relation("FileVersionUploader")
+  fileComments               FileComment[]
+  filesCheckedOut            File[]                     @relation("FileCheckedOutBy")
+  wikiPagesAuthored          WikiPage[]                 @relation("WikiPageAuthor")
+  wikiPagesUpdated           WikiPage[]                 @relation("WikiPageUpdater")
+  formsCreated               WorkspaceForm[]            @relation("FormCreator")
+  formResponses              WorkspaceFormResponse[]
   activityLogs               ActivityLog[]
 
   @@index([departmentId])
@@ -133,6 +174,7 @@ model User {
   @@index([forcePasswordReset])
   @@index([singleActiveSession])
   @@index([sessionVersion])
+  @@index([twoFactorEnabled])
   @@index([suspendedAt])
   @@index([accessRevokedAt])
   @@index([deletedAt])
@@ -259,6 +301,10 @@ model Workspace {
   integrations        Integration[]
   activityLogs        ActivityLog[]
   approvalRequests    ApprovalRequest[]
+  wikiPages           WikiPage[]
+  forms               WorkspaceForm[]
+  notifications       Notification[]
+  messagePins         MessagePin[]
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
 
@@ -316,6 +362,7 @@ model WorkspaceMeeting {
   @@index([workspaceId, approvalStatus])
   @@index([createdById, startsAt])
   @@index([cancelledAt])
+  @@index([autoRecord])
 }
 
 model WorkspaceMeetingResponse {
@@ -465,30 +512,78 @@ model Folder {
 }
 
 model File {
-  id             String          @id @default(cuid())
-  workspaceId    String
-  folderId       String?
-  uploadedById   String
-  fileUrl        String
-  storageKey     String          @unique
-  fileName       String
-  fileType       String
-  size           Int
-  approvalStatus ApprovalStatus  @default(APPROVED)
-  approvedById   String?
-  approvedAt     DateTime?
-  rejectedReason String?
-  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  folder         Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  uploadedBy     User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
-  chatMessages   ChatMessage[]   @relation("MessageAttachment")
-  shareLinks     FileShareLink[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  id                   String          @id @default(cuid())
+  workspaceId          String
+  folderId             String?
+  uploadedById         String
+  fileUrl              String
+  storageKey           String          @unique
+  fileName             String
+  fileType             String
+  size                 Int
+  approvalStatus       ApprovalStatus  @default(APPROVED)
+  approvedById         String?
+  approvedAt           DateTime?
+  rejectedReason       String?
+  currentVersionNumber Int             @default(1)
+  checkedOutById       String?
+  checkedOutAt         DateTime?
+  retentionUntil       DateTime?
+  legalHold            Boolean         @default(false)
+  scanStatus           FileScanStatus  @default(SKIPPED)
+  scanDetails          String?
+  workspace            Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folder               Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  uploadedBy           User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
+  checkedOutBy         User?           @relation("FileCheckedOutBy", fields: [checkedOutById], references: [id], onDelete: SetNull)
+  chatMessages         ChatMessage[]   @relation("MessageAttachment")
+  versions             FileVersion[]
+  comments             FileComment[]
+  shareLinks           FileShareLink[]
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   @@index([workspaceId, folderId])
   @@index([workspaceId, approvalStatus])
   @@index([uploadedById])
+  @@index([checkedOutById])
+  @@index([scanStatus])
+  @@index([retentionUntil])
+  @@index([legalHold])
+}
+
+model FileVersion {
+  id            String   @id @default(cuid())
+  fileId        String
+  versionNumber Int
+  storageKey    String   @unique
+  fileUrl       String
+  fileName      String
+  fileType      String
+  size          Int
+  changeNote    String?
+  uploadedById  String
+  file          File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  uploadedBy    User     @relation("FileVersionUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+
+  @@unique([fileId, versionNumber])
+  @@index([fileId, createdAt])
+  @@index([uploadedById])
+}
+
+model FileComment {
+  id        String   @id @default(cuid())
+  fileId    String
+  authorId  String
+  body      String   @db.Text
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fileId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model FileShareLink {
@@ -533,6 +628,8 @@ model ChatMessage {
   voiceMimeType    String?
   voiceSize        Int?
   voiceDurationMs  Int?
+  replyToId        String?
+  forwardedFromId  String?
   editedAt         DateTime?
   deletedAt        DateTime?
   channel          ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -543,6 +640,7 @@ model ChatMessage {
 
   @@index([channelId, createdAt])
   @@index([authorId, createdAt])
+  @@index([replyToId])
   @@index([deletedAt])
 }
 
@@ -576,6 +674,8 @@ model DirectMessage {
   voiceMimeType   String?
   voiceSize       Int?
   voiceDurationMs Int?
+  replyToId       String?
+  forwardedFromId String?
   editedAt        DateTime?
   deletedAt       DateTime?
   conversation    DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -584,6 +684,7 @@ model DirectMessage {
 
   @@index([conversationId, createdAt])
   @@index([authorId, createdAt])
+  @@index([replyToId])
   @@index([deletedAt])
 }
 
@@ -611,6 +712,8 @@ model OrgChatMessage {
   voiceMimeType   String?
   voiceSize       Int?
   voiceDurationMs Int?
+  replyToId       String?
+  forwardedFromId String?
   editedAt        DateTime?
   deletedAt       DateTime?
   room            OrgChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -620,6 +723,7 @@ model OrgChatMessage {
 
   @@index([roomId, createdAt])
   @@index([authorId, createdAt])
+  @@index([replyToId])
   @@index([deletedAt])
 }
 
@@ -656,6 +760,177 @@ model ActivityLog {
 
   @@index([workspaceId, createdAt])
   @@index([userId, createdAt])
+}
+
+model Notification {
+  id          String     @id @default(cuid())
+  userId      String
+  workspaceId String?
+  type        String
+  title       String
+  body        String?
+  href        String?
+  readAt      DateTime?
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+model NotificationPreference {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  inAppEnabled   Boolean  @default(true)
+  browserEnabled Boolean  @default(false)
+  emailMentions  Boolean  @default(true)
+  emailTasks     Boolean  @default(true)
+  emailMeetings  Boolean  @default(true)
+  emailApprovals Boolean  @default(true)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime @updatedAt
+}
+
+model UserPresence {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  status     String   @default("online")
+  lastSeenAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt  DateTime @updatedAt
+
+  @@index([lastSeenAt])
+}
+
+model ChatTypingState {
+  id        String   @id @default(cuid())
+  userId    String
+  scopeKind String
+  scopeId   String
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, scopeKind, scopeId])
+  @@index([scopeKind, scopeId, expiresAt])
+}
+
+model MessageReaction {
+  id          String   @id @default(cuid())
+  userId      String
+  messageKind String
+  messageId   String
+  emoji       String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, messageKind, messageId, emoji])
+  @@index([messageKind, messageId])
+}
+
+model MessageReadReceipt {
+  id          String   @id @default(cuid())
+  userId      String
+  messageKind String
+  messageId   String
+  readAt      DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageKind, messageId])
+  @@index([messageKind, messageId, readAt])
+}
+
+model MessageBookmark {
+  id          String   @id @default(cuid())
+  userId      String
+  messageKind String
+  messageId   String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, messageKind, messageId])
+  @@index([userId, createdAt])
+}
+
+model MessagePin {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  pinnedById  String
+  messageKind String
+  messageId   String
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pinnedBy    User       @relation("MessagePinnedBy", fields: [pinnedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+
+  @@unique([messageKind, messageId])
+  @@index([workspaceId, createdAt])
+}
+
+model UserDevice {
+  id         String    @id @default(cuid())
+  userId     String
+  deviceKey  String
+  name       String?
+  userAgent  String?
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@unique([userId, deviceKey])
+  @@index([userId, revokedAt, lastSeenAt])
+}
+
+model WikiPage {
+  id          String         @id @default(cuid())
+  workspaceId String
+  title       String
+  slug        String
+  content     String         @db.Text
+  status      WikiPageStatus @default(DRAFT)
+  authorId    String
+  updatedById String
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author      User           @relation("WikiPageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  updatedBy   User           @relation("WikiPageUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status, updatedAt])
+}
+
+model WorkspaceForm {
+  id          String                  @id @default(cuid())
+  workspaceId String
+  title       String
+  description String?
+  status      WorkspaceFormStatus     @default(DRAFT)
+  fields      Json
+  createdById String
+  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User                    @relation("FormCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  responses   WorkspaceFormResponse[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([workspaceId, status, updatedAt])
+}
+
+model WorkspaceFormResponse {
+  id           String        @id @default(cuid())
+  formId       String
+  respondentId String
+  answers      Json
+  form         WorkspaceForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+  respondent   User          @relation(fields: [respondentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([formId, respondentId])
+  @@index([formId, createdAt])
+  @@index([respondentId, createdAt])
 }
 
 model ApprovalRequest {

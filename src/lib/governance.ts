@@ -1,6 +1,7 @@
 import { ApprovalStatus, WorkspaceRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
+import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getWorkspaceMembership, hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
 
@@ -31,7 +32,7 @@ export async function createApprovalRequestIfNeeded(input: {
     return null;
   }
 
-  return prisma.approvalRequest.upsert({
+  const approval = await prisma.approvalRequest.upsert({
     where: {
       targetType_targetId: {
         targetType: input.targetType,
@@ -53,6 +54,27 @@ export async function createApprovalRequestIfNeeded(input: {
       title: input.title
     }
   });
+
+  const reviewers = await prisma.workspaceMember.findMany({
+    where: {
+      workspaceId: input.workspaceId,
+      role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER] },
+      userId: { not: input.requesterId }
+    },
+    select: { userId: true }
+  });
+  await notifyUsers(
+    reviewers.map((reviewer) => reviewer.userId),
+    {
+      workspaceId: input.workspaceId,
+      type: "APPROVAL_REQUIRED",
+      title: `${input.targetType.toLowerCase()} approval required`,
+      body: input.title,
+      href: `/dashboard/workspaces/${input.workspaceId}`
+    }
+  );
+
+  return approval;
 }
 
 export async function ensureCanSeeFile(userId: string, file: {

@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { requireOrgChatRoomAccess, requireOrgChatRoomSendAccess } from "@/lib/org-chat";
+import { notifyMentionedUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { createDirectMessageSchema } from "@/lib/validators";
 import {
@@ -56,6 +57,8 @@ export async function POST(request: Request, context: RouteContext) {
     const room = await requireOrgChatRoomSendAccess(user.id, roomId);
     let messageBody = "";
     let voiceData: StoredVoiceNote | null = null;
+    let replyToId: string | null = null;
+    let forwardedFromId: string | null = null;
 
     if (isMultipartRequest(request)) {
       const voiceRequest = await parseVoiceNoteRequest(request);
@@ -67,6 +70,8 @@ export async function POST(request: Request, context: RouteContext) {
         scope: "organization",
         scopeId: roomId
       });
+      replyToId = voiceRequest.replyToId;
+      forwardedFromId = voiceRequest.forwardedFromId;
     } else {
       const body = await request.json();
       const parsed = createDirectMessageSchema.safeParse(body);
@@ -76,6 +81,21 @@ export async function POST(request: Request, context: RouteContext) {
       }
 
       messageBody = parsed.data.body;
+      replyToId = parsed.data.replyToId || null;
+      forwardedFromId = parsed.data.forwardedFromId || null;
+    }
+
+    if (replyToId || forwardedFromId) {
+      const referenceCount = await prisma.orgChatMessage.count({
+        where: {
+          roomId,
+          id: { in: [replyToId, forwardedFromId].filter(Boolean) as string[] }
+        }
+      });
+
+      if (referenceCount !== new Set([replyToId, forwardedFromId].filter(Boolean)).size) {
+        throw new ApiError(404, "Referenced organization message was not found.");
+      }
     }
 
     let message;
@@ -86,6 +106,8 @@ export async function POST(request: Request, context: RouteContext) {
           roomId,
           authorId: user.id,
           body: messageBody,
+          replyToId,
+          forwardedFromId,
           ...voiceData
         },
         include: {
@@ -113,6 +135,12 @@ export async function POST(request: Request, context: RouteContext) {
         audience: room.audience,
         voiceNote: Boolean(voiceData)
       }
+    });
+    await notifyMentionedUsers({
+      text: messageBody,
+      actorId: user.id,
+      title: `You were mentioned in ${room.name}`,
+      href: "/dashboard"
     });
 
     return ok({ message }, { status: 201 });

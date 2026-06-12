@@ -52,6 +52,8 @@ export async function parseVoiceNoteRequest(request: Request) {
   const voiceNote = formData.get("voiceNote");
   const body = String(formData.get("body") ?? "").trim();
   const durationMs = Number(formData.get("durationMs"));
+  const replyToId = String(formData.get("replyToId") ?? "").trim() || null;
+  const forwardedFromId = String(formData.get("forwardedFromId") ?? "").trim() || null;
 
   if (!(voiceNote instanceof File)) {
     throw new ApiError(422, "A recorded voice note is required.");
@@ -83,7 +85,9 @@ export async function parseVoiceNoteRequest(request: Request) {
     body,
     durationMs: Math.round(durationMs),
     voiceNote,
-    mimeType
+    mimeType,
+    replyToId,
+    forwardedFromId
   };
 }
 

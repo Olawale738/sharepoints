@@ -3,6 +3,7 @@ import { ApprovalStatus } from "@prisma/client";
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { applyApprovalDecision } from "@/lib/governance";
+import { createNotification } from "@/lib/notifications";
 import { approvalDecisionSchema } from "@/lib/validators";
 
 type RouteContext = {
@@ -38,6 +39,14 @@ export async function PATCH(request: Request, context: RouteContext) {
           title: approval.title,
           status: approval.status
         }
+      });
+      await createNotification({
+        userId: approval.requesterId,
+        workspaceId: approval.workspaceId,
+        type: "APPROVAL_DECISION",
+        title: `${approval.targetType.toLowerCase()} ${approval.status.toLowerCase()}`,
+        body: approval.reason || approval.title,
+        href: `/dashboard/workspaces/${approval.workspaceId}`
       });
     }
 

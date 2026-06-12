@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     }
 
     const approvalFilter = isGlobalAdmin ? {} : { approvalStatus: "APPROVED" as const };
-    const [workspaces, files, folders, tasks, members, messages] = await Promise.all([
+    const [workspaces, files, folders, tasks, members, messages, directMessages, orgMessages, wikiPages, forms] =
+      await Promise.all([
       prisma.workspace.findMany({
         where: {
           id: { in: workspaceIds },
@@ -87,6 +88,62 @@ export async function GET(request: Request) {
           channel: { select: { workspaceId: true, name: true, workspace: { select: { name: true } } } }
         },
         take: 8
+      }),
+      prisma.directMessage.findMany({
+        where: {
+          conversation: { workspaceId: { in: workspaceIds } },
+          deletedAt: null,
+          body: { contains: q, mode: "insensitive" }
+        },
+        select: {
+          id: true,
+          body: true,
+          conversation: {
+            select: {
+              workspaceId: true,
+              workspace: { select: { name: true } }
+            }
+          }
+        },
+        take: 8
+      }),
+      prisma.orgChatMessage.findMany({
+        where: {
+          deletedAt: null,
+          body: { contains: q, mode: "insensitive" }
+        },
+        select: {
+          id: true,
+          body: true,
+          room: { select: { name: true } }
+        },
+        take: 8
+      }),
+      prisma.wikiPage.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          OR: [{ title: { contains: q, mode: "insensitive" } }, { content: { contains: q, mode: "insensitive" } }]
+        },
+        select: {
+          id: true,
+          title: true,
+          workspaceId: true,
+          workspace: { select: { name: true } }
+        },
+        take: 8
+      }),
+      prisma.workspaceForm.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          OR: [{ title: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }]
+        },
+        select: {
+          id: true,
+          title: true,
+          workspaceId: true,
+          workspace: { select: { name: true } }
+        },
+        take: 8
       })
     ]);
 
@@ -127,6 +184,30 @@ export async function GET(request: Request) {
           title: message.body.slice(0, 80),
           detail: `${message.channel.workspace.name} - #${message.channel.name}`,
           href: `/dashboard/workspaces/${message.channel.workspaceId}`
+        })),
+        ...directMessages.map((message) => ({
+          type: "direct chat",
+          title: message.body.slice(0, 80),
+          detail: message.conversation.workspace.name,
+          href: `/dashboard/workspaces/${message.conversation.workspaceId}`
+        })),
+        ...orgMessages.map((message) => ({
+          type: "organization chat",
+          title: message.body.slice(0, 80),
+          detail: message.room.name,
+          href: "/dashboard"
+        })),
+        ...wikiPages.map((page) => ({
+          type: "knowledge",
+          title: page.title,
+          detail: page.workspace.name,
+          href: `/dashboard/workspaces/${page.workspaceId}`
+        })),
+        ...forms.map((form) => ({
+          type: "form",
+          title: form.title,
+          detail: form.workspace.name,
+          href: `/dashboard/workspaces/${form.workspaceId}`
         }))
       ].slice(0, 30)
     });

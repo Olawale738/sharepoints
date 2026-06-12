@@ -27,6 +27,7 @@ type ChatComposerProps = {
   onChange: (value: string) => void;
   onSend: () => void;
   onSendVoiceNote?: (voiceNote: Blob, durationMs: number) => Promise<boolean>;
+  onTyping?: (active: boolean) => void;
 };
 
 function formatDuration(milliseconds: number) {
@@ -56,7 +57,8 @@ export function ChatComposer({
   isSending,
   onChange,
   onSend,
-  onSendVoiceNote
+  onSendVoiceNote,
+  onTyping
 }: ChatComposerProps) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -329,7 +331,10 @@ export function ChatComposer({
           placeholder={placeholder}
           rows={1}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            onTyping?.(Boolean(event.target.value.trim()));
+          }}
           onKeyDown={handleKeyDown}
         />
         {onSendVoiceNote ? (

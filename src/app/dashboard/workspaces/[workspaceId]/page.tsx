@@ -14,13 +14,16 @@ import { DirectMessagesPanel } from "@/components/dashboard/direct-messages-pane
 import { FileTable } from "@/components/dashboard/file-table";
 import { FileUpload } from "@/components/dashboard/file-upload";
 import { FolderCreateForm } from "@/components/dashboard/folder-create-form";
+import { FormsPanel } from "@/components/dashboard/forms-panel";
 import { IntegrationsPanel } from "@/components/dashboard/integrations-panel";
+import { KnowledgeBasePanel } from "@/components/dashboard/knowledge-base-panel";
 import { MeetingsPanel } from "@/components/dashboard/meetings-panel";
 import { MembersPanel } from "@/components/dashboard/members-panel";
 import { RolePermissionsPanel } from "@/components/dashboard/role-permissions-panel";
 import { TasksPanel } from "@/components/dashboard/tasks-panel";
 import { WorkspaceDepartmentAccessPanel } from "@/components/dashboard/workspace-department-access-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
+import { WorkspacePresence } from "@/components/dashboard/workspace-presence";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
 import { canApproveWorkspaceContent } from "@/lib/governance";
@@ -538,10 +541,27 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               createdAt: file.createdAt.toISOString(),
               approvalStatus: file.approvalStatus,
               rejectedReason: file.rejectedReason,
+              currentVersionNumber: file.currentVersionNumber,
+              checkedOutById: file.checkedOutById,
+              legalHold: file.legalHold,
+              retentionUntil: file.retentionUntil?.toISOString() ?? null,
+              scanStatus: file.scanStatus,
               uploadedBy: file.uploadedBy
             }))}
             canDeleteFiles={permissions.canDeleteFiles}
             canCreateShareLinks={permissions.canCreateShareLinks}
+            canUploadFiles={permissions.canUploadFiles}
+            canManageGovernance={hasAdminAccess}
+          />
+
+          <KnowledgeBasePanel
+            workspaceId={workspaceId}
+            canManage={permissions.canCreateAnnouncements}
+          />
+
+          <FormsPanel
+            workspaceId={workspaceId}
+            canManage={permissions.canCreateAnnouncements}
           />
 
           <TasksPanel
@@ -604,6 +624,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               voiceMimeType: message.voiceMimeType,
               voiceSize: message.voiceSize,
               voiceDurationMs: message.voiceDurationMs,
+              replyToId: message.replyToId,
+              forwardedFromId: message.forwardedFromId,
               author: message.author,
               attachmentFile: message.attachmentFile
             }))}
@@ -637,6 +659,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
                 voiceMimeType: message.voiceMimeType,
                 voiceSize: message.voiceSize,
                 voiceDurationMs: message.voiceDurationMs,
+                replyToId: message.replyToId,
+                forwardedFromId: message.forwardedFromId,
                 author: message.author
               }))
             }))}
@@ -645,6 +669,8 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
         </div>
 
         <div className="space-y-4">
+          <WorkspacePresence workspaceId={workspaceId} />
+
           <AnnouncementsPanel
             workspaceId={workspaceId}
             announcements={announcements.map((announcement) => ({

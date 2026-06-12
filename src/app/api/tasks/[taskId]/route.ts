@@ -1,5 +1,6 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { updateTaskSchema } from "@/lib/validators";
@@ -143,6 +144,16 @@ export async function PATCH(request: Request, context: RouteContext) {
       action: activityActions.taskUpdated,
       targetId: task.id,
       metadata: { title: task.title, status: task.status }
+    });
+    const taskAssigneeIds = Array.from(
+      new Set([task.assignedTo?.id, ...task.assignees.map((assignee) => assignee.userId)].filter(Boolean) as string[])
+    ).filter((assigneeId) => assigneeId !== user.id);
+    await notifyUsers(taskAssigneeIds, {
+      workspaceId: task.workspaceId,
+      type: "TASK_UPDATED",
+      title: "An assigned task was updated",
+      body: `${task.title} is now ${task.status.toLowerCase().replaceAll("_", " ")}.`,
+      href: `/dashboard/workspaces/${task.workspaceId}`
     });
 
     return ok({ task });

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Loader2, UsersRound } from "lucide-react";
+import { Building2, CornerUpLeft, Loader2, UsersRound, X } from "lucide-react";
 
 import { ChatComposer } from "@/components/dashboard/chat-composer";
 import { BubbleMessage, ChatMessageBubble } from "@/components/dashboard/chat-message-bubble";
+import { useChatCollaboration } from "@/components/dashboard/use-chat-collaboration";
 
 type OrgChatMessage = BubbleMessage & {
   id: string;
@@ -51,21 +52,27 @@ export function OrganizationChatPanel({
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<OrgChatMessage | null>(null);
 
   const activeRoom = rooms.find((room) => room.id === activeRoomId);
   const canSendMessages = Boolean(activeRoom?.canSendMessages);
+  const collaboration = useChatCollaboration({
+    kind: "organization",
+    scopeId: activeRoomId,
+    messageIds: messages.map((message) => message.id)
+  });
 
   useEffect(() => {
-    async function loadMessages() {
+    async function loadMessages(showLoading = false) {
       if (!activeRoomId) {
         setMessages([]);
         return;
       }
 
       setError("");
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`);
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
 
       const data = (await response.json().catch(() => null)) as {
         messages?: OrgChatMessage[];
@@ -80,7 +87,10 @@ export function OrganizationChatPanel({
       setMessages(data.messages);
     }
 
-    loadMessages();
+    setReplyingTo(null);
+    void loadMessages(true);
+    const interval = window.setInterval(loadMessages, 4_000);
+    return () => window.clearInterval(interval);
   }, [activeRoomId]);
 
   async function sendMessage() {
@@ -93,7 +103,7 @@ export function OrganizationChatPanel({
     const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body })
+      body: JSON.stringify({ body, replyToId: replyingTo?.id })
     });
     setIsSending(false);
 
@@ -121,6 +131,8 @@ export function OrganizationChatPanel({
       )
     );
     setBody("");
+    setReplyingTo(null);
+    void collaboration.setTyping(false);
   }
 
   async function sendVoiceNote(voiceNote: Blob, durationMs: number) {
@@ -132,6 +144,7 @@ export function OrganizationChatPanel({
     const formData = new FormData();
     formData.append("voiceNote", voiceNote, "voice-note.webm");
     formData.append("durationMs", String(durationMs));
+    if (replyingTo?.id) formData.append("replyToId", replyingTo.id);
     const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`, {
       method: "POST",
       body: formData
@@ -159,7 +172,31 @@ export function OrganizationChatPanel({
           : room
       )
     );
+    setReplyingTo(null);
     return true;
+  }
+
+  async function forwardMessage(message: OrgChatMessage) {
+    if (!activeRoomId) return;
+    const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        body: message.body || (message.voiceStorageKey ? "Forwarded voice note" : "Forwarded message"),
+        forwardedFromId: message.id
+      })
+    });
+    const data = (await response.json().catch(() => null)) as {
+      message?: OrgChatMessage;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !data?.message) {
+      setError(data?.error ?? "Message could not be forwarded.");
+      return;
+    }
+
+    setMessages((current) => [...current, data.message as OrgChatMessage]);
   }
 
   function updateMessage(updatedMessage: OrgChatMessage) {
@@ -224,15 +261,42 @@ export function OrganizationChatPanel({
               currentUserId={currentUserId}
               endpoint={`/api/org-chat/rooms/${activeRoomId}/messages/${message.id}`}
               message={message}
+              replyPreview={messages.find((item) => item.id === message.replyToId)}
+              reactions={collaboration.byMessageId[message.id]?.reactions}
+              readCount={collaboration.byMessageId[message.id]?.readCount}
+              bookmarked={collaboration.byMessageId[message.id]?.bookmarked}
+              pinned={collaboration.byMessageId[message.id]?.pinned}
               voiceKind="organization"
               onError={setError}
+              onReply={(item) => setReplyingTo(item as OrgChatMessage)}
+              onForward={(item) => void forwardMessage(item as OrgChatMessage)}
+              onReact={(messageId, emoji) => void collaboration.react(messageId, emoji)}
+              onBookmark={(messageId) => void collaboration.toggleBookmark(messageId)}
+              onPin={(messageId) => void collaboration.togglePin(messageId)}
               onMessageChange={(updatedMessage) => updateMessage(updatedMessage as OrgChatMessage)}
             />
           ))}
+          {collaboration.typingUsers.length ? (
+            <p className="text-xs italic text-ink/45">{collaboration.typingUsers.join(", ")} typing...</p>
+          ) : null}
         </div>
 
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
+          {replyingTo ? (
+            <div className="mb-2 flex items-center justify-between rounded-md border-l-2 border-moss bg-mint/45 px-3 py-2 text-xs">
+              <span className="flex min-w-0 items-center gap-2">
+                <CornerUpLeft className="h-3.5 w-3.5 shrink-0 text-moss" />
+                <span className="truncate">
+                  Replying to {replyingTo.author.name ?? replyingTo.author.email ?? "message"}:{" "}
+                  {replyingTo.voiceStorageKey ? "Voice note" : replyingTo.body}
+                </span>
+              </span>
+              <button aria-label="Cancel reply" type="button" onClick={() => setReplyingTo(null)}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
           <ChatComposer
             key={activeRoomId}
             disabled={!activeRoomId || !canSendMessages}
@@ -242,6 +306,7 @@ export function OrganizationChatPanel({
             onChange={setBody}
             onSend={sendMessage}
             onSendVoiceNote={sendVoiceNote}
+            onTyping={(active) => void collaboration.setTyping(active)}
           />
         </div>
       </section>

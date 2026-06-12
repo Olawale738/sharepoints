@@ -2,6 +2,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { createMeetingPasscode, createMeetingRoomName, meetingInclude, serializeMeeting } from "@/lib/meetings";
+import { notifyWorkspaceMembers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createWorkspaceMeetingSchema } from "@/lib/validators";
@@ -122,6 +123,18 @@ export async function POST(request: Request, context: RouteContext) {
         approvalStatus
       }
     });
+    if (approvalStatus === "APPROVED") {
+      await notifyWorkspaceMembers(
+        id,
+        {
+          type: "MEETING_SCHEDULED",
+          title: "A workspace meeting was scheduled",
+          body: `${meeting.title} starts ${meeting.startsAt.toLocaleString()}.`,
+          href: `/dashboard/workspaces/${id}`
+        },
+        user.id
+      );
+    }
 
     return ok({ meeting: serializeMeeting(meeting, user.id, new URL(request.url).origin) }, { status: 201 });
   } catch (error) {

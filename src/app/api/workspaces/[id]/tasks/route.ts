@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
+import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createTaskSchema } from "@/lib/validators";
@@ -203,6 +204,13 @@ export async function POST(request: Request, context: RouteContext) {
       action: activityActions.taskCreated,
       targetId: task.id,
       metadata: { title: task.title, status: task.status, priority: task.priority, approvalStatus }
+    });
+    await notifyUsers(assigneeIds.filter((assigneeId) => assigneeId !== user.id), {
+      workspaceId: id,
+      type: "TASK_ASSIGNED",
+      title: "A task was assigned to you",
+      body: task.title,
+      href: `/dashboard/workspaces/${id}`
     });
 
     return ok({ task }, { status: 201 });

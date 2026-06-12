@@ -7,6 +7,7 @@ import { SecurityEventType } from "@prisma/client";
 import { isBlockedServiceEmail, markCompanyInvitationAccepted } from "@/lib/email-policy";
 import { prisma } from "@/lib/prisma";
 import { logSecurityEvent } from "@/lib/security";
+import { verifyTotpCode } from "@/lib/totp";
 import { loginSchema } from "@/lib/validators";
 
 const providers: NextAuthConfig["providers"] = [
@@ -14,7 +15,8 @@ const providers: NextAuthConfig["providers"] = [
     name: "Email",
     credentials: {
       email: { label: "Email", type: "email" },
-      password: { label: "Password", type: "password" }
+      password: { label: "Password", type: "password" },
+      otp: { label: "Authenticator code", type: "text" }
     },
     async authorize(rawCredentials) {
       const parsed = loginSchema.safeParse(rawCredentials);
@@ -58,6 +60,18 @@ const providers: NextAuthConfig["providers"] = [
           metadata: { reason: "invalid_password" }
         });
         return null;
+      }
+
+      if (user.twoFactorEnabled) {
+        if (!user.twoFactorSecret || !parsed.data.otp || !verifyTotpCode(user.twoFactorSecret, parsed.data.otp)) {
+          await logSecurityEvent({
+            userId: user.id,
+            type: SecurityEventType.LOGIN_FAILED,
+            email: user.email,
+            metadata: { reason: "invalid_two_factor_code" }
+          });
+          return null;
+        }
       }
 
       await logSecurityEvent({

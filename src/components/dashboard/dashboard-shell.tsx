@@ -1,10 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
+import { BarChart3, CalendarDays, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
+import { NotificationCenter } from "@/components/dashboard/notification-center";
+import { PlatformClient } from "@/components/dashboard/platform-client";
+import { PwaInstallButton } from "@/components/dashboard/pwa-install-button";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 
@@ -31,6 +34,7 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
 
   return (
     <div className="min-h-screen bg-paper">
+      <PlatformClient />
       <aside className="fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-ink/10 bg-white px-4 py-5 lg:block">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-white">
@@ -76,14 +80,32 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
             <div className="hidden min-w-0 flex-1 justify-center xl:flex">
               <GlobalSearch />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-1">
+              <Link
+                aria-label="Calendar"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/calendar"
+              >
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Calendar</span>
+              </Link>
+              <Link
+                aria-label="Analytics"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/analytics"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Analytics</span>
+              </Link>
+              <NotificationCenter />
+              <PwaInstallButton />
               {canOpenAdminCenter ? (
                 <Link
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
                   href="/dashboard/admin"
                 >
                   <SlidersHorizontal className="h-4 w-4" />
-                  Admin
+                  <span className="hidden xl:inline">Admin</span>
                 </Link>
               ) : null}
               <Link
@@ -91,7 +113,7 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, children 
                 href="/dashboard/profile"
               >
                 <UserRound className="h-4 w-4" />
-                Profile
+                <span className="hidden xl:inline">Profile</span>
               </Link>
               <SignOutButton />
             </div>

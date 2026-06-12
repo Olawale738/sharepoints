@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const loginSchema = z.object({
   email: z.string().email().max(254).transform((value) => value.toLowerCase()),
-  password: z.string().min(8).max(128)
+  password: z.string().min(8).max(128),
+  otp: z.string().trim().regex(/^\d{6}$/).optional().or(z.literal(""))
 });
 
 export const registerSchema = loginSchema.extend({
@@ -90,7 +91,9 @@ export const createChannelSchema = z.object({
 
 export const createChatMessageSchema = z.object({
   body: z.string().trim().min(1).max(4000),
-  attachmentFileId: z.string().cuid().optional().nullable()
+  attachmentFileId: z.string().cuid().optional().nullable(),
+  replyToId: z.string().cuid().optional().nullable(),
+  forwardedFromId: z.string().cuid().optional().nullable()
 });
 
 export const startDirectConversationSchema = z.object({
@@ -98,7 +101,9 @@ export const startDirectConversationSchema = z.object({
 });
 
 export const createDirectMessageSchema = z.object({
-  body: z.string().trim().min(1).max(4000)
+  body: z.string().trim().min(1).max(4000),
+  replyToId: z.string().cuid().optional().nullable(),
+  forwardedFromId: z.string().cuid().optional().nullable()
 });
 
 export const updateMessageSchema = z.object({
@@ -139,9 +144,9 @@ export const updateTaskSchema = createTaskSchema.partial().extend({
 
 export const createWorkspaceMeetingSchema = z
   .object({
-      title: z.string().trim().min(2).max(120),
-      meetingType: z.enum(["AUDIO", "VIDEO"]).optional(),
-      description: z.string().trim().max(1000).optional().or(z.literal("")),
+    title: z.string().trim().min(2).max(120),
+    meetingType: z.enum(["AUDIO", "VIDEO"]).optional(),
+    description: z.string().trim().max(1000).optional().or(z.literal("")),
     agenda: z.string().trim().max(2000).optional().or(z.literal("")),
     recordingUrl: z.string().url().max(2048).optional().or(z.literal("")),
     autoRecord: z.boolean().optional(),
@@ -208,4 +213,69 @@ export const createFileShareLinkSchema = z.object({
 
 export const updateUserAccessSchema = z.object({
   action: z.enum(["SUSPEND", "RESTORE", "REVOKE", "DELETE"])
+});
+
+export const chatCollaborationSchema = z.object({
+  action: z.enum(["REACT", "BOOKMARK", "PIN", "READ", "TYPING"]),
+  messageKind: z.enum(["channel", "direct", "organization"]).optional(),
+  messageId: z.string().cuid().optional(),
+  emoji: z.string().trim().min(1).max(16).optional(),
+  scopeKind: z.enum(["channel", "direct", "organization"]).optional(),
+  scopeId: z.string().cuid().optional(),
+  active: z.boolean().optional()
+});
+
+export const notificationPreferenceSchema = z.object({
+  browserEnabled: z.boolean().optional(),
+  emailMentions: z.boolean().optional(),
+  emailTasks: z.boolean().optional(),
+  emailMeetings: z.boolean().optional(),
+  emailApprovals: z.boolean().optional()
+});
+
+export const createWikiPageSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  content: z.string().trim().min(1).max(50_000),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional()
+});
+
+export const updateWikiPageSchema = createWikiPageSchema.partial();
+
+export const formFieldSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(160),
+  type: z.enum(["TEXT", "LONG_TEXT", "EMAIL", "NUMBER", "DATE", "CHOICE", "CHECKBOX"]),
+  required: z.boolean().optional(),
+  options: z.array(z.string().trim().min(1).max(120)).max(30).optional()
+});
+
+export const createWorkspaceFormSchema = z.object({
+  title: z.string().trim().min(2).max(160),
+  description: z.string().trim().max(1000).optional().or(z.literal("")),
+  status: z.enum(["DRAFT", "OPEN", "CLOSED"]).optional(),
+  fields: z.array(formFieldSchema).min(1).max(40)
+});
+
+export const submitWorkspaceFormSchema = z.object({
+  answers: z.record(z.union([z.string().max(5000), z.number(), z.boolean(), z.array(z.string().max(500))]))
+});
+
+export const fileGovernanceSchema = z.object({
+  action: z.enum(["CHECK_OUT", "CHECK_IN", "SET_RETENTION", "SET_LEGAL_HOLD"]),
+  retentionUntil: z.string().datetime().optional().nullable().or(z.literal("")),
+  legalHold: z.boolean().optional()
+});
+
+export const fileCommentSchema = z.object({
+  body: z.string().trim().min(1).max(4000)
+});
+
+export const twoFactorCodeSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/)
+});
+
+export const deviceHeartbeatSchema = z.object({
+  deviceKey: z.string().trim().min(8).max(160),
+  name: z.string().trim().max(120).optional().or(z.literal("")),
+  userAgent: z.string().trim().max(1000).optional().or(z.literal(""))
 });

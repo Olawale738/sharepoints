@@ -15,7 +15,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const user = await requireUser();
     const { id } = await context.params;
     const file = await prisma.file.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        versions: {
+          select: {
+            storageKey: true
+          }
+        }
+      }
     });
 
     if (!file) {
@@ -23,7 +30,17 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     await requireWorkspacePermission(user.id, file.workspaceId, "canDeleteFiles");
-    await deleteObject(file.storageKey);
+
+    if (file.legalHold) {
+      throw new ApiError(409, "This document is under legal hold and cannot be deleted.");
+    }
+
+    if (file.retentionUntil && file.retentionUntil > new Date()) {
+      throw new ApiError(409, `This document is retained until ${file.retentionUntil.toISOString()}.`);
+    }
+
+    const storageKeys = Array.from(new Set([file.storageKey, ...file.versions.map((version) => version.storageKey)]));
+    await Promise.all(storageKeys.map((storageKey) => deleteObject(storageKey)));
 
     await prisma.file.delete({
       where: { id: file.id }

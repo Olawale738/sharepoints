@@ -1,6 +1,7 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { canApproveWorkspaceContent, createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
+import { notifyWorkspaceMembers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { createAnnouncementSchema } from "@/lib/validators";
@@ -91,6 +92,18 @@ export async function POST(request: Request, context: RouteContext) {
       targetId: announcement.id,
       metadata: { title: announcement.title, pinned: announcement.pinned, approvalStatus }
     });
+    if (approvalStatus === "APPROVED") {
+      await notifyWorkspaceMembers(
+        id,
+        {
+          type: "ANNOUNCEMENT",
+          title: announcement.title,
+          body: announcement.body.slice(0, 240),
+          href: `/dashboard/workspaces/${id}`
+        },
+        user.id
+      );
+    }
 
     return ok({ announcement }, { status: 201 });
   } catch (error) {

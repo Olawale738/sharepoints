@@ -81,6 +81,10 @@ export async function GET(request: Request, context: RouteContext) {
     await requireWorkspaceMembership(session.user.id, file.workspaceId);
     await ensureCanSeeFile(session.user.id, file);
 
+    if (file.scanStatus === "INFECTED") {
+      throw new ApiError(423, "This document was blocked by security screening.");
+    }
+
     if (isWordDocument(file.fileName, file.fileType)) {
       const mammoth = await import("mammoth");
       const buffer = await getObjectBuffer(file.storageKey);
