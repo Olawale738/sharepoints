@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Edit3, Loader2, Paperclip, Trash2, X } from "lucide-react";
 
+import { VoiceNotePlayer } from "@/components/dashboard/voice-note-player";
 import { Button } from "@/components/ui/button";
 import { messageDeleteWindowMs } from "@/lib/message-constants";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -14,6 +15,10 @@ export type BubbleMessage = {
   createdAt: string;
   editedAt?: string | null;
   deletedAt?: string | null;
+  voiceStorageKey?: string | null;
+  voiceMimeType?: string | null;
+  voiceSize?: number | null;
+  voiceDurationMs?: number | null;
   author?: {
     id?: string | null;
     name?: string | null;
@@ -32,6 +37,7 @@ type ChatMessageBubbleProps = {
   currentUserId: string;
   message: BubbleMessage;
   endpoint: string;
+  voiceKind: "channel" | "direct" | "organization";
   onMessageChange: (message: BubbleMessage) => void;
   onError: (message: string) => void;
 };
@@ -44,6 +50,7 @@ export function ChatMessageBubble({
   currentUserId,
   message,
   endpoint,
+  voiceKind,
   onMessageChange,
   onError
 }: ChatMessageBubbleProps) {
@@ -62,9 +69,11 @@ export function ChatMessageBubble({
 
   const isMine = Boolean(message.author?.id && message.author.id === currentUserId);
   const isDeleted = Boolean(message.deletedAt);
-  const canEdit = isMine && !isDeleted;
+  const hasVoiceNote = Boolean(message.voiceStorageKey);
+  const canManage = isMine && !isDeleted;
+  const canEdit = canManage && Boolean(message.body.trim());
   const canDelete =
-    canEdit && currentTime !== null && currentTime - new Date(message.createdAt).getTime() <= messageDeleteWindowMs;
+    canManage && currentTime !== null && currentTime - new Date(message.createdAt).getTime() <= messageDeleteWindowMs;
   const bubbleTone = isDeleted ? "bg-white/75 text-ink/55" : isMine ? "bg-mint text-ink" : "bg-white text-ink";
 
   async function saveEdit() {
@@ -144,9 +153,20 @@ export function ChatMessageBubble({
             </div>
           ) : (
             <>
-              <p className={`whitespace-pre-wrap break-words text-sm ${isDeleted ? "italic" : ""}`}>
-                {isDeleted ? "This message was deleted." : message.body}
-              </p>
+              {isDeleted ? (
+                <p className="whitespace-pre-wrap break-words text-sm italic">This message was deleted.</p>
+              ) : null}
+              {!isDeleted && hasVoiceNote ? (
+                <VoiceNotePlayer
+                  durationMs={message.voiceDurationMs}
+                  src={`/api/voice-notes/${voiceKind}/${message.id}`}
+                />
+              ) : null}
+              {!isDeleted && message.body ? (
+                <p className={`whitespace-pre-wrap break-words text-sm ${hasVoiceNote ? "mt-2" : ""}`}>
+                  {message.body}
+                </p>
+              ) : null}
               {!isDeleted && message.attachmentFile ? (
                 <a
                   className="mt-2 inline-flex items-center gap-2 rounded-md border border-ink/10 bg-white px-2 py-1 text-xs text-moss"
@@ -163,19 +183,21 @@ export function ChatMessageBubble({
             </>
           )}
         </div>
-        {canEdit && !isEditing ? (
+        {canManage && !isEditing ? (
           <div className="absolute -top-3 right-2 hidden gap-1 rounded-full border border-ink/10 bg-white p-1 shadow-soft group-hover:flex">
-            <button
-              aria-label="Edit message"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink/65 transition hover:bg-mint hover:text-ink"
-              type="button"
-              onClick={() => {
-                setDraft(message.body);
-                setIsEditing(true);
-              }}
-            >
-              <Edit3 className="h-3.5 w-3.5" />
-            </button>
+            {canEdit ? (
+              <button
+                aria-label="Edit message"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink/65 transition hover:bg-mint hover:text-ink"
+                type="button"
+                onClick={() => {
+                  setDraft(message.body);
+                  setIsEditing(true);
+                }}
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
             <button
               aria-label="Delete message"
               className="inline-flex h-7 w-7 items-center justify-center rounded-full text-ink/65 transition hover:bg-clay/10 hover:text-clay disabled:cursor-not-allowed disabled:opacity-40"

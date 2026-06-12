@@ -123,6 +123,45 @@ export function OrganizationChatPanel({
     setBody("");
   }
 
+  async function sendVoiceNote(voiceNote: Blob, durationMs: number) {
+    if (!activeRoomId) {
+      return false;
+    }
+
+    setError("");
+    const formData = new FormData();
+    formData.append("voiceNote", voiceNote, "voice-note.webm");
+    formData.append("durationMs", String(durationMs));
+    const response = await fetch(`/api/org-chat/rooms/${activeRoomId}/messages`, {
+      method: "POST",
+      body: formData
+    });
+    const data = (await response.json().catch(() => null)) as {
+      message?: OrgChatMessage;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !data?.message) {
+      setError(data?.error ?? "Voice note could not be sent.");
+      return false;
+    }
+
+    setMessages((current) => [...current, data.message as OrgChatMessage]);
+    setRooms((current) =>
+      current.map((room) =>
+        room.id === activeRoomId
+          ? {
+              ...room,
+              _count: {
+                messages: (room._count?.messages ?? 0) + 1
+              }
+            }
+          : room
+      )
+    );
+    return true;
+  }
+
   function updateMessage(updatedMessage: OrgChatMessage) {
     setMessages((current) =>
       current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
@@ -185,6 +224,7 @@ export function OrganizationChatPanel({
               currentUserId={currentUserId}
               endpoint={`/api/org-chat/rooms/${activeRoomId}/messages/${message.id}`}
               message={message}
+              voiceKind="organization"
               onError={setError}
               onMessageChange={(updatedMessage) => updateMessage(updatedMessage as OrgChatMessage)}
             />
@@ -194,12 +234,14 @@ export function OrganizationChatPanel({
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
           <ChatComposer
+            key={activeRoomId}
             disabled={!activeRoomId || !canSendMessages}
             isSending={isSending}
             placeholder="Message this room"
             value={body}
             onChange={setBody}
             onSend={sendMessage}
+            onSendVoiceNote={sendVoiceNote}
           />
         </div>
       </section>

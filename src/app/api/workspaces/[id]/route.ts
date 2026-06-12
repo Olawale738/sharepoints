@@ -3,6 +3,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess } from "@/lib/rbac";
 import { deleteObject } from "@/lib/storage";
+import { removeVoiceNote } from "@/lib/voice-notes";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -23,6 +24,34 @@ export async function DELETE(_request: Request, context: RouteContext) {
           select: {
             storageKey: true
           }
+        },
+        chatChannels: {
+          select: {
+            messages: {
+              where: {
+                voiceStorageKey: {
+                  not: null
+                }
+              },
+              select: {
+                voiceStorageKey: true
+              }
+            }
+          }
+        },
+        directConversations: {
+          select: {
+            messages: {
+              where: {
+                voiceStorageKey: {
+                  not: null
+                }
+              },
+              select: {
+                voiceStorageKey: true
+              }
+            }
+          }
         }
       }
     });
@@ -34,6 +63,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
     for (const file of workspace.files) {
       await deleteObject(file.storageKey);
     }
+    const voiceStorageKeys = [
+      ...workspace.chatChannels.flatMap((channel) => channel.messages.map((message) => message.voiceStorageKey)),
+      ...workspace.directConversations.flatMap((conversation) =>
+        conversation.messages.map((message) => message.voiceStorageKey)
+      )
+    ];
+
+    await Promise.all(voiceStorageKeys.map((storageKey) => removeVoiceNote(storageKey).catch(() => undefined)));
 
     await prisma.workspace.delete({
       where: { id }
@@ -45,7 +82,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       targetId: workspace.id,
       metadata: {
         name: workspace.name,
-        filesDeleted: workspace.files.length
+        filesDeleted: workspace.files.length,
+        voiceNotesDeleted: voiceStorageKeys.length
       }
     });
 

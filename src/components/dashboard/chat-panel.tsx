@@ -112,6 +112,37 @@ export function ChatPanel({
     setBody("");
   }
 
+  async function sendVoiceNote(voiceNote: Blob, durationMs: number) {
+    if (!activeChannelId) {
+      return false;
+    }
+
+    setError("");
+    const formData = new FormData();
+    formData.append("voiceNote", voiceNote, "voice-note.webm");
+    formData.append("durationMs", String(durationMs));
+    const response = await fetch(`/api/channels/${activeChannelId}/messages`, {
+      method: "POST",
+      body: formData
+    });
+    const data = (await response.json().catch(() => null)) as { message?: Message; error?: string } | null;
+
+    if (!response.ok || !data?.message) {
+      setError(data?.error ?? "Voice note could not be sent.");
+      return false;
+    }
+
+    setMessages((current) => [...current, data.message as Message]);
+    setChannels((current) =>
+      current.map((channel) =>
+        channel.id === activeChannelId && channel._count
+          ? { ...channel, _count: { messages: channel._count.messages + 1 } }
+          : channel
+      )
+    );
+    return true;
+  }
+
   function updateMessage(updatedMessage: Message) {
     setMessages((current) => current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message)));
   }
@@ -256,6 +287,7 @@ export function ChatPanel({
               currentUserId={currentUserId}
               endpoint={`/api/channels/${activeChannelId}/messages/${message.id}`}
               message={message}
+              voiceKind="channel"
               onError={setError}
               onMessageChange={(updatedMessage) => updateMessage(updatedMessage as Message)}
             />
@@ -265,12 +297,14 @@ export function ChatPanel({
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
           <ChatComposer
+            key={activeChannelId}
             disabled={!canSendMessages || !activeChannelId}
             isSending={isSending}
             placeholder="Message this channel"
             value={body}
             onChange={setBody}
             onSend={sendMessage}
+            onSendVoiceNote={sendVoiceNote}
           />
         </div>
       </section>

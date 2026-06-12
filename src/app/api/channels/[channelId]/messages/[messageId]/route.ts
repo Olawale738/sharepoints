@@ -7,6 +7,7 @@ import {
 } from "@/lib/message-policy";
 import { prisma } from "@/lib/prisma";
 import { updateMessageSchema } from "@/lib/validators";
+import { removeVoiceNote } from "@/lib/voice-notes";
 import { requireWorkspaceChannelMembership, requireWorkspaceChannelSendAccess } from "@/lib/workspace-chat-access";
 
 type RouteContext = {
@@ -102,7 +103,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id: true,
         authorId: true,
         createdAt: true,
-        deletedAt: true
+        deletedAt: true,
+        voiceStorageKey: true
       }
     });
 
@@ -121,10 +123,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
       data: {
         body: "",
         attachmentFileId: null,
+        voiceStorageKey: null,
+        voiceMimeType: null,
+        voiceSize: null,
+        voiceDurationMs: null,
         deletedAt: new Date()
       },
       include: messageInclude
     });
+    await removeVoiceNote(existing.voiceStorageKey).catch(() => undefined);
 
     await logActivity({
       userId: user.id,

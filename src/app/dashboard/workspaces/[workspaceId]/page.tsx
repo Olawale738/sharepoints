@@ -600,6 +600,10 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               createdAt: message.createdAt.toISOString(),
               editedAt: message.editedAt?.toISOString() ?? null,
               deletedAt: message.deletedAt?.toISOString() ?? null,
+              voiceStorageKey: message.voiceStorageKey,
+              voiceMimeType: message.voiceMimeType,
+              voiceSize: message.voiceSize,
+              voiceDurationMs: message.voiceDurationMs,
               author: message.author,
               attachmentFile: message.attachmentFile
             }))}
@@ -629,6 +633,10 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
                 createdAt: message.createdAt.toISOString(),
                 editedAt: message.editedAt?.toISOString() ?? null,
                 deletedAt: message.deletedAt?.toISOString() ?? null,
+                voiceStorageKey: message.voiceStorageKey,
+                voiceMimeType: message.voiceMimeType,
+                voiceSize: message.voiceSize,
+                voiceDurationMs: message.voiceDurationMs,
                 author: message.author
               }))
             }))}

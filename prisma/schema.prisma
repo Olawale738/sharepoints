@@ -529,6 +529,10 @@ model ChatMessage {
   externalAuthor   String?
   body             String      @db.Text
   attachmentFileId String?
+  voiceStorageKey  String?     @unique
+  voiceMimeType    String?
+  voiceSize        Int?
+  voiceDurationMs  Int?
   editedAt         DateTime?
   deletedAt        DateTime?
   channel          ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -564,15 +568,19 @@ model DirectConversation {
 }
 
 model DirectMessage {
-  id             String             @id @default(cuid())
-  conversationId String
-  authorId       String
-  body           String             @db.Text
-  editedAt       DateTime?
-  deletedAt      DateTime?
-  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  author         User               @relation("AuthoredDirectMessages", fields: [authorId], references: [id], onDelete: Cascade)
-  createdAt      DateTime           @default(now())
+  id              String             @id @default(cuid())
+  conversationId  String
+  authorId        String
+  body            String             @db.Text
+  voiceStorageKey String?            @unique
+  voiceMimeType   String?
+  voiceSize       Int?
+  voiceDurationMs Int?
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  conversation    DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author          User               @relation("AuthoredDirectMessages", fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
 
   @@index([conversationId, createdAt])
   @@index([authorId, createdAt])
@@ -595,16 +603,20 @@ model OrgChatRoom {
 }
 
 model OrgChatMessage {
-  id        String      @id @default(cuid())
-  roomId    String
-  authorId  String
-  body      String      @db.Text
-  editedAt  DateTime?
-  deletedAt DateTime?
-  room      OrgChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  author    User        @relation("AuthoredOrgChatMessages", fields: [authorId], references: [id], onDelete: Cascade)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  roomId          String
+  authorId        String
+  body            String      @db.Text
+  voiceStorageKey String?     @unique
+  voiceMimeType   String?
+  voiceSize       Int?
+  voiceDurationMs Int?
+  editedAt        DateTime?
+  deletedAt       DateTime?
+  room            OrgChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  author          User        @relation("AuthoredOrgChatMessages", fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@index([roomId, createdAt])
   @@index([authorId, createdAt])

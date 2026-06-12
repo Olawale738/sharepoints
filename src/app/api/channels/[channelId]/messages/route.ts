@@ -2,6 +2,13 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { prisma } from "@/lib/prisma";
 import { createChatMessageSchema } from "@/lib/validators";
+import {
+  isMultipartRequest,
+  parseVoiceNoteRequest,
+  removeVoiceNote,
+  storeVoiceNote,
+  StoredVoiceNote
+} from "@/lib/voice-notes";
 import { requireWorkspaceChannelMembership, requireWorkspaceChannelSendAccess } from "@/lib/workspace-chat-access";
 
 type RouteContext = {
@@ -51,61 +58,87 @@ export async function POST(request: Request, context: RouteContext) {
     const user = await requireUser();
     const { channelId } = await context.params;
     const channel = await requireWorkspaceChannelSendAccess(user.id, channelId);
+    let messageBody = "";
+    let attachmentFileId: string | null = null;
+    let voiceData: StoredVoiceNote | null = null;
 
-    const body = await request.json();
-    const parsed = createChatMessageSchema.safeParse(body);
-
-    if (!parsed.success) {
-      throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid message.");
-    }
-
-    if (parsed.data.attachmentFileId) {
-      const file = await prisma.file.findFirst({
-        where: {
-          id: parsed.data.attachmentFileId,
-          workspaceId: channel.workspaceId
-        },
-        select: { id: true }
+    if (isMultipartRequest(request)) {
+      const voiceRequest = await parseVoiceNoteRequest(request);
+      messageBody = voiceRequest.body;
+      voiceData = await storeVoiceNote({
+        voiceNote: voiceRequest.voiceNote,
+        mimeType: voiceRequest.mimeType,
+        durationMs: voiceRequest.durationMs,
+        scope: "channels",
+        scopeId: channelId
       });
+    } else {
+      const body = await request.json();
+      const parsed = createChatMessageSchema.safeParse(body);
 
-      if (!file) {
-        throw new ApiError(404, "Attachment file not found in this workspace.");
+      if (!parsed.success) {
+        throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid message.");
       }
-    }
 
-    const message = await prisma.chatMessage.create({
-      data: {
-        channelId,
-        authorId: user.id,
-        body: parsed.data.body,
-        attachmentFileId: parsed.data.attachmentFileId || null
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true
-          }
-        },
-        attachmentFile: {
-          select: {
-            id: true,
-            fileName: true,
-            fileType: true,
-            size: true
-          }
+      messageBody = parsed.data.body;
+      attachmentFileId = parsed.data.attachmentFileId || null;
+
+      if (attachmentFileId) {
+        const file = await prisma.file.findFirst({
+          where: {
+            id: attachmentFileId,
+            workspaceId: channel.workspaceId
+          },
+          select: { id: true }
+        });
+
+        if (!file) {
+          throw new ApiError(404, "Attachment file not found in this workspace.");
         }
       }
-    });
+    }
+
+    let message;
+
+    try {
+      message = await prisma.chatMessage.create({
+        data: {
+          channelId,
+          authorId: user.id,
+          body: messageBody,
+          attachmentFileId,
+          ...voiceData
+        },
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          },
+          attachmentFile: {
+            select: {
+              id: true,
+              fileName: true,
+              fileType: true,
+              size: true
+            }
+          }
+        }
+      });
+    } catch (error) {
+      await removeVoiceNote(voiceData?.voiceStorageKey).catch(() => undefined);
+      throw error;
+    }
 
     await logActivity({
       userId: user.id,
       workspaceId: channel.workspaceId,
       action: activityActions.messageCreated,
       targetId: message.id,
-      metadata: { channelId }
+      metadata: { channelId, voiceNote: Boolean(voiceData) }
     });
 
     return ok({ message }, { status: 201 });

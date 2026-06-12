@@ -68,7 +68,11 @@ function previewText(message?: DirectMessage) {
     return "";
   }
 
-  return message.deletedAt ? "This message was deleted." : message.body;
+  if (message.deletedAt) {
+    return "This message was deleted.";
+  }
+
+  return message.voiceStorageKey ? "Voice note" : message.body;
 }
 
 export function DirectMessagesPanel({
@@ -193,6 +197,46 @@ export function DirectMessagesPanel({
     setBody("");
   }
 
+  async function sendVoiceNote(voiceNote: Blob, durationMs: number) {
+    if (!activeConversationId) {
+      return false;
+    }
+
+    setError("");
+    const formData = new FormData();
+    formData.append("voiceNote", voiceNote, "voice-note.webm");
+    formData.append("durationMs", String(durationMs));
+    const response = await fetch(`/api/direct-conversations/${activeConversationId}/messages`, {
+      method: "POST",
+      body: formData
+    });
+    const data = (await response.json().catch(() => null)) as {
+      message?: DirectMessage;
+      error?: string;
+    } | null;
+
+    if (!response.ok || !data?.message) {
+      setError(data?.error ?? "Voice note could not be sent.");
+      return false;
+    }
+
+    const message = data.message;
+    setMessages((current) => [...current, message]);
+    setConversations((current) => {
+      const active = current.find((conversation) => conversation.id === activeConversationId);
+
+      if (!active) {
+        return current;
+      }
+
+      return [
+        { ...active, messages: [...active.messages, message], lastMessageAt: message.createdAt },
+        ...current.filter((conversation) => conversation.id !== activeConversationId)
+      ];
+    });
+    return true;
+  }
+
   function updateMessage(updatedMessage: DirectMessage) {
     setMessages((current) =>
       current.map((message) => (message.id === updatedMessage.id ? updatedMessage : message))
@@ -303,6 +347,7 @@ export function DirectMessagesPanel({
                 currentUserId={currentUserId}
                 endpoint={`/api/direct-conversations/${activeConversationId}/messages/${message.id}`}
                 message={message}
+                voiceKind="direct"
                 onError={setError}
                 onMessageChange={(updatedMessage) => updateMessage(updatedMessage as DirectMessage)}
               />
@@ -312,12 +357,14 @@ export function DirectMessagesPanel({
         <div className="border-t border-ink/10 p-4">
           {error ? <p className="mb-2 rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
           <ChatComposer
+            key={activeConversationId}
             disabled={!activeConversationId || !canSendMessages}
             isSending={isSending}
             placeholder="Message this member"
             value={body}
             onChange={setBody}
             onSend={sendMessage}
+            onSendVoiceNote={sendVoiceNote}
           />
         </div>
       </section>

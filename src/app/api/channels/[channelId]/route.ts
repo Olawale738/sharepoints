@@ -2,6 +2,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceAdminAccess } from "@/lib/rbac";
+import { removeVoiceNote } from "@/lib/voice-notes";
 
 type RouteContext = {
   params: Promise<{ channelId: string }>;
@@ -17,7 +18,17 @@ export async function DELETE(_request: Request, context: RouteContext) {
       select: {
         id: true,
         name: true,
-        workspaceId: true
+        workspaceId: true,
+        messages: {
+          where: {
+            voiceStorageKey: {
+              not: null
+            }
+          },
+          select: {
+            voiceStorageKey: true
+          }
+        }
       }
     });
 
@@ -42,6 +53,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id: channel.id
       }
     });
+    await Promise.all(
+      channel.messages.map((message) => removeVoiceNote(message.voiceStorageKey).catch(() => undefined))
+    );
 
     await logActivity({
       userId: user.id,
@@ -49,7 +63,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
       action: activityActions.channelDeleted,
       targetId: channel.id,
       metadata: {
-        name: channel.name
+        name: channel.name,
+        voiceNotesDeleted: channel.messages.length
       }
     });
 

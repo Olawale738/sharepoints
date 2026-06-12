@@ -997,6 +997,10 @@ export default async function DashboardPage() {
             createdAt: message.createdAt.toISOString(),
             editedAt: message.editedAt?.toISOString() ?? null,
             deletedAt: message.deletedAt?.toISOString() ?? null,
+            voiceStorageKey: message.voiceStorageKey,
+            voiceMimeType: message.voiceMimeType,
+            voiceSize: message.voiceSize,
+            voiceDurationMs: message.voiceDurationMs,
             author: message.author
           }))}
         />

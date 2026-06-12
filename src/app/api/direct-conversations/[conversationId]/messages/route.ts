@@ -1,38 +1,20 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { requireConversationParticipant } from "@/lib/direct-chat-access";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
+import { requireWorkspacePermission } from "@/lib/rbac";
 import { createDirectMessageSchema } from "@/lib/validators";
+import {
+  isMultipartRequest,
+  parseVoiceNoteRequest,
+  removeVoiceNote,
+  storeVoiceNote,
+  StoredVoiceNote
+} from "@/lib/voice-notes";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
 };
-
-async function requireConversationParticipant(userId: string, conversationId: string) {
-  const conversation = await prisma.directConversation.findUnique({
-    where: {
-      id: conversationId
-    },
-    select: {
-      id: true,
-      workspaceId: true,
-      participantAId: true,
-      participantBId: true
-    }
-  });
-
-  if (!conversation) {
-    throw new ApiError(404, "Direct conversation not found.");
-  }
-
-  if (conversation.participantAId !== userId && conversation.participantBId !== userId) {
-    throw new ApiError(403, "You are not a participant in this conversation.");
-  }
-
-  await requireWorkspaceMembership(userId, conversation.workspaceId);
-
-  return conversation;
-}
 
 export async function GET(request: Request, context: RouteContext) {
   try {
@@ -93,50 +75,75 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(403, "The recipient is no longer in this workspace.");
     }
 
-    const body = await request.json();
-    const parsed = createDirectMessageSchema.safeParse(body);
+    let messageBody = "";
+    let voiceData: StoredVoiceNote | null = null;
 
-    if (!parsed.success) {
-      throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid direct message.");
+    if (isMultipartRequest(request)) {
+      const voiceRequest = await parseVoiceNoteRequest(request);
+      messageBody = voiceRequest.body;
+      voiceData = await storeVoiceNote({
+        voiceNote: voiceRequest.voiceNote,
+        mimeType: voiceRequest.mimeType,
+        durationMs: voiceRequest.durationMs,
+        scope: "direct",
+        scopeId: conversationId
+      });
+    } else {
+      const body = await request.json();
+      const parsed = createDirectMessageSchema.safeParse(body);
+
+      if (!parsed.success) {
+        throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid direct message.");
+      }
+
+      messageBody = parsed.data.body;
     }
 
-    const message = await prisma.$transaction(async (tx) => {
-      const createdMessage = await tx.directMessage.create({
-        data: {
-          conversationId,
-          authorId: user.id,
-          body: parsed.data.body
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true
+    let message;
+
+    try {
+      message = await prisma.$transaction(async (tx) => {
+        const createdMessage = await tx.directMessage.create({
+          data: {
+            conversationId,
+            authorId: user.id,
+            body: messageBody,
+            ...voiceData
+          },
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true
+              }
             }
           }
-        }
-      });
+        });
 
-      await tx.directConversation.update({
-        where: {
-          id: conversationId
-        },
-        data: {
-          lastMessageAt: createdMessage.createdAt
-        }
-      });
+        await tx.directConversation.update({
+          where: {
+            id: conversationId
+          },
+          data: {
+            lastMessageAt: createdMessage.createdAt
+          }
+        });
 
-      return createdMessage;
-    });
+        return createdMessage;
+      });
+    } catch (error) {
+      await removeVoiceNote(voiceData?.voiceStorageKey).catch(() => undefined);
+      throw error;
+    }
 
     await logActivity({
       userId: user.id,
       workspaceId: conversation.workspaceId,
       action: activityActions.directMessageCreated,
       targetId: message.id,
-      metadata: { conversationId }
+      metadata: { conversationId, voiceNote: Boolean(voiceData) }
     });
 
     return ok({ message }, { status: 201 });

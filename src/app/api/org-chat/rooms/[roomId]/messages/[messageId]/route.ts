@@ -8,6 +8,7 @@ import {
 import { requireOrgChatRoomAccess, requireOrgChatRoomSendAccess } from "@/lib/org-chat";
 import { prisma } from "@/lib/prisma";
 import { updateMessageSchema } from "@/lib/validators";
+import { removeVoiceNote } from "@/lib/voice-notes";
 
 type RouteContext = {
   params: Promise<{ roomId: string; messageId: string }>;
@@ -96,7 +97,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id: true,
         authorId: true,
         createdAt: true,
-        deletedAt: true
+        deletedAt: true,
+        voiceStorageKey: true
       }
     });
 
@@ -114,10 +116,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
       },
       data: {
         body: "",
+        voiceStorageKey: null,
+        voiceMimeType: null,
+        voiceSize: null,
+        voiceDurationMs: null,
         deletedAt: new Date()
       },
       include: messageInclude
     });
+    await removeVoiceNote(existing.voiceStorageKey).catch(() => undefined);
 
     await logActivity({
       userId: user.id,

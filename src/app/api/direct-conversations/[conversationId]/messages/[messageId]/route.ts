@@ -5,39 +5,14 @@ import {
   ensureMessageCanStillBeDeleted,
   ensureMessageIsNotDeleted
 } from "@/lib/message-policy";
+import { requireConversationParticipant } from "@/lib/direct-chat-access";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceMembership } from "@/lib/rbac";
 import { updateMessageSchema } from "@/lib/validators";
+import { removeVoiceNote } from "@/lib/voice-notes";
 
 type RouteContext = {
   params: Promise<{ conversationId: string; messageId: string }>;
 };
-
-async function requireConversationParticipant(userId: string, conversationId: string) {
-  const conversation = await prisma.directConversation.findUnique({
-    where: {
-      id: conversationId
-    },
-    select: {
-      id: true,
-      workspaceId: true,
-      participantAId: true,
-      participantBId: true
-    }
-  });
-
-  if (!conversation) {
-    throw new ApiError(404, "Direct conversation not found.");
-  }
-
-  if (conversation.participantAId !== userId && conversation.participantBId !== userId) {
-    throw new ApiError(403, "You are not a participant in this conversation.");
-  }
-
-  await requireWorkspaceMembership(userId, conversation.workspaceId);
-
-  return conversation;
-}
 
 const messageInclude = {
   author: {
@@ -120,7 +95,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
         id: true,
         authorId: true,
         createdAt: true,
-        deletedAt: true
+        deletedAt: true,
+        voiceStorageKey: true
       }
     });
 
@@ -138,10 +114,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
       },
       data: {
         body: "",
+        voiceStorageKey: null,
+        voiceMimeType: null,
+        voiceSize: null,
+        voiceDurationMs: null,
         deletedAt: new Date()
       },
       include: messageInclude
     });
+    await removeVoiceNote(existing.voiceStorageKey).catch(() => undefined);
 
     await logActivity({
       userId: user.id,
