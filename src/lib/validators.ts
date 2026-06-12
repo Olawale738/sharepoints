@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const chatMessageIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(191)
+  .regex(/^[A-Za-z0-9_-]+$/, "Invalid message ID");
+
 export const loginSchema = z.object({
   email: z.string().email().max(254).transform((value) => value.toLowerCase()),
   password: z.string().min(8).max(128),
@@ -92,8 +99,8 @@ export const createChannelSchema = z.object({
 export const createChatMessageSchema = z.object({
   body: z.string().trim().min(1).max(4000),
   attachmentFileId: z.string().cuid().optional().nullable(),
-  replyToId: z.string().cuid().optional().nullable(),
-  forwardedFromId: z.string().cuid().optional().nullable()
+  replyToId: chatMessageIdSchema.optional().nullable(),
+  forwardedFromId: chatMessageIdSchema.optional().nullable()
 });
 
 export const startDirectConversationSchema = z.object({
@@ -102,8 +109,8 @@ export const startDirectConversationSchema = z.object({
 
 export const createDirectMessageSchema = z.object({
   body: z.string().trim().min(1).max(4000),
-  replyToId: z.string().cuid().optional().nullable(),
-  forwardedFromId: z.string().cuid().optional().nullable()
+  replyToId: chatMessageIdSchema.optional().nullable(),
+  forwardedFromId: chatMessageIdSchema.optional().nullable()
 });
 
 export const updateMessageSchema = z.object({
@@ -218,7 +225,7 @@ export const updateUserAccessSchema = z.object({
 export const chatCollaborationSchema = z.object({
   action: z.enum(["REACT", "BOOKMARK", "PIN", "READ", "TYPING"]),
   messageKind: z.enum(["channel", "direct", "organization"]).optional(),
-  messageId: z.string().cuid().optional(),
+  messageId: chatMessageIdSchema.optional(),
   emoji: z.string().trim().min(1).max(16).optional(),
   scopeKind: z.enum(["channel", "direct", "organization"]).optional(),
   scopeId: z.string().cuid().optional(),
