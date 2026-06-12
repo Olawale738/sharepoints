@@ -114,6 +114,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: meetingId
       },
       data: {
+        meetingType: parsed.data.meetingType,
         agenda: parsed.data.agenda === undefined ? undefined : parsed.data.agenda || null,
         notes: parsed.data.notes === undefined ? undefined : parsed.data.notes || null,
         actionItems: parsed.data.actionItems === undefined ? undefined : parsed.data.actionItems || null,

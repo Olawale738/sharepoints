@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2, Radio, ShieldCheck, Video } from "lucide-react";
+import { ExternalLink, Loader2, Phone, Radio, ShieldCheck, Video } from "lucide-react";
 
 type JitsiApi = {
   addListener: (event: string, listener: (payload?: Record<string, unknown>) => void) => void;
@@ -22,6 +22,7 @@ type VideoMeetingRoomProps = {
   meetingId: string;
   autoRecord: boolean;
   recordingMode: string;
+  meetingType: "AUDIO" | "VIDEO";
 };
 
 function configuredDomain() {
@@ -37,9 +38,15 @@ function scriptUrl(domain: string) {
   return `https://${domain}/external_api.js`;
 }
 
-function meetingUrl(roomName: string) {
+function meetingUrl(roomName: string, meetingType: "AUDIO" | "VIDEO") {
   const domain = configuredDomain();
-  return `https://${domain}/${configuredRoomName(roomName)}`;
+  const baseUrl = `https://${domain}/${configuredRoomName(roomName)}`;
+
+  if (meetingType === "AUDIO") {
+    return `${baseUrl}#config.startAudioOnly=true&config.startWithVideoMuted=true`;
+  }
+
+  return baseUrl;
 }
 
 function loadJitsiScript(domain: string) {
@@ -73,12 +80,14 @@ export function VideoMeetingRoom({
   title,
   meetingId,
   autoRecord,
-  recordingMode
+  recordingMode,
+  meetingType
 }: VideoMeetingRoomProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const apiRef = useRef<JitsiApi | null>(null);
   const attemptedAutoRecordRef = useRef(false);
-  const [status, setStatus] = useState("Connecting to LETW video room...");
+  const isAudioCall = meetingType === "AUDIO";
+  const [status, setStatus] = useState(`Connecting to LETW ${isAudioCall ? "audio call" : "video room"}...`);
   const [recordingMessage, setRecordingMessage] = useState(
     autoRecord
       ? "Auto recording is armed. It starts when the meeting moderator joins and the Jitsi server supports recording."
@@ -109,7 +118,24 @@ export function VideoMeetingRoom({
           configOverwrite: {
             disableDeepLinking: true,
             prejoinPageEnabled: true,
-            startWithAudioMuted: true
+            startWithAudioMuted: true,
+            startWithVideoMuted: isAudioCall,
+            startAudioOnly: isAudioCall,
+            ...(isAudioCall
+              ? {
+                  toolbarButtons: [
+                    "microphone",
+                    "desktop",
+                    "chat",
+                    "participants-pane",
+                    "raisehand",
+                    "tileview",
+                    "fullscreen",
+                    "settings",
+                    "hangup"
+                  ]
+                }
+              : {})
           },
           interfaceConfigOverwrite: {
             SHOW_JITSI_WATERMARK: false
@@ -117,10 +143,10 @@ export function VideoMeetingRoom({
         });
 
         apiRef.current = api;
-        setStatus("Meeting room ready.");
+        setStatus(isAudioCall ? "Audio call ready." : "Video room ready.");
 
         api.addListener("videoConferenceJoined", () => {
-          setStatus("Joined meeting.");
+          setStatus(isAudioCall ? "Joined audio call." : "Joined video meeting.");
 
           if (!autoRecord || attemptedAutoRecordRef.current) {
             return;
@@ -217,9 +243,10 @@ export function VideoMeetingRoom({
       apiRef.current?.dispose();
       apiRef.current = null;
     };
-  }, [autoRecord, displayName, meetingId, recordingMode, roomName, title]);
+  }, [autoRecord, displayName, isAudioCall, meetingId, recordingMode, roomName, title]);
 
-  const fullScreenUrl = meetingUrl(roomName);
+  const fullScreenUrl = meetingUrl(roomName, meetingType);
+  const CallIcon = isAudioCall ? Phone : Video;
 
   return (
     <section className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
@@ -227,7 +254,7 @@ export function VideoMeetingRoom({
         <div>
           <p className="flex items-center gap-2 text-sm font-medium text-moss">
             <ShieldCheck className="h-4 w-4" />
-            LETW protected meeting
+            LETW protected {isAudioCall ? "audio call" : "video meeting"}
           </p>
           <h1 className="mt-1 text-xl font-semibold text-ink">{title}</h1>
         </div>
@@ -244,8 +271,8 @@ export function VideoMeetingRoom({
       <div className="bg-paper p-3">
         <div className="mb-3 grid gap-2 md:grid-cols-2">
           <div className="flex items-center gap-2 rounded-md bg-mint/70 px-3 py-2 text-sm text-ink">
-            <Video className="h-4 w-4 text-moss" />
-            {status === "Connecting to LETW video room..." ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            <CallIcon className="h-4 w-4 text-moss" />
+            {status.startsWith("Connecting") ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {status}
           </div>
           {recordingMessage ? (

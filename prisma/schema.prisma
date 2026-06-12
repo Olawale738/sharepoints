@@ -41,6 +41,11 @@ enum MeetingResponseStatus {
   NO
 }
 
+enum MeetingType {
+  AUDIO
+  VIDEO
+}
+
 enum ApprovalStatus {
   PENDING
   APPROVED
@@ -290,6 +295,7 @@ model WorkspaceMeeting {
   recordingStatus    String?
   recordingError     String?
   recordingStartedAt DateTime?
+  meetingType        MeetingType                @default(VIDEO)
   startsAt           DateTime
   endsAt             DateTime
   roomName           String                     @unique
@@ -306,6 +312,7 @@ model WorkspaceMeeting {
   updatedAt          DateTime                   @updatedAt
 
   @@index([workspaceId, startsAt])
+  @@index([workspaceId, meetingType, startsAt])
   @@index([workspaceId, approvalStatus])
   @@index([createdById, startsAt])
   @@index([cancelledAt])

@@ -413,10 +413,10 @@ export default async function AdminControlCenterPage() {
           <section className="rounded-lg border border-ink/10 bg-white">
             <div className="flex items-center gap-2 border-b border-ink/10 px-4 py-3">
               <CalendarClock className="h-4 w-4 text-moss" />
-              <h2 className="text-sm font-semibold">Meetings</h2>
+              <h2 className="text-sm font-semibold">Calls and meetings</h2>
             </div>
             <div className="divide-y divide-ink/10">
-              {meetings.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No meetings yet.</p> : null}
+              {meetings.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No calls or meetings yet.</p> : null}
               {meetings.map((meeting) => (
                 <Link
                   key={meeting.id}
@@ -429,9 +429,10 @@ export default async function AdminControlCenterPage() {
                       {meeting.cancelledAt ? "cancelled" : meeting.approvalStatus.toLowerCase()}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-xs text-ink/50">
-                    {meeting.workspace.name} - {formatDate(meeting.startsAt)}
-                  </p>
+                    <p className="mt-1 text-xs text-ink/50">
+                      {meeting.meetingType === "AUDIO" ? "Audio call" : "Video meeting"} - {meeting.workspace.name} -{" "}
+                      {formatDate(meeting.startsAt)}
+                    </p>
                 </Link>
               ))}
             </div>

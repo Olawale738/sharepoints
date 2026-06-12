@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CalendarClock, CalendarPlus, FileText, KeyRound, Link2, UsersRound } from "lucide-react";
+import { CalendarClock, CalendarPlus, FileText, KeyRound, Link2, Phone, UsersRound, Video } from "lucide-react";
 
 import { auth } from "@/auth";
 import { CopyTextButton } from "@/components/dashboard/copy-text-button";
@@ -65,6 +65,9 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
   const hasValidPasscode = passcode?.trim() === meeting.passcode;
   const isCancelled = Boolean(meeting.cancelledAt);
   const isApproved = meeting.approvalStatus === "APPROVED";
+  const isAudioCall = meeting.meetingType === "AUDIO";
+  const CallIcon = isAudioCall ? Phone : Video;
+  const callLabel = isAudioCall ? "Audio call" : "Video meeting";
 
   return (
     <div className="space-y-6">
@@ -73,7 +76,8 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge className={isCancelled ? "bg-clay/10 text-clay" : isApproved ? "bg-mint" : "bg-wheat"}>
-                {isCancelled ? "Cancelled" : isApproved ? "Video meeting" : meeting.approvalStatus.toLowerCase()}
+                <CallIcon className="mr-1 h-3.5 w-3.5" />
+                {isCancelled ? `Cancelled ${callLabel.toLowerCase()}` : isApproved ? callLabel : meeting.approvalStatus.toLowerCase()}
               </Badge>
               <span className="inline-flex items-center gap-1 text-xs text-ink/55">
                 <UsersRound className="h-3.5 w-3.5" />
@@ -89,7 +93,8 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
             </p>
             {meeting.autoRecord ? (
               <p className="mt-3 rounded-md bg-mint/70 px-3 py-2 text-sm text-ink/70">
-                Automatic Jitsi recording is enabled for this meeting. Status: {meeting.recordingStatus ?? "waiting for moderator"}.
+                Automatic Jitsi recording is enabled for this {isAudioCall ? "call" : "meeting"}. Status:{" "}
+                {meeting.recordingStatus ?? "waiting for moderator"}.
                 {meeting.recordingError ? <span className="block text-clay">Error: {meeting.recordingError}</span> : null}
               </p>
             ) : null}
@@ -150,13 +155,14 @@ export default async function MeetingPage({ params, searchParams }: MeetingPageP
         </div>
       ) : !isApproved ? (
         <div className="rounded-lg border border-wheat bg-white p-5 text-sm text-ink/70">
-          This meeting is not approved yet. It will open after an admin or approved leader accepts it.
+          This {isAudioCall ? "audio call" : "video meeting"} is not approved yet. It will open after an admin or approved leader accepts it.
         </div>
       ) : hasValidPasscode ? (
         <VideoMeetingRoom
           autoRecord={meeting.autoRecord}
           displayName={displayName}
           meetingId={meeting.id}
+          meetingType={meeting.meetingType}
           recordingMode={meeting.recordingMode}
           roomName={meeting.roomName}
           title={meeting.title}

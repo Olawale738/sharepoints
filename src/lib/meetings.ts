@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from "crypto";
-import type { ApprovalStatus, MeetingResponseStatus } from "@prisma/client";
+import type { ApprovalStatus, MeetingResponseStatus, MeetingType } from "@prisma/client";
 
 import { slugify } from "@/lib/utils";
 
@@ -44,6 +44,7 @@ type SerializableMeeting = {
   recordingStatus?: string | null;
   recordingError?: string | null;
   recordingStartedAt?: Date | null;
+  meetingType?: MeetingType;
   approvalStatus?: ApprovalStatus;
   rejectedReason?: string | null;
   startsAt: Date;
@@ -100,6 +101,7 @@ export function serializeMeeting(meeting: SerializableMeeting, userId: string, o
     recordingStatus: meeting.recordingStatus ?? null,
     recordingError: meeting.recordingError ?? null,
     recordingStartedAt: meeting.recordingStartedAt?.toISOString() ?? null,
+    meetingType: meeting.meetingType ?? "VIDEO",
     approvalStatus: meeting.approvalStatus ?? "APPROVED",
     rejectedReason: meeting.rejectedReason ?? null,
     startsAt: meeting.startsAt.toISOString(),

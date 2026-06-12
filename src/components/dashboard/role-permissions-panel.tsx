@@ -40,7 +40,7 @@ const permissionLabels: Array<{ key: PermissionKey; label: string }> = [
   { key: "canViewActivity", label: "View activity" },
   { key: "canCreateAnnouncements", label: "Create announcements" },
   { key: "canManageTasks", label: "Manage tasks" },
-  { key: "canScheduleMeetings", label: "Schedule video meetings" },
+  { key: "canScheduleMeetings", label: "Schedule audio/video calls" },
   { key: "canCreateShareLinks", label: "Create share links" }
 ];
 

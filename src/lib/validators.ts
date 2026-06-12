@@ -139,8 +139,9 @@ export const updateTaskSchema = createTaskSchema.partial().extend({
 
 export const createWorkspaceMeetingSchema = z
   .object({
-    title: z.string().trim().min(2).max(120),
-    description: z.string().trim().max(1000).optional().or(z.literal("")),
+      title: z.string().trim().min(2).max(120),
+      meetingType: z.enum(["AUDIO", "VIDEO"]).optional(),
+      description: z.string().trim().max(1000).optional().or(z.literal("")),
     agenda: z.string().trim().max(2000).optional().or(z.literal("")),
     recordingUrl: z.string().url().max(2048).optional().or(z.literal("")),
     autoRecord: z.boolean().optional(),
@@ -158,6 +159,7 @@ export const updateMeetingResponseSchema = z.object({
 });
 
 export const updateMeetingDetailsSchema = z.object({
+  meetingType: z.enum(["AUDIO", "VIDEO"]).optional(),
   agenda: z.string().trim().max(2000).optional().or(z.literal("")),
   notes: z.string().trim().max(4000).optional().or(z.literal("")),
   actionItems: z.string().trim().max(4000).optional().or(z.literal("")),

@@ -85,6 +85,7 @@ export async function POST(request: Request, context: RouteContext) {
         workspaceId: id,
         createdById: user.id,
         title: parsed.data.title,
+        meetingType: parsed.data.meetingType ?? "VIDEO",
         description: parsed.data.description || null,
         agenda: parsed.data.agenda || null,
         recordingUrl: parsed.data.recordingUrl || null,
@@ -116,6 +117,7 @@ export async function POST(request: Request, context: RouteContext) {
       targetId: meeting.id,
       metadata: {
         title: meeting.title,
+        meetingType: meeting.meetingType,
         startsAt: meeting.startsAt.toISOString(),
         approvalStatus
       }

@@ -697,7 +697,7 @@ export default async function DashboardPage() {
   const latestAdminControls = [
     {
       title: "Approve meeting schedulers",
-      detail: "Give Leaders or Moderators permission to schedule workspace video meetings.",
+      detail: "Give Leaders or Moderators permission to schedule workspace audio calls and video meetings.",
       action: "Open role permissions",
       href: adminControlWorkspaceHref,
       icon: SlidersHorizontal
@@ -710,9 +710,9 @@ export default async function DashboardPage() {
       icon: UserCog
     },
     {
-      title: "Schedule workspace video",
-      detail: "Create protected video meetings with invite links, passcodes, RSVP, and calendar files.",
-      action: "Open meetings",
+      title: "Schedule workspace calls",
+      detail: "Create protected audio calls or video meetings with invite links, passcodes, RSVP, and calendar files.",
+      action: "Open calls",
       href: adminControlWorkspaceHref,
       icon: CalendarClock
     }

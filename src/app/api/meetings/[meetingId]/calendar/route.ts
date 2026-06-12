@@ -54,10 +54,11 @@ export async function GET(request: Request, context: RouteContext) {
 
     const origin = new URL(request.url).origin;
     const joinUrl = meetingInviteUrl(meeting.id, origin);
+    const callLabel = meeting.meetingType === "AUDIO" ? "audio call" : "video meeting";
     const description = [
       meeting.description ?? "",
       "",
-      `Join LETW meeting: ${joinUrl}`,
+      `Join LETW ${callLabel}: ${joinUrl}`,
       `Passcode: ${meeting.passcode}`
     ]
       .join("\n")
@@ -78,7 +79,7 @@ export async function GET(request: Request, context: RouteContext) {
       `DTEND:${icsDate(meeting.endsAt)}`,
       `SUMMARY:${escapeIcs(meeting.title)}`,
       `DESCRIPTION:${escapeIcs(description)}`,
-      `LOCATION:${escapeIcs("LETW video meeting")}`,
+      `LOCATION:${escapeIcs(`LETW ${callLabel}`)}`,
       `URL:${joinUrl}`,
       organizer,
       "END:VEVENT",

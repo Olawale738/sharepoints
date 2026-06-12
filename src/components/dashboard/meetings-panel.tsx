@@ -12,6 +12,7 @@ import {
   KeyRound,
   Link2,
   Loader2,
+  Phone,
   Plus,
   Trash2,
   UsersRound,
@@ -27,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type MeetingResponseStatus = "YES" | "MAYBE" | "NO";
 type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+type MeetingType = "AUDIO" | "VIDEO";
 
 type Meeting = {
   id: string;
@@ -42,6 +44,7 @@ type Meeting = {
   recordingStatus?: string | null;
   recordingError?: string | null;
   recordingStartedAt?: string | null;
+  meetingType?: MeetingType;
   approvalStatus?: ApprovalStatus;
   rejectedReason?: string | null;
   startsAt: string;
@@ -132,8 +135,10 @@ function meetingStatus(meeting: Meeting, now: number | null) {
 }
 
 function toInviteText(meeting: Meeting) {
+  const callType = meeting.meetingType === "AUDIO" ? "audio call" : "video meeting";
+
   return [
-    `LETW video meeting: ${meeting.title}`,
+    `LETW ${callType}: ${meeting.title}`,
     `Join link: ${meeting.inviteUrl}`,
     `Passcode: ${meeting.passcode}`,
     `Time: ${localDateTime(meeting.startsAt)}`,
@@ -162,9 +167,13 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduledType, setScheduledType] = useState<MeetingType>("VIDEO");
   const [busyMeetingId, setBusyMeetingId] = useState("");
   const [detailsByMeeting, setDetailsByMeeting] = useState<
-    Record<string, Pick<Meeting, "agenda" | "notes" | "actionItems" | "recordingUrl" | "autoRecord" | "recordingMode">>
+    Record<
+      string,
+      Pick<Meeting, "agenda" | "notes" | "actionItems" | "recordingUrl" | "autoRecord" | "recordingMode" | "meetingType">
+    >
   >({});
   const [now, setNow] = useState<number | null>(null);
 
@@ -205,6 +214,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: String(formData.get("title")),
+        meetingType: String(formData.get("meetingType") ?? "VIDEO"),
         description: String(formData.get("description") ?? ""),
         agenda: String(formData.get("agenda") ?? ""),
         recordingUrl: String(formData.get("recordingUrl") ?? ""),
@@ -226,10 +236,11 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
     setMeetings((current) => [data.meeting as Meeting, ...current]);
     setStatus(
       data.meeting.approvalStatus === "PENDING"
-        ? "Meeting sent for approval."
-        : `Meeting scheduled. Passcode: ${data.meeting.passcode}`
+        ? `${data.meeting.meetingType === "AUDIO" ? "Audio call" : "Video meeting"} sent for approval.`
+        : `${data.meeting.meetingType === "AUDIO" ? "Audio call" : "Video meeting"} scheduled. Passcode: ${data.meeting.passcode}`
     );
     form.reset();
+    setScheduledType("VIDEO");
   }
 
   async function copyInvite(meeting: Meeting) {
@@ -316,6 +327,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        meetingType: details.meetingType ?? meeting.meetingType ?? "VIDEO",
         agenda: details.agenda ?? meeting.agenda ?? "",
         notes: details.notes ?? meeting.notes ?? "",
         actionItems: details.actionItems ?? meeting.actionItems ?? "",
@@ -341,8 +353,8 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
     <div className="rounded-lg border border-ink/10 bg-white p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Video className="h-4 w-4 text-moss" />
-          <h2 className="text-sm font-semibold">Video meetings</h2>
+          <CalendarClock className="h-4 w-4 text-moss" />
+          <h2 className="text-sm font-semibold">Calls and meetings</h2>
         </div>
         <Badge className="bg-mint">{meetings.filter((meeting) => !meeting.cancelledAt && meeting.approvalStatus !== "REJECTED").length} active</Badge>
       </div>
@@ -350,6 +362,32 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
       {canSchedule ? (
         <form className="mb-4 grid gap-3 rounded-md border border-ink/10 bg-paper p-3 lg:grid-cols-2" onSubmit={scheduleMeeting}>
           <Input className="lg:col-span-2" name="title" placeholder="Meeting title" required />
+          <div className="lg:col-span-2 grid grid-cols-2 gap-2 rounded-md border border-ink/10 bg-white p-1">
+            {(["AUDIO", "VIDEO"] as MeetingType[]).map((meetingType) => {
+              const Icon = meetingType === "AUDIO" ? Phone : Video;
+              const selected = scheduledType === meetingType;
+
+              return (
+                <label
+                  key={meetingType}
+                  className={`flex cursor-pointer items-center justify-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+                    selected ? "bg-moss text-white" : "text-ink hover:bg-mint/50"
+                  }`}
+                >
+                  <input
+                    className="sr-only"
+                    name="meetingType"
+                    type="radio"
+                    value={meetingType}
+                    checked={selected}
+                    onChange={() => setScheduledType(meetingType)}
+                  />
+                  <Icon className="h-4 w-4" />
+                  {meetingType === "AUDIO" ? "Audio call" : "Video meeting"}
+                </label>
+              );
+            })}
+          </div>
           <Input name="startsAt" type="datetime-local" required />
           <Input name="endsAt" type="datetime-local" required />
           <Input className="lg:col-span-2" name="recordingUrl" placeholder="Recording link after the meeting" />
@@ -376,7 +414,7 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
           <div className="lg:col-span-2">
             <Button type="submit" disabled={isScheduling}>
               {isScheduling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Schedule meeting
+              Schedule {scheduledType === "AUDIO" ? "audio call" : "video meeting"}
             </Button>
           </div>
         </form>
@@ -386,13 +424,15 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
       {status ? <p className="mb-3 rounded-md bg-mint/70 px-3 py-2 text-sm text-ink">{status}</p> : null}
 
       <div className="space-y-3">
-        {sortedMeetings.length === 0 ? <p className="text-sm text-ink/55">No video meetings scheduled yet.</p> : null}
+        {sortedMeetings.length === 0 ? <p className="text-sm text-ink/55">No calls or meetings scheduled yet.</p> : null}
         {sortedMeetings.map((meeting) => {
           const statusInfo = meetingStatus(meeting, now);
           const approvalStatus = meeting.approvalStatus ?? "APPROVED";
           const isCancelled = Boolean(meeting.cancelledAt);
           const canJoin = !isCancelled && approvalStatus === "APPROVED";
           const draftDetails = detailsByMeeting[meeting.id] ?? {};
+          const isAudioCall = meeting.meetingType === "AUDIO";
+          const CallIcon = isAudioCall ? Phone : Video;
 
           return (
             <article key={meeting.id} className="rounded-md border border-ink/10 bg-paper p-3">
@@ -401,6 +441,10 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <Badge className={statusInfo.className}>{statusInfo.label}</Badge>
                     <Badge className={approvalClasses[approvalStatus]}>{approvalStatus.toLowerCase()}</Badge>
+                    <Badge className="bg-white">
+                      <CallIcon className="mr-1 h-3.5 w-3.5" />
+                      {isAudioCall ? "audio call" : "video meeting"}
+                    </Badge>
                     <span className="inline-flex items-center gap-1 text-xs text-ink/55">
                       <CalendarClock className="h-3.5 w-3.5" />
                       <DateTimeText value={meeting.startsAt} />
@@ -466,12 +510,12 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-medium text-white transition hover:bg-[#185747]"
                       href={meeting.inviteUrl}
                     >
-                      <Video className="h-4 w-4" />
-                      Join
+                      <CallIcon className="h-4 w-4" />
+                      Join {isAudioCall ? "call" : "meeting"}
                     </Link>
                   ) : (
                     <Button className="h-9" variant="secondary" disabled>
-                      <Video className="h-4 w-4" />
+                      <CallIcon className="h-4 w-4" />
                       Join
                     </Button>
                   )}
@@ -575,6 +619,19 @@ export function MeetingsPanel({ workspaceId, meetings: initialMeetings, canSched
 
               {canCancel ? (
                 <div className="mt-4 grid gap-3 border-t border-ink/10 pt-3 lg:grid-cols-2">
+                  <select
+                    className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm outline-none focus:border-moss focus:ring-2 focus:ring-moss/20"
+                    value={draftDetails.meetingType ?? meeting.meetingType ?? "VIDEO"}
+                    onChange={(event) =>
+                      setDetailsByMeeting((current) => ({
+                        ...current,
+                        [meeting.id]: { ...current[meeting.id], meetingType: event.target.value as MeetingType }
+                      }))
+                    }
+                  >
+                    <option value="AUDIO">Audio call</option>
+                    <option value="VIDEO">Video meeting</option>
+                  </select>
                   <Textarea
                     className="bg-white"
                     placeholder="Agenda"
