@@ -28,6 +28,23 @@ test("people operations and its APIs require authentication", async ({ page, req
   }
 });
 
+test("AI, CRM, and activity deletion enforce authentication", async ({ request }) => {
+  const aiResponse = await request.get("/api/ai-assistant");
+  expect(aiResponse.status()).toBe(401);
+
+  const crmResponse = await request.patch("/api/admin/members/not-a-user", {
+    data: {
+      membershipStatus: "ACTIVE",
+      ministryInterests: [],
+      skills: []
+    }
+  });
+  expect(crmResponse.status()).toBe(401);
+
+  const activityResponse = await request.delete("/api/workspaces/not-a-workspace/activity");
+  expect(activityResponse.status()).toBe(401);
+});
+
 test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
   test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
   await page.goto("/login");

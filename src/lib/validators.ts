@@ -72,6 +72,7 @@ export const updateWorkspaceRolePermissionSchema = z.object({
   canManageMembers: z.boolean(),
   canManageIntegrations: z.boolean(),
   canViewActivity: z.boolean(),
+  canClearActivity: z.boolean(),
   canCreateAnnouncements: z.boolean(),
   canManageTasks: z.boolean(),
   canScheduleMeetings: z.boolean(),

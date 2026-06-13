@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   CalendarClock,
+  ContactRound,
   Database,
   Files,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   UsersRound,
   Workflow,
   ShieldAlert
@@ -49,6 +51,7 @@ export default async function AdminControlCenterPage() {
     fileStats,
     meetings,
     activities,
+    aiAudits,
     rolePermissionCount,
     activeShareLinkCount
   ] = await Promise.all([
@@ -221,6 +224,20 @@ export default async function AdminControlCenterPage() {
       },
       take: 30
     }),
+    prisma.aiAssistantAudit.findMany({
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 30
+    }),
     prisma.workspaceRolePermission.count(),
     prisma.fileShareLink.count({
       where: {
@@ -276,6 +293,12 @@ export default async function AdminControlCenterPage() {
       value: securityEvents.length,
       detail: "Recent login and access events",
       icon: Activity
+    },
+    {
+      label: "AI audits",
+      value: aiAudits.length,
+      detail: "Recent permission-aware searches",
+      icon: Sparkles
     }
   ];
 
@@ -305,6 +328,13 @@ export default async function AdminControlCenterPage() {
           >
             <ShieldAlert className="h-4 w-4" />
             Enterprise controls
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/admin/members"
+          >
+            <ContactRound className="h-4 w-4" />
+            Member CRM
           </Link>
         </div>
       </section>
@@ -384,6 +414,40 @@ export default async function AdminControlCenterPage() {
               user: event.user
             }))}
           />
+
+          <section className="rounded-lg border border-ink/10 bg-white">
+            <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-moss" />
+                <h2 className="text-sm font-semibold">AI access audit</h2>
+              </div>
+              <Badge>{aiAudits.length}</Badge>
+            </div>
+            <div className="divide-y divide-ink/10">
+              {aiAudits.length === 0 ? (
+                <p className="px-4 py-8 text-sm text-ink/55">No AI assistant requests yet.</p>
+              ) : null}
+              {aiAudits.map((audit) => {
+                const sources = Array.isArray(audit.sources) ? audit.sources : [];
+
+                return (
+                  <div className="px-4 py-3" key={audit.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-ink">{audit.user.name ?? audit.user.email ?? "Member"}</p>
+                      <Badge className={audit.status === "COMPLETED" ? "bg-mint" : "bg-paper"}>
+                        {audit.status.toLowerCase().replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-ink/65">{audit.question}</p>
+                    <p className="mt-1 text-xs text-ink/40">
+                      {audit.mode.toLowerCase().replaceAll("_", " ")} - {sources.length} authorized sources -{" "}
+                      {formatDate(audit.createdAt)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </div>
 
         <div className="space-y-6">

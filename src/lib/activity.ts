@@ -63,5 +63,6 @@ export const activityActions = {
   userSuspended: "user.suspended",
   userRestored: "user.restored",
   userAccessRevoked: "user.access_revoked",
-  userDeleted: "user.deleted"
+  userDeleted: "user.deleted",
+  memberProfileUpdated: "member.profile_updated"
 } as const;

@@ -454,6 +454,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       canManageMembers: saved?.canManageMembers ?? defaults.canManageMembers,
       canManageIntegrations: saved?.canManageIntegrations ?? defaults.canManageIntegrations,
       canViewActivity: saved?.canViewActivity ?? defaults.canViewActivity,
+      canClearActivity: saved?.canClearActivity ?? defaults.canClearActivity,
       canCreateAnnouncements: saved?.canCreateAnnouncements ?? defaults.canCreateAnnouncements,
       canManageTasks: saved?.canManageTasks ?? defaults.canManageTasks,
       canScheduleMeetings: saved?.canScheduleMeetings ?? defaults.canScheduleMeetings,
@@ -729,7 +730,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           {permissions.canViewActivity ? (
             <ActivityList
               workspaceId={workspaceId}
-              canClear={hasAdminAccess}
+              canClear={permissions.canClearActivity}
               items={activities.map((activity) => ({
                 id: activity.id,
                 action: activity.action,

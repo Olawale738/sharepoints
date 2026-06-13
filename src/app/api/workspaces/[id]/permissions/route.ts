@@ -24,6 +24,7 @@ function serializeRolePermissions(role: WorkspaceRole, saved?: SavedRolePermissi
     canManageMembers: saved?.canManageMembers ?? defaultPermissionsForRole(role).canManageMembers,
     canManageIntegrations: saved?.canManageIntegrations ?? defaultPermissionsForRole(role).canManageIntegrations,
     canViewActivity: saved?.canViewActivity ?? defaultPermissionsForRole(role).canViewActivity,
+    canClearActivity: saved?.canClearActivity ?? defaultPermissionsForRole(role).canClearActivity,
     canCreateAnnouncements:
       saved?.canCreateAnnouncements ?? defaultPermissionsForRole(role).canCreateAnnouncements,
     canManageTasks: saved?.canManageTasks ?? defaultPermissionsForRole(role).canManageTasks,

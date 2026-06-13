@@ -79,6 +79,7 @@ enum SecurityEventType {
   TWO_FACTOR_DISABLED
   DEVICE_REVOKED
   FILE_BLOCKED
+  ACTIVITY_LOGS_CLEARED
 }
 
 enum FileScanStatus {
@@ -342,6 +343,9 @@ model User {
   formsCreated               WorkspaceForm[]            @relation("FormCreator")
   formResponses              WorkspaceFormResponse[]
   activityLogs               ActivityLog[]
+  memberProfile              MemberProfile?
+  aiAssistantThreads         AiAssistantThread[]
+  aiAssistantAudits          AiAssistantAudit[]
 
   @@index([departmentId])
   @@index([category])
@@ -589,6 +593,7 @@ model WorkspaceRolePermission {
   canManageMembers       Boolean       @default(false)
   canManageIntegrations  Boolean       @default(false)
   canViewActivity        Boolean       @default(false)
+  canClearActivity       Boolean       @default(false)
   canCreateAnnouncements Boolean       @default(false)
   canManageTasks         Boolean       @default(false)
   canScheduleMeetings    Boolean       @default(false)
@@ -599,6 +604,87 @@ model WorkspaceRolePermission {
 
   @@unique([workspaceId, role])
   @@index([workspaceId])
+}
+
+model MemberProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  phone                   String?
+  alternatePhone          String?
+  membershipNumber        String?   @unique
+  membershipStatus        String    @default("ACTIVE")
+  dateOfBirth             DateTime?
+  gender                  String?
+  maritalStatus           String?
+  address                 String?
+  city                    String?
+  country                 String?
+  occupation              String?
+  employer                String?
+  emergencyContactName    String?
+  emergencyContactPhone   String?
+  firstVisitAt            DateTime?
+  salvationAt             DateTime?
+  baptismAt               DateTime?
+  membershipStartedAt     DateTime?
+  communicationPreference String?
+  ministryInterests       Json?
+  skills                  Json?
+  pastoralCareStatus      String?
+  adminNotes              String?   @db.Text
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([membershipStatus])
+  @@index([city])
+  @@index([pastoralCareStatus])
+}
+
+model AiAssistantThread {
+  id        String               @id @default(cuid())
+  userId    String
+  title     String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AiAssistantMessage[]
+  audits    AiAssistantAudit[]
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([userId, updatedAt])
+}
+
+model AiAssistantMessage {
+  id        String            @id @default(cuid())
+  threadId  String
+  role      String
+  content   String            @db.Text
+  mode      String?
+  sources   Json?
+  thread    AiAssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  createdAt DateTime          @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model AiAssistantAudit {
+  id           String             @id @default(cuid())
+  userId       String
+  threadId     String?
+  mode         String
+  question     String             @db.Text
+  workspaceIds Json
+  sources      Json
+  model        String?
+  status       String
+  errorMessage String?
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread       AiAssistantThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  createdAt    DateTime           @default(now())
+
+  @@index([userId, createdAt])
+  @@index([threadId, createdAt])
+  @@index([status, createdAt])
 }
 
 model WorkspaceAnnouncement {

@@ -1,6 +1,6 @@
 import { handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceAdminAccess } from "@/lib/rbac";
+import { requireWorkspacePermission } from "@/lib/rbac";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -11,12 +11,26 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const user = await requireUser();
     const { id } = await context.params;
 
-    await requireWorkspaceAdminAccess(user.id, id, "Only admins can clear workspace activity logs.");
+    await requireWorkspacePermission(user.id, id, "canClearActivity");
 
-    const result = await prisma.activityLog.deleteMany({
-      where: {
-        workspaceId: id
-      }
+    const result = await prisma.$transaction(async (tx) => {
+      const cleared = await tx.activityLog.deleteMany({
+        where: {
+          workspaceId: id
+        }
+      });
+      await tx.securityEvent.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          type: "ACTIVITY_LOGS_CLEARED",
+          metadata: {
+            workspaceId: id,
+            clearedCount: cleared.count
+          }
+        }
+      });
+      return cleared;
     });
 
     return ok({
