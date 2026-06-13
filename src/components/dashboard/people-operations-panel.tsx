@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { localeOptions } from "@/lib/i18n";
 
 type UserOption = { id: string; name?: string | null; email?: string | null };
 type WorkspaceOption = { id: string; name: string };
@@ -1220,9 +1221,11 @@ export function PeopleOperationsPanel({
             </div>
             <Textarea className="min-h-56" name="text" placeholder="Paste the text to translate" required />
             <select name="targetLanguage" className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm">
-              <option value="yo">Yoruba</option>
-              <option value="en">English</option>
-              <option value="fr">French</option>
+              {localeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
             <Button disabled={busy === "translate"}><Languages className="h-4 w-4" />Translate</Button>
           </form>

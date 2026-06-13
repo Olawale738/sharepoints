@@ -1,17 +1,12 @@
 import { z } from "zod";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { localeEnglishName, supportedLocales } from "@/lib/i18n";
 
 const translateSchema = z.object({
   text: z.string().trim().min(1).max(20_000),
-  targetLanguage: z.enum(["en", "yo", "fr"])
+  targetLanguage: z.enum(supportedLocales)
 });
-
-const languageNames = {
-  en: "English",
-  yo: "Yoruba",
-  fr: "French"
-} as const;
 
 export async function POST(request: Request) {
   try {
@@ -30,7 +25,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
         instructions:
-          `Translate the user's text into ${languageNames[parsed.data.targetLanguage]}. ` +
+          `Translate the user's text into ${localeEnglishName(parsed.data.targetLanguage)}. ` +
           "Preserve names, scripture references, formatting, and meaning. Return only the translation.",
         input: parsed.data.text
       })

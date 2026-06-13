@@ -7,6 +7,7 @@ import { FormEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { localeOptions, normalizeLocale } from "@/lib/i18n";
 
 type ProfileFormProps = {
   user: {
@@ -72,11 +73,13 @@ export function ProfileForm({ user }: ProfileFormProps) {
           id="profile-locale"
           name="locale"
           className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm"
-          defaultValue={user.locale ?? "en"}
+          defaultValue={normalizeLocale(user.locale)}
         >
-          <option value="en">English</option>
-          <option value="yo">Yoruba</option>
-          <option value="fr">Français</option>
+          {localeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
       {error ? <p className="rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}

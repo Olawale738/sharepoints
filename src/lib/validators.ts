@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { supportedLocales } from "@/lib/i18n";
+
 const chatMessageIdSchema = z
   .string()
   .trim()
@@ -82,7 +84,7 @@ export const updateWorkspaceRolePermissionSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   image: z.string().url().max(2048).optional().or(z.literal("")),
-  locale: z.enum(["en", "yo", "fr"]).optional()
+  locale: z.enum(supportedLocales).optional()
 });
 
 export const inviteCompanyEmailSchema = z.object({

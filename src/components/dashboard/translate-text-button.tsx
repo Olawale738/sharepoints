@@ -3,8 +3,10 @@
 import { Languages, Loader2, X } from "lucide-react";
 import { useState } from "react";
 
+import { localeOptions, type AppLocale } from "@/lib/i18n";
+
 export function TranslateTextButton({ text }: { text: string }) {
-  const [language, setLanguage] = useState<"en" | "yo" | "fr">("yo");
+  const [language, setLanguage] = useState<AppLocale>("yo");
   const [translation, setTranslation] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -31,13 +33,15 @@ export function TranslateTextButton({ text }: { text: string }) {
       <div className="flex items-center gap-1">
         <select
           aria-label="Translation language"
-          className="h-7 rounded-md border border-ink/10 bg-white px-1 text-[11px]"
+          className="h-7 max-w-32 rounded-md border border-ink/10 bg-white px-1 text-[11px]"
           value={language}
-          onChange={(event) => setLanguage(event.target.value as "en" | "yo" | "fr")}
+          onChange={(event) => setLanguage(event.target.value as AppLocale)}
         >
-          <option value="yo">Yoruba</option>
-          <option value="en">English</option>
-          <option value="fr">French</option>
+          {localeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
         <button
           className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-ink/55 hover:bg-mint hover:text-moss"
