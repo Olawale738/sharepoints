@@ -6,10 +6,6 @@ import { auth } from "@/auth";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { prisma } from "@/lib/prisma";
 
-function canCreateWorkspaceFromRole(role: string) {
-  return role === "ADMIN" || role === "LEADER" || role === "EDITOR";
-}
-
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth();
 
@@ -17,7 +13,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect("/login");
   }
 
-  const [ownMemberships, currentUser] = await Promise.all([
+  const [ownMemberships, currentUser, organizationLeadership] = await Promise.all([
     prisma.workspaceMember.findMany({
     where: { userId: session.user.id, workspace: { deletedAt: null } },
     include: {
@@ -39,6 +35,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { locale: true }
+    }),
+    prisma.organizationUnitLeader.findFirst({
+      where: { userId: session.user.id, canCreateWorkspaces: true },
+      select: { id: true }
     })
   ]);
   const isGlobalAdmin = ownMemberships.some((membership) => membership.role === WorkspaceRole.ADMIN);
@@ -83,7 +83,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         membersCount: membership.workspace._count.members
       }));
   const canCreateWorkspace =
-    isGlobalAdmin || ownMemberships.some((membership) => canCreateWorkspaceFromRole(membership.role));
+    isGlobalAdmin ||
+    Boolean(organizationLeadership);
 
   return (
     <DashboardShell

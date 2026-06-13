@@ -359,22 +359,31 @@ export async function hasAnyWorkspaceAdminRole(userId: string) {
 }
 
 export async function hasAnyWorkspaceCreatorRole(userId: string) {
-  const creatorMembership = await prisma.workspaceMember.findFirst({
-    where: {
-      userId,
-      role: {
-        in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.EDITOR]
+  const [creatorMembership, organizationLeadership] = await Promise.all([
+    prisma.workspaceMember.findFirst({
+      where: {
+        userId,
+        role: WorkspaceRole.ADMIN,
+        workspace: {
+          deletedAt: null
+        }
       },
-      workspace: {
-        deletedAt: null
+      select: {
+        id: true
       }
-    },
-    select: {
-      id: true
-    }
-  });
+    }),
+    prisma.organizationUnitLeader.findFirst({
+      where: {
+        userId,
+        canCreateWorkspaces: true
+      },
+      select: {
+        id: true
+      }
+    })
+  ]);
 
-  return Boolean(creatorMembership);
+  return Boolean(creatorMembership || organizationLeadership);
 }
 
 export async function requireAnyWorkspaceAdmin(
@@ -388,7 +397,7 @@ export async function requireAnyWorkspaceAdmin(
 
 export async function requireWorkspaceCreatorRole(
   userId: string,
-  message = "Only workspace admins and assigned leaders can create new workspaces."
+  message = "Only administrators and leaders explicitly assigned to a church network scope can create workspaces."
 ) {
   await requireNoSanction(
     userId,

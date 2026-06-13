@@ -195,6 +195,90 @@ enum ResourceBookingStatus {
   CANCELLED
 }
 
+enum OrganizationUnitType {
+  GLOBAL
+  COUNTRY
+  REGION
+  BRANCH
+  CHURCH
+  MINISTRY
+}
+
+enum SafeguardingCaseStatus {
+  OPEN
+  TRIAGE
+  ACTIVE
+  MONITORING
+  CLOSED
+}
+
+enum SafeguardingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FreshnessIssueType {
+  STALE
+  DUPLICATE
+  MISSING_OWNER
+  BROKEN_LINK
+  REVIEW_DUE
+}
+
+enum FreshnessIssueStatus {
+  OPEN
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum CommunicationSafetyCategory {
+  THREAT
+  HARASSMENT
+  SAFEGUARDING
+  CONFIDENTIAL_DATA
+  SELF_HARM
+  OTHER
+}
+
+enum CommunicationSafetyStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum EmergencyIncidentStatus {
+  DRAFT
+  ACTIVE
+  RESOLVED
+  CANCELLED
+}
+
+enum WelfareResponseStatus {
+  SAFE
+  NEEDS_HELP
+  NO_RESPONSE
+}
+
+enum MembershipCardStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum GovernanceHoldStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum ResourceCheckInStatus {
+  CHECKED_IN
+  CHECKED_OUT
+}
+
 enum VisitorJourneyType {
   VISITOR
   NEW_CONVERT
@@ -525,6 +609,8 @@ model Workspace {
   notifications       Notification[]
   messagePins         MessagePin[]
   templateId          String?
+  organizationUnitId  String?
+  scopeType           OrganizationUnitType?
   deletedAt           DateTime?
   deletedById         String?
   restoreUntil        DateTime?
@@ -534,6 +620,7 @@ model Workspace {
   @@index([createdById])
   @@index([deletedAt, restoreUntil])
   @@index([templateId])
+  @@index([organizationUnitId, scopeType])
 }
 
 model WorkspaceDepartmentAccess {
@@ -1906,4 +1993,216 @@ model DutySchedule {
   @@index([assignedToId, startsAt])
   @@index([substituteUserId, startsAt])
   @@index([workspaceId, status, startsAt])
+}
+
+model OrganizationUnit {
+  id          String               @id @default(cuid())
+  parentId    String?
+  type        OrganizationUnitType
+  name        String
+  code        String?              @unique
+  countryCode String?
+  description String?
+  active      Boolean              @default(true)
+  createdById String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([parentId, type, name])
+  @@index([parentId, type, active])
+  @@index([countryCode, type])
+}
+
+model OrganizationUnitLeader {
+  id                  String   @id @default(cuid())
+  unitId              String
+  userId              String
+  title               String
+  canCreateWorkspaces Boolean  @default(true)
+  inheritToChildren   Boolean  @default(true)
+  assignedById        String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([unitId, userId, title])
+  @@index([userId, canCreateWorkspaces])
+  @@index([unitId, inheritToChildren])
+}
+
+model SafeguardingCase {
+  id                 String                 @id @default(cuid())
+  reference          String                 @unique
+  organizationUnitId String?
+  workspaceId        String?
+  subjectName        String
+  subjectUserId      String?
+  category           String
+  summary            String                 @db.Text
+  privateNotes       String?                @db.Text
+  severity           SafeguardingSeverity
+  status             SafeguardingCaseStatus @default(OPEN)
+  assignedToId       String?
+  reviewerId         String?
+  reportedById       String
+  nextReviewAt       DateTime?
+  closedAt           DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([organizationUnitId, status, severity])
+  @@index([assignedToId, status])
+  @@index([workspaceId, status])
+}
+
+model WorkspaceAiAgent {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  instructions       String   @db.Text
+  workspaceId        String?
+  organizationUnitId String?
+  allowedSourceTypes Json
+  createdById        String
+  enabled            Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([workspaceId, name])
+  @@index([organizationUnitId, enabled])
+  @@index([createdById, enabled])
+}
+
+model ContentFreshnessIssue {
+  id            String               @id @default(cuid())
+  sourceType    String
+  sourceId      String
+  workspaceId   String?
+  issueType     FreshnessIssueType
+  title         String
+  details       String?
+  ownerId       String?
+  lastUpdatedAt DateTime?
+  reviewDueAt   DateTime?
+  status        FreshnessIssueStatus @default(OPEN)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([sourceType, sourceId, issueType])
+  @@index([workspaceId, status, issueType])
+  @@index([reviewDueAt, status])
+}
+
+model CommunicationSafetyCase {
+  id             String                      @id @default(cuid())
+  sourceType     String
+  sourceId       String
+  workspaceId    String?
+  category       CommunicationSafetyCategory
+  severity       SafeguardingSeverity
+  summary        String                      @db.Text
+  status         CommunicationSafetyStatus   @default(OPEN)
+  reviewerId     String?
+  resolutionNote String?                     @db.Text
+  detectedAt     DateTime                    @default(now())
+  reviewedAt     DateTime?
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([sourceType, sourceId, category])
+  @@index([workspaceId, status, severity])
+  @@index([reviewerId, status])
+}
+
+model EmergencyIncident {
+  id                 String                  @id @default(cuid())
+  organizationUnitId String?
+  workspaceId        String?
+  title              String
+  instructions       String                  @db.Text
+  severity           SafeguardingSeverity
+  status             EmergencyIncidentStatus @default(DRAFT)
+  location           String?
+  createdById        String
+  activatedAt        DateTime?
+  resolvedAt         DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([organizationUnitId, status, severity])
+  @@index([workspaceId, status])
+}
+
+model EmergencyWelfareResponse {
+  id          String                @id @default(cuid())
+  incidentId  String
+  userId      String
+  status      WelfareResponseStatus
+  note        String?
+  respondedAt DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([incidentId, userId])
+  @@index([incidentId, status])
+  @@index([userId, respondedAt])
+}
+
+model DigitalMembershipCard {
+  id         String               @id @default(cuid())
+  userId     String               @unique
+  qrToken    String               @unique
+  cardNumber String               @unique
+  status     MembershipCardStatus @default(ACTIVE)
+  issuedById String
+  issuedAt   DateTime             @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  updatedAt  DateTime             @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model GovernanceHold {
+  id            String               @id @default(cuid())
+  name          String
+  targetType    String
+  targetId      String
+  workspaceId   String?
+  reason        String               @db.Text
+  status        GovernanceHoldStatus @default(ACTIVE)
+  preserveUntil DateTime?
+  createdById   String
+  releasedById  String?
+  releasedAt    DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([targetType, targetId, status])
+  @@index([workspaceId, status])
+  @@index([preserveUntil, status])
+}
+
+model SmartResourcePass {
+  id          String   @id @default(cuid())
+  resourceId  String   @unique
+  qrToken     String   @unique
+  enabled     Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ResourceCheckIn {
+  id           String                @id @default(cuid())
+  resourceId   String
+  bookingId    String?
+  userId       String
+  status       ResourceCheckInStatus @default(CHECKED_IN)
+  checkedInAt  DateTime              @default(now())
+  checkedOutAt DateTime?
+  note         String?
+
+  @@index([resourceId, status, checkedInAt])
+  @@index([userId, checkedInAt])
+  @@index([bookingId])
 }

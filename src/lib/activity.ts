@@ -64,8 +64,7 @@ export const activityActions = {
   userRestored: "user.restored",
   userAccessRevoked: "user.access_revoked",
   userDeleted: "user.deleted",
-  memberProfileUpdated: "member.profile_updated"
-  ,
+  memberProfileUpdated: "member.profile_updated",
   complianceCampaignCreated: "compliance.campaign_created",
   complianceCampaignLaunched: "compliance.campaign_launched",
   complianceFormSubmitted: "compliance.form_submitted",
@@ -76,5 +75,22 @@ export const activityActions = {
   churchEventDeleted: "church.event_deleted",
   pastoralFollowUpDeleted: "church.follow_up_deleted",
   churchResourceDeleted: "church.resource_deleted",
-  resourceBookingDeleted: "church.booking_deleted"
+  resourceBookingDeleted: "church.booking_deleted",
+  organizationUnitCreated: "organization.unit_created",
+  organizationLeaderAssigned: "organization.leader_assigned",
+  safeguardingCaseCreated: "safeguarding.case_created",
+  safeguardingCaseUpdated: "safeguarding.case_updated",
+  aiAgentCreated: "ai.agent_created",
+  aiAgentUpdated: "ai.agent_updated",
+  contentFreshnessScanRun: "governance.freshness_scan_run",
+  communicationSafetyScanRun: "safety.communication_scan_run",
+  emergencyCreated: "emergency.created",
+  emergencyUpdated: "emergency.updated",
+  membershipCardIssued: "membership.card_issued",
+  membershipCardUpdated: "membership.card_updated",
+  governanceHoldCreated: "governance.hold_created",
+  governanceHoldReleased: "governance.hold_released",
+  resourcePassCreated: "resource.pass_created",
+  resourceCheckedIn: "resource.checked_in",
+  resourceCheckedOut: "resource.checked_out"
 } as const;

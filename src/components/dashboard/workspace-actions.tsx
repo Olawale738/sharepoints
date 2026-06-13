@@ -13,6 +13,14 @@ type WorkspaceActionsProps = {
   canCreateWorkspace: boolean;
 };
 
+type OrganizationUnitOption = {
+  id: string;
+  parentId: string | null;
+  type: string;
+  name: string;
+  canCreateWorkspace: boolean;
+};
+
 export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) {
   const router = useRouter();
   const formId = useId();
@@ -21,14 +29,21 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; category: string }>>([]);
+  const [organizationUnits, setOrganizationUnits] = useState<OrganizationUnitOption[]>([]);
 
   useEffect(() => {
     if (!canCreateWorkspace) return;
-    fetch("/api/workspace-templates")
-      .then((response) => response.json())
-      .then((data: { templates?: Array<{ id: string; name: string; category: string }> }) =>
-        setTemplates(data.templates ?? [])
-      )
+    Promise.all([
+      fetch("/api/workspace-templates").then((response) => response.json()),
+      fetch("/api/organization-units").then((response) => response.json())
+    ])
+      .then(([templateData, unitData]: [
+        { templates?: Array<{ id: string; name: string; category: string }> },
+        { units?: OrganizationUnitOption[] }
+      ]) => {
+        setTemplates(templateData.templates ?? []);
+        setOrganizationUnits((unitData.units ?? []).filter((unit) => unit.canCreateWorkspace));
+      })
       .catch(() => undefined);
   }, [canCreateWorkspace]);
 
@@ -47,7 +62,8 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
         body: JSON.stringify({
           name: String(formData.get("name")),
           description: String(formData.get("description") ?? ""),
-          templateId: String(formData.get("templateId") ?? "") || null
+          templateId: String(formData.get("templateId") ?? "") || null,
+          organizationUnitId: String(formData.get("organizationUnitId") ?? "") || null
         })
       });
 
@@ -126,6 +142,21 @@ export function WorkspaceActions({ canCreateWorkspace }: WorkspaceActionsProps) 
             <div className="space-y-2">
               <Label htmlFor={`${formId}-workspace-description`}>Description</Label>
               <Textarea id={`${formId}-workspace-description`} name="description" rows={3} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${formId}-workspace-scope`}>Church network scope</Label>
+              <select
+                id={`${formId}-workspace-scope`}
+                name="organizationUnitId"
+                className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm outline-none focus:border-moss"
+              >
+                <option value="">Organization-wide workspace</option>
+                {organizationUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.type.toLowerCase()}: {unit.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor={`${formId}-workspace-template`}>Template</Label>

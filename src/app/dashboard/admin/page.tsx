@@ -12,7 +12,8 @@ import {
   Sparkles,
   UsersRound,
   Workflow,
-  ShieldAlert
+  ShieldAlert,
+  Globe2
 } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -317,6 +318,13 @@ export default async function AdminControlCenterPage() {
               Manage users, invitations, workspaces, roles, approvals, activity, storage, meetings, departments, and security from one place.
             </p>
           </div>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/admin/global"
+          >
+            <Globe2 className="h-4 w-4" />
+            Global church network
+          </Link>
           <Link
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-4 text-sm font-medium text-ink transition hover:bg-mint/50"
             href="/dashboard"

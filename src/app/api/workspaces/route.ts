@@ -3,6 +3,7 @@ import { Prisma, WorkspaceRole } from "@prisma/client";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
+import { requireWorkspaceUnitCreationAccess } from "@/lib/organization-access";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireWorkspaceCreatorRole } from "@/lib/rbac";
 import { createWorkspaceSchema } from "@/lib/validators";
@@ -93,6 +94,13 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid workspace details.");
     }
+    const isGlobalAdmin = await hasAnyWorkspaceAdminRole(user.id);
+    if (!isGlobalAdmin && !parsed.data.organizationUnitId) {
+      throw new ApiError(403, "Assigned leaders must choose their authorized country, region, church, or ministry scope.");
+    }
+    const organizationUnit = parsed.data.organizationUnitId
+      ? await requireWorkspaceUnitCreationAccess(user.id, parsed.data.organizationUnitId)
+      : null;
 
     const baseSlug = slugify(parsed.data.name) || "workspace";
     let slug = baseSlug;
@@ -108,6 +116,8 @@ export async function POST(request: Request) {
         name: parsed.data.name,
         slug,
         description: parsed.data.description || null,
+        organizationUnitId: organizationUnit?.id ?? null,
+        scopeType: organizationUnit?.type ?? null,
         createdById: user.id,
         members: {
           create: {
@@ -126,7 +136,11 @@ export async function POST(request: Request) {
       workspaceId: workspace.id,
       action: activityActions.workspaceCreated,
       targetId: workspace.id,
-      metadata: { name: workspace.name }
+      metadata: {
+        name: workspace.name,
+        organizationUnitId: organizationUnit?.id,
+        scopeType: organizationUnit?.type
+      }
     });
     await getOrCreateGeneralChannel(workspace.id, user.id);
     if (parsed.data.templateId) {

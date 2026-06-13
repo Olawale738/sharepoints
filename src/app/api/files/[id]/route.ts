@@ -28,6 +28,19 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (file.legalHold) {
       throw new ApiError(409, "This document is under legal hold and cannot be deleted.");
     }
+    const governanceHold = await prisma.governanceHold.findFirst({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { targetType: "FILE", targetId: file.id },
+          { targetType: "WORKSPACE", targetId: file.workspaceId }
+        ]
+      },
+      select: { id: true }
+    });
+    if (governanceHold) {
+      throw new ApiError(409, "This document is preserved by an active governance hold.");
+    }
 
     if (file.retentionUntil && file.retentionUntil > new Date()) {
       throw new ApiError(409, `This document is retained until ${file.retentionUntil.toISOString()}.`);

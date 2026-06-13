@@ -49,6 +49,14 @@ type Access = {
   workspaces: Array<{ id: string; name: string }>;
 };
 
+type AiAgent = {
+  id: string;
+  name: string;
+  description: string | null;
+  workspaceId: string | null;
+  allowedSourceTypes: unknown;
+};
+
 const modes = [
   ["ASK", "Ask"],
   ["SUMMARIZE", "Summarize"],
@@ -69,6 +77,8 @@ const examples = [
 export function AiAssistantPanel() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [access, setAccess] = useState<Access>({ role: "USER", workspaces: [] });
+  const [agents, setAgents] = useState<AiAgent[]>([]);
+  const [agentId, setAgentId] = useState("");
   const [threadId, setThreadId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState("");
   const [mode, setMode] = useState<(typeof modes)[number][0]>("ASK");
@@ -84,11 +94,17 @@ export function AiAssistantPanel() {
     let active = true;
     fetch("/api/ai-assistant")
       .then(async (response) => {
-        const data = (await response.json()) as { access?: Access; threads?: Thread[]; error?: string };
+        const data = (await response.json()) as {
+          access?: Access;
+          threads?: Thread[];
+          agents?: AiAgent[];
+          error?: string;
+        };
         if (!response.ok) throw new Error(data.error ?? "Assistant could not load.");
         if (!active) return;
         setAccess(data.access ?? { role: "USER", workspaces: [] });
         setThreads(data.threads ?? []);
+        setAgents(data.agents ?? []);
       })
       .catch((loadError: unknown) => {
         if (active) setError(loadError instanceof Error ? loadError.message : "Assistant could not load.");
@@ -128,6 +144,7 @@ export function AiAssistantPanel() {
         question,
         mode,
         workspaceId: workspaceId || null,
+        agentId: agentId || null,
         threadId
       })
     });
@@ -245,6 +262,23 @@ export function AiAssistantPanel() {
           {error ? <p className="rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
 
           <div className="border-t border-ink/10 pt-4">
+            {agents.length ? (
+              <label className="mb-3 block text-xs font-medium text-ink/60">
+                Specialized LETW agent
+                <select
+                  className="mt-1 h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm text-ink outline-none focus:border-moss"
+                  value={agentId}
+                  onChange={(event) => setAgentId(event.target.value)}
+                >
+                  <option value="">General permission-aware assistant</option>
+                  {agents.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name}{agent.description ? ` - ${agent.description}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {modes.map(([value, label]) => (
                 <button className={`rounded-md border px-3 py-2 text-xs font-medium transition ${mode === value ? "border-moss bg-mint text-ink" : "border-ink/10 bg-white text-ink/60"}`} key={value} onClick={() => setMode(value)} type="button">

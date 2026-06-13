@@ -38,7 +38,8 @@ export const resetPasswordSchema = z
 export const createWorkspaceSchema = z.object({
   name: z.string().trim().min(2).max(80),
   description: z.string().trim().max(240).optional().or(z.literal("")),
-  templateId: z.string().cuid().optional().nullable().or(z.literal(""))
+  templateId: z.string().cuid().optional().nullable().or(z.literal("")),
+  organizationUnitId: z.string().cuid().optional().nullable().or(z.literal(""))
 });
 
 export const joinWorkspaceSchema = z.object({

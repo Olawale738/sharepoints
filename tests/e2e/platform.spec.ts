@@ -71,6 +71,38 @@ test("required forms and sanctions enforce authentication", async ({ page, reque
   expect(sanctionResponse.status()).toBe(401);
 });
 
+test("global church network controls require authentication", async ({ page, request }) => {
+  for (const path of [
+    "/dashboard/admin/global",
+    "/dashboard/emergency",
+    "/dashboard/membership-card",
+    "/dashboard/resource-check-in"
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login/);
+  }
+
+  for (const path of [
+    "/api/admin/global-operations",
+    "/api/organization-units",
+    "/api/emergencies",
+    "/api/membership-card"
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(401);
+  }
+
+  const welfareResponse = await request.post("/api/emergencies/not-an-incident/respond", {
+    data: { status: "SAFE" }
+  });
+  expect(welfareResponse.status()).toBe(401);
+
+  const resourceResponse = await request.post("/api/resources/check-in", {
+    data: { token: "00000000-0000-0000-0000-000000000000" }
+  });
+  expect(resourceResponse.status()).toBe(401);
+});
+
 test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
   test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
   await page.goto("/login");

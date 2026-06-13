@@ -26,6 +26,23 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (!workspace) {
       throw new ApiError(404, "Workspace not found.");
     }
+    const activeHold = await prisma.governanceHold.findFirst({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { targetType: "WORKSPACE", targetId: workspace.id },
+          { workspaceId: workspace.id }
+        ]
+      },
+      select: { id: true }
+    });
+    const heldFile = await prisma.file.findFirst({
+      where: { workspaceId: workspace.id, legalHold: true },
+      select: { id: true }
+    });
+    if (activeHold || heldFile) {
+      throw new ApiError(409, "This workspace is protected by an active governance or legal hold.");
+    }
 
     const recycled = await recycleWorkspace(id, user.id);
 

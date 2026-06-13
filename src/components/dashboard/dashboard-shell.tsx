@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BarChart3, CalendarDays, ClipboardCheck, HeartHandshake, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
+import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, HeartHandshake, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -86,6 +86,22 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               <GlobalSearch />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-1 sm:justify-end">
+              <Link
+                aria-label="Emergency command center"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/emergency"
+              >
+                <RadioTower className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Emergency</span>
+              </Link>
+              <Link
+                aria-label="Digital membership card"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/membership-card"
+              >
+                <BadgeCheck className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Member card</span>
+              </Link>
               <Link
                 aria-label={messages.aiAssistant}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"

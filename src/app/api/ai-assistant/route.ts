@@ -2,17 +2,20 @@ import { z } from "zod";
 
 import {
   aiAssistantModes,
+  canUseWorkspaceAi,
   collectAuthorizedAiSources,
   describeAiAccess,
   type AiSource
 } from "@/lib/ai-assistant";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { getOrganizationAncestorIds, getOrganizationUnitAccess } from "@/lib/organization-access";
 import { prisma } from "@/lib/prisma";
 
 const requestSchema = z.object({
   question: z.string().trim().min(2).max(4_000),
   mode: z.enum(aiAssistantModes).default("ASK"),
   workspaceId: z.string().cuid().nullable().optional(),
+  agentId: z.string().cuid().nullable().optional(),
   threadId: z.string().cuid().nullable().optional()
 });
 
@@ -43,10 +46,24 @@ function extractOutput(body: {
   );
 }
 
+async function canUseOrganizationAgent(userId: string, organizationUnitId: string) {
+  const leadershipAccess = await getOrganizationUnitAccess(userId);
+  if (leadershipAccess.isAdmin || leadershipAccess.visibleUnitIds.has(organizationUnitId)) return true;
+  const memberships = await prisma.workspaceMember.findMany({
+    where: { userId, workspace: { deletedAt: null } },
+    select: { workspace: { select: { organizationUnitId: true } } }
+  });
+  const directUnitIds = memberships
+    .map((membership) => membership.workspace.organizationUnitId)
+    .filter((id): id is string => Boolean(id));
+  const accessibleUnitIds = await getOrganizationAncestorIds(directUnitIds);
+  return accessibleUnitIds.includes(organizationUnitId);
+}
+
 export async function GET() {
   try {
     const user = await requireUser();
-    const [access, threads] = await Promise.all([
+    const [access, threads, agents] = await Promise.all([
       describeAiAccess(user.id),
       prisma.aiAssistantThread.findMany({
         where: { userId: user.id },
@@ -58,10 +75,25 @@ export async function GET() {
         },
         orderBy: { updatedAt: "desc" },
         take: 12
+      }),
+      prisma.workspaceAiAgent.findMany({
+        where: { enabled: true },
+        orderBy: { name: "asc" }
       })
     ]);
 
-    return ok({ access, threads });
+    const accessibleAgents = [];
+    for (const agent of agents) {
+      if (
+        (agent.workspaceId && (await canUseWorkspaceAi(user.id, agent.workspaceId))) ||
+        (agent.organizationUnitId && (await canUseOrganizationAgent(user.id, agent.organizationUnitId))) ||
+        (!agent.workspaceId && !agent.organizationUnitId)
+      ) {
+        accessibleAgents.push(agent);
+      }
+    }
+
+    return ok({ access, threads, agents: accessibleAgents });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -78,7 +110,25 @@ export async function POST(request: Request) {
       throw new ApiError(503, "The LETW AI Assistant is not configured yet.");
     }
 
-    const { question, mode, workspaceId } = parsed.data;
+    const { question, mode } = parsed.data;
+    const agent = parsed.data.agentId
+      ? await prisma.workspaceAiAgent.findFirst({
+          where: { id: parsed.data.agentId, enabled: true }
+        })
+      : null;
+    if (parsed.data.agentId && !agent) {
+      throw new ApiError(404, "AI agent not found.");
+    }
+    if (agent?.workspaceId && !(await canUseWorkspaceAi(user.id, agent.workspaceId))) {
+      throw new ApiError(403, "You do not have permission to use this workspace AI agent.");
+    }
+    if (
+      agent?.organizationUnitId &&
+      !(await canUseOrganizationAgent(user.id, agent.organizationUnitId))
+    ) {
+      throw new ApiError(403, "You do not have permission to use this church network AI agent.");
+    }
+    const workspaceId = agent?.workspaceId ?? parsed.data.workspaceId;
     const existingThread = parsed.data.threadId
       ? await prisma.aiAssistantThread.findFirst({
           where: { id: parsed.data.threadId, userId: user.id }
@@ -102,6 +152,12 @@ export async function POST(request: Request) {
       mode,
       workspaceId
     });
+    const allowedSourceTypes = Array.isArray(agent?.allowedSourceTypes)
+      ? new Set(agent.allowedSourceTypes.filter((item): item is string => typeof item === "string"))
+      : null;
+    const authorizedSources = allowedSourceTypes
+      ? retrieval.sources.filter((source) => allowedSourceTypes.has(source.type))
+      : retrieval.sources;
 
     await prisma.aiAssistantMessage.create({
       data: {
@@ -112,7 +168,7 @@ export async function POST(request: Request) {
       }
     });
 
-    if (!retrieval.sources.length) {
+    if (!authorizedSources.length) {
       const answer =
         "I could not find authorized LETW information that answers this request. You may not have permission to access it, or no approved content is available.";
       await prisma.$transaction([
@@ -144,9 +200,10 @@ export async function POST(request: Request) {
       "You are read-only. Never claim to have sent a message, changed a record, approved content, or performed an action.",
       "When asked to perform an action, provide a draft or proposed steps and state that user confirmation is required in LETW.",
       `Requested mode: ${mode}.`,
+      agent ? `Active specialized agent: ${agent.name}. Agent instructions: ${agent.instructions}` : "",
       "Answer clearly and concisely for a church collaboration platform."
-    ].join(" ");
-    const sourceAudit = retrieval.sources.map((source) => ({
+    ].filter(Boolean).join(" ");
+    const sourceAudit = authorizedSources.map((source) => ({
       id: source.id,
       type: source.type,
       workspaceId: source.workspaceId,
@@ -176,7 +233,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           model,
           instructions,
-          input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(retrieval.sources)}`
+          input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(authorizedSources)}`
         })
       });
     } catch (serviceError) {
@@ -224,7 +281,7 @@ export async function POST(request: Request) {
           role: "ASSISTANT",
           mode,
           content: answer,
-          sources: retrieval.sources
+          sources: authorizedSources
         }
       }),
       prisma.aiAssistantAudit.update({
@@ -237,7 +294,7 @@ export async function POST(request: Request) {
       })
     ]);
 
-    return ok({ threadId: thread.id, answer, sources: retrieval.sources });
+    return ok({ threadId: thread.id, answer, sources: authorizedSources });
   } catch (error) {
     return handleRouteError(error);
   }
