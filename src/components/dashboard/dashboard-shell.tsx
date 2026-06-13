@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BarChart3, CalendarDays, HeartHandshake, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardCheck, HeartHandshake, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -93,6 +93,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               >
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden 2xl:inline">AI Assistant</span>
+              </Link>
+              <Link
+                aria-label="Required forms"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/compliance"
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Required forms</span>
               </Link>
               <Link
                 aria-label="Calendar"

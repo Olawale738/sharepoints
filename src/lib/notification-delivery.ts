@@ -5,6 +5,13 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function absoluteHref(href: string | null) {
+  if (!href) return null;
+  if (/^https?:\/\//i.test(href)) return href;
+  const origin = (process.env.AUTH_URL ?? "https://sharepoints.letw.org").replace(/\/$/, "");
+  return `${origin}${href.startsWith("/") ? href : `/${href}`}`;
+}
+
 function isQuietTime(start: string | null, end: string | null, timeZone: string) {
   if (!start || !end) return false;
   const local = new Intl.DateTimeFormat("en-GB", {
@@ -111,10 +118,11 @@ async function sendPush(tokens: string[], title: string, body: string | null, hr
   return response.ok;
 }
 
-export async function deliverPendingNotifications() {
+export async function deliverPendingNotifications(notificationIds?: string[]) {
   const notifications = await prisma.notification.findMany({
     where: {
       AND: [
+        ...(notificationIds?.length ? [{ id: { in: notificationIds } }] : []),
         { OR: [{ deliverAt: null }, { deliverAt: { lte: new Date() } }] },
         { OR: [{ deliveredAt: null }, { emailSentAt: null }, { pushSentAt: null }] }
       ]
@@ -128,7 +136,7 @@ export async function deliverPendingNotifications() {
       }
     },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-    take: 200
+    take: notificationIds?.length ? Math.min(notificationIds.length, 500) : 200
   });
   let delivered = 0;
   const byUser = new Map<string, typeof notifications>();
@@ -158,7 +166,7 @@ export async function deliverPendingNotifications() {
         subscriptions.map((subscription) => subscription.endpoint),
         notification.title,
         notification.body,
-        notification.href
+        absoluteHref(notification.href)
       );
       let emailSent = false;
       if (preference?.digest === "IMMEDIATE" && notification.user.email && !notification.emailSentAt) {
@@ -166,7 +174,7 @@ export async function deliverPendingNotifications() {
           notification.user.email,
           notification.title,
           notification.body,
-          notification.href
+          absoluteHref(notification.href)
         );
       }
       await prisma.notification.update({
@@ -195,7 +203,7 @@ export async function deliverPendingNotifications() {
         pendingDigest.map((notification) => ({
           title: notification.title,
           body: notification.body,
-          href: notification.href
+          href: absoluteHref(notification.href)
         }))
       );
       if (sent) {

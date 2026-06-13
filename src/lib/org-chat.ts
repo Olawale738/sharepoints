@@ -1,8 +1,9 @@
-import { OrgChatAudience, WorkspaceRole } from "@prisma/client";
+import { MemberSanctionType, OrgChatAudience, WorkspaceRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { getRolePermissions } from "@/lib/rbac";
+import { getActiveSanctionTypes, requireNoSanction } from "@/lib/sanctions";
 
 export const orgChatRoomDefinitions = [
   {
@@ -100,6 +101,8 @@ async function canSendForMembership(membership: MembershipForOrgChat) {
 
 export async function getUserOrgChatAudiences(userId: string) {
   const memberships = await getMemberships(userId);
+  const sanctions = await getActiveSanctionTypes(userId);
+  const chatRestricted = sanctions.has(MemberSanctionType.RESTRICT_CHAT);
   const readable = new Set<OrgChatAudience>();
   const sendable = new Set<OrgChatAudience>();
 
@@ -115,7 +118,7 @@ export async function getUserOrgChatAudiences(userId: string) {
         readable.add(roleAudience(membership.role));
       }
 
-      if (await canSendForMembership(membership)) {
+      if (!chatRestricted && (await canSendForMembership(membership))) {
         sendable.add(OrgChatAudience.ALL);
 
         if (membership.role === WorkspaceRole.ADMIN) {
@@ -156,6 +159,11 @@ export async function requireOrgChatRoomAccess(userId: string, roomId: string) {
 }
 
 export async function requireOrgChatRoomSendAccess(userId: string, roomId: string) {
+  await requireNoSanction(
+    userId,
+    [MemberSanctionType.RESTRICT_CHAT],
+    "Your chat access is temporarily restricted. Contact an administrator."
+  );
   const room = await requireOrgChatRoomAccess(userId, roomId);
   const { sendable } = await getUserOrgChatAudiences(userId);
 

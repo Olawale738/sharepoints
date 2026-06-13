@@ -5,6 +5,7 @@ import { requireConversationParticipant } from "@/lib/direct-chat-access";
 import { requireOrgChatRoomAccess, requireOrgChatRoomSendAccess } from "@/lib/org-chat";
 import { prisma } from "@/lib/prisma";
 import { publishRealtime } from "@/lib/realtime";
+import { requireWorkspacePermission } from "@/lib/rbac";
 import { requireWorkspaceChannelMembership, requireWorkspaceChannelSendAccess } from "@/lib/workspace-chat-access";
 
 const forwardSchema = z.object({
@@ -66,7 +67,8 @@ export async function POST(request: Request) {
         include: { author: { select: { id: true, name: true, email: true, image: true } } }
       });
     } else if (parsed.data.destinationKind === "direct") {
-      await requireConversationParticipant(user.id, parsed.data.destinationId);
+      const conversation = await requireConversationParticipant(user.id, parsed.data.destinationId);
+      await requireWorkspacePermission(user.id, conversation.workspaceId, "canSendMessages");
       message = await prisma.directMessage.create({
         data: {
           conversationId: parsed.data.destinationId,

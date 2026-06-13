@@ -45,6 +45,22 @@ test("AI, CRM, and activity deletion enforce authentication", async ({ request }
   expect(activityResponse.status()).toBe(401);
 });
 
+test("required forms and sanctions enforce authentication", async ({ page, request }) => {
+  await page.goto("/dashboard/compliance");
+  await expect(page).toHaveURL(/\/login/);
+
+  const complianceResponse = await request.get("/api/compliance");
+  expect(complianceResponse.status()).toBe(401);
+
+  const campaignResponse = await request.post("/api/compliance/campaigns", { data: {} });
+  expect(campaignResponse.status()).toBe(401);
+
+  const sanctionResponse = await request.patch("/api/compliance/sanctions/not-a-sanction", {
+    data: { reason: "Test" }
+  });
+  expect(sanctionResponse.status()).toBe(401);
+});
+
 test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
   test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
   await page.goto("/login");

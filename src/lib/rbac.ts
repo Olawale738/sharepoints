@@ -1,7 +1,8 @@
-import { WorkspaceRole } from "@prisma/client";
+import { MemberSanctionType, WorkspaceRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { requireNoSanction } from "@/lib/sanctions";
 
 export const permissionKeys = [
   "canUploadFiles",
@@ -389,6 +390,11 @@ export async function requireWorkspaceCreatorRole(
   userId: string,
   message = "Only workspace admins and assigned leaders can create new workspaces."
 ) {
+  await requireNoSanction(
+    userId,
+    [MemberSanctionType.RESTRICT_FILES],
+    "Your account is temporarily restricted from creating collaboration spaces."
+  );
   if (!(await hasAnyWorkspaceCreatorRole(userId))) {
     throw new ApiError(403, message);
   }
@@ -406,6 +412,21 @@ export async function requireWorkspacePermission(
       membership,
       permissions: allWorkspacePermissions
     };
+  }
+
+  if (permission === "canSendMessages") {
+    await requireNoSanction(
+      userId,
+      [MemberSanctionType.RESTRICT_CHAT],
+      "Your chat access is temporarily restricted. Contact an administrator."
+    );
+  }
+  if (["canUploadFiles", "canDeleteFiles", "canCreateFolders", "canCreateShareLinks"].includes(permission)) {
+    await requireNoSanction(
+      userId,
+      [MemberSanctionType.RESTRICT_FILES],
+      "Your file collaboration access is temporarily restricted. Contact an administrator."
+    );
   }
 
   const permissions = await getRolePermissions(workspaceId, membership.role);

@@ -37,23 +37,28 @@ export async function notifyUsers(userIds: string[], input: Omit<NotificationInp
     return;
   }
 
-  await prisma.notification.createMany({
-    data: uniqueUserIds.map((userId) => ({
-      userId,
-      workspaceId: input.workspaceId ?? null,
-      type: input.type,
-      title: input.title,
-      body: input.body ?? null,
-      href: input.href ?? null,
-      priority: input.priority ?? NotificationPriority.NORMAL,
-      deliverAt: input.deliverAt ?? null
-    }))
-  });
+  const notifications = await prisma.$transaction(
+    uniqueUserIds.map((userId) =>
+      prisma.notification.create({
+        data: {
+          userId,
+          workspaceId: input.workspaceId ?? null,
+          type: input.type,
+          title: input.title,
+          body: input.body ?? null,
+          href: input.href ?? null,
+          priority: input.priority ?? NotificationPriority.NORMAL,
+          deliverAt: input.deliverAt ?? null
+        }
+      })
+    )
+  );
   await Promise.all(
     uniqueUserIds.map((userId) =>
       publishRealtime("notifications", userId, "notification.refresh", { userId })
     )
   );
+  return notifications;
 }
 
 export async function notifyWorkspaceMembers(

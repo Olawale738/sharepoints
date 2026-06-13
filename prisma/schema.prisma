@@ -80,6 +80,8 @@ enum SecurityEventType {
   DEVICE_REVOKED
   FILE_BLOCKED
   ACTIVITY_LOGS_CLEARED
+  MEMBER_SANCTION_ISSUED
+  MEMBER_SANCTION_LIFTED
 }
 
 enum FileScanStatus {
@@ -261,6 +263,39 @@ enum LeaveRequestStatus {
   CANCELLED
 }
 
+enum ComplianceCampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum ComplianceAudienceType {
+  ALL_ACTIVE
+  DEPARTMENT
+  WORKSPACE
+  SELECTED
+}
+
+enum ComplianceAssignmentStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  EXEMPT
+  SANCTIONED
+}
+
+enum MemberSanctionType {
+  WARNING
+  RESTRICT_CHAT
+  RESTRICT_FILES
+}
+
+enum MemberSanctionStatus {
+  ACTIVE
+  LIFTED
+}
+
 enum AvailabilityStatus {
   AVAILABLE
   LIMITED
@@ -275,56 +310,56 @@ enum DutyScheduleStatus {
 }
 
 model User {
-  id                         String                     @id @default(cuid())
+  id                         String                       @id @default(cuid())
   name                       String?
-  email                      String?                    @unique
+  email                      String?                      @unique
   emailVerified              DateTime?
   image                      String?
   passwordHash               String?
   departmentId               String?
   category                   String?
-  forcePasswordReset         Boolean                    @default(false)
-  singleActiveSession        Boolean                    @default(false)
-  sessionVersion             Int                        @default(0)
+  forcePasswordReset         Boolean                      @default(false)
+  singleActiveSession        Boolean                      @default(false)
+  sessionVersion             Int                          @default(0)
   twoFactorSecret            String?
-  twoFactorEnabled           Boolean                    @default(false)
+  twoFactorEnabled           Boolean                      @default(false)
   suspendedAt                DateTime?
   accessRevokedAt            DateTime?
   deletedAt                  DateTime?
-  locale                     String                     @default("en")
-  createdAt                  DateTime                   @default(now())
-  updatedAt                  DateTime                   @updatedAt
+  locale                     String                       @default("en")
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
   accounts                   Account[]
   sessions                   Session[]
   authenticators             Authenticator[]
-  department                 Department?                @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
-  departmentsCreated         Department[]               @relation("DepartmentsCreated")
+  department                 Department?                  @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentsCreated         Department[]                 @relation("DepartmentsCreated")
   passwordResetTokens        PasswordResetToken[]
-  approvalRequests           ApprovalRequest[]          @relation("ApprovalRequester")
-  approvalReviews            ApprovalRequest[]          @relation("ApprovalReviewer")
-  companyInvitationsSent     CompanyEmailInvitation[]   @relation("CompanyInvitationsSent")
-  companyInvitationsAccepted CompanyEmailInvitation[]   @relation("CompanyInvitationsAccepted")
-  createdWorkspaces          Workspace[]                @relation("WorkspaceCreator")
+  approvalRequests           ApprovalRequest[]            @relation("ApprovalRequester")
+  approvalReviews            ApprovalRequest[]            @relation("ApprovalReviewer")
+  companyInvitationsSent     CompanyEmailInvitation[]     @relation("CompanyInvitationsSent")
+  companyInvitationsAccepted CompanyEmailInvitation[]     @relation("CompanyInvitationsAccepted")
+  createdWorkspaces          Workspace[]                  @relation("WorkspaceCreator")
   workspaceMemberships       WorkspaceMember[]
-  uploadedFiles              File[]                     @relation("UploadedFiles")
-  createdFolders             Folder[]                   @relation("CreatedFolders")
-  createdChannels            ChatChannel[]              @relation("CreatedChannels")
-  chatMessages               ChatMessage[]              @relation("AuthoredMessages")
-  createdOrgChatRooms        OrgChatRoom[]              @relation("CreatedOrgChatRooms")
-  orgChatMessages            OrgChatMessage[]           @relation("AuthoredOrgChatMessages")
-  createdDirectConversations DirectConversation[]       @relation("CreatedDirectConversations")
-  directConversationsAsA     DirectConversation[]       @relation("DirectParticipantA")
-  directConversationsAsB     DirectConversation[]       @relation("DirectParticipantB")
-  directMessages             DirectMessage[]            @relation("AuthoredDirectMessages")
-  createdIntegrations        Integration[]              @relation("CreatedIntegrations")
-  authoredAnnouncements      WorkspaceAnnouncement[]    @relation("AuthoredAnnouncements")
-  assignedTasks              WorkspaceTask[]            @relation("AssignedTasks")
+  uploadedFiles              File[]                       @relation("UploadedFiles")
+  createdFolders             Folder[]                     @relation("CreatedFolders")
+  createdChannels            ChatChannel[]                @relation("CreatedChannels")
+  chatMessages               ChatMessage[]                @relation("AuthoredMessages")
+  createdOrgChatRooms        OrgChatRoom[]                @relation("CreatedOrgChatRooms")
+  orgChatMessages            OrgChatMessage[]             @relation("AuthoredOrgChatMessages")
+  createdDirectConversations DirectConversation[]         @relation("CreatedDirectConversations")
+  directConversationsAsA     DirectConversation[]         @relation("DirectParticipantA")
+  directConversationsAsB     DirectConversation[]         @relation("DirectParticipantB")
+  directMessages             DirectMessage[]              @relation("AuthoredDirectMessages")
+  createdIntegrations        Integration[]                @relation("CreatedIntegrations")
+  authoredAnnouncements      WorkspaceAnnouncement[]      @relation("AuthoredAnnouncements")
+  assignedTasks              WorkspaceTask[]              @relation("AssignedTasks")
   taskAssignments            WorkspaceTaskAssignee[]
   taskComments               WorkspaceTaskComment[]
-  createdTasks               WorkspaceTask[]            @relation("CreatedTasks")
-  createdMeetings            WorkspaceMeeting[]         @relation("CreatedMeetings")
+  createdTasks               WorkspaceTask[]              @relation("CreatedTasks")
+  createdMeetings            WorkspaceMeeting[]           @relation("CreatedMeetings")
   meetingResponses           WorkspaceMeetingResponse[]
-  createdShareLinks          FileShareLink[]            @relation("CreatedShareLinks")
+  createdShareLinks          FileShareLink[]              @relation("CreatedShareLinks")
   securityEvents             SecurityEvent[]
   notifications              Notification[]
   notificationPreference     NotificationPreference?
@@ -333,19 +368,25 @@ model User {
   messageReactions           MessageReaction[]
   messageReceipts            MessageReadReceipt[]
   messageBookmarks           MessageBookmark[]
-  messagePins                MessagePin[]               @relation("MessagePinnedBy")
+  messagePins                MessagePin[]                 @relation("MessagePinnedBy")
   devices                    UserDevice[]
-  fileVersions               FileVersion[]              @relation("FileVersionUploader")
+  fileVersions               FileVersion[]                @relation("FileVersionUploader")
   fileComments               FileComment[]
-  filesCheckedOut            File[]                     @relation("FileCheckedOutBy")
-  wikiPagesAuthored          WikiPage[]                 @relation("WikiPageAuthor")
-  wikiPagesUpdated           WikiPage[]                 @relation("WikiPageUpdater")
-  formsCreated               WorkspaceForm[]            @relation("FormCreator")
+  filesCheckedOut            File[]                       @relation("FileCheckedOutBy")
+  wikiPagesAuthored          WikiPage[]                   @relation("WikiPageAuthor")
+  wikiPagesUpdated           WikiPage[]                   @relation("WikiPageUpdater")
+  formsCreated               WorkspaceForm[]              @relation("FormCreator")
   formResponses              WorkspaceFormResponse[]
   activityLogs               ActivityLog[]
   memberProfile              MemberProfile?
   aiAssistantThreads         AiAssistantThread[]
   aiAssistantAudits          AiAssistantAudit[]
+  complianceCampaignsCreated MemberComplianceCampaign[]   @relation("ComplianceCampaignCreator")
+  complianceAssignments      MemberComplianceAssignment[] @relation("ComplianceAssignmentMember")
+  complianceReviews          MemberComplianceAssignment[] @relation("ComplianceAssignmentReviewer")
+  sanctionsReceived          MemberSanction[]             @relation("SanctionedMember")
+  sanctionsIssued            MemberSanction[]             @relation("SanctionIssuer")
+  sanctionsLifted            MemberSanction[]             @relation("SanctionLifter")
 
   @@index([departmentId])
   @@index([category])
@@ -685,6 +726,85 @@ model AiAssistantAudit {
   @@index([userId, createdAt])
   @@index([threadId, createdAt])
   @@index([status, createdAt])
+}
+
+model MemberComplianceCampaign {
+  id                   String                       @id @default(cuid())
+  title                String
+  description          String?                      @db.Text
+  requiredFields       Json
+  status               ComplianceCampaignStatus     @default(DRAFT)
+  audienceType         ComplianceAudienceType
+  audienceReferenceId  String?
+  dueAt                DateTime
+  requiresReview       Boolean                      @default(true)
+  allowCareException   Boolean                      @default(true)
+  reminderIntervalDays Int                          @default(3)
+  createdById          String
+  createdBy            User                         @relation("ComplianceCampaignCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignments          MemberComplianceAssignment[]
+  createdAt            DateTime                     @default(now())
+  launchedAt           DateTime?
+  closedAt             DateTime?
+  updatedAt            DateTime                     @updatedAt
+
+  @@index([status, dueAt])
+  @@index([createdById, createdAt])
+  @@index([audienceType, audienceReferenceId])
+}
+
+model MemberComplianceAssignment {
+  id                   String                     @id @default(cuid())
+  campaignId           String
+  userId               String
+  status               ComplianceAssignmentStatus @default(PENDING)
+  answers              Json?
+  completionPercent    Int                        @default(0)
+  submittedAt          DateTime?
+  reviewedAt           DateTime?
+  reviewedById         String?
+  reviewNote           String?                    @db.Text
+  exceptionRequestedAt DateTime?
+  exceptionCategory    String?
+  exceptionNote        String?                    @db.Text
+  reminderCount        Int                        @default(0)
+  lastReminderAt       DateTime?
+  campaign             MemberComplianceCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user                 User                       @relation("ComplianceAssignmentMember", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy           User?                      @relation("ComplianceAssignmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  sanctions            MemberSanction[]
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+
+  @@unique([campaignId, userId])
+  @@index([userId, status, createdAt])
+  @@index([campaignId, status])
+  @@index([lastReminderAt])
+}
+
+model MemberSanction {
+  id           String                      @id @default(cuid())
+  userId       String
+  assignmentId String?
+  type         MemberSanctionType
+  status       MemberSanctionStatus        @default(ACTIVE)
+  reason       String                      @db.Text
+  issuedById   String
+  expiresAt    DateTime?
+  liftedAt     DateTime?
+  liftedById   String?
+  liftReason   String?                     @db.Text
+  user         User                        @relation("SanctionedMember", fields: [userId], references: [id], onDelete: Cascade)
+  assignment   MemberComplianceAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  issuedBy     User                        @relation("SanctionIssuer", fields: [issuedById], references: [id], onDelete: Restrict)
+  liftedBy     User?                       @relation("SanctionLifter", fields: [liftedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+
+  @@index([userId, status, type])
+  @@index([assignmentId])
+  @@index([expiresAt, status])
+  @@index([issuedById, createdAt])
 }
 
 model WorkspaceAnnouncement {

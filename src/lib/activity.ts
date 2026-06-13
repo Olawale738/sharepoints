@@ -65,4 +65,11 @@ export const activityActions = {
   userAccessRevoked: "user.access_revoked",
   userDeleted: "user.deleted",
   memberProfileUpdated: "member.profile_updated"
+  ,
+  complianceCampaignCreated: "compliance.campaign_created",
+  complianceCampaignLaunched: "compliance.campaign_launched",
+  complianceFormSubmitted: "compliance.form_submitted",
+  complianceAssignmentReviewed: "compliance.assignment_reviewed",
+  memberSanctionIssued: "member.sanction_issued",
+  memberSanctionLifted: "member.sanction_lifted"
 } as const;

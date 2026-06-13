@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   CalendarClock,
+  ClipboardCheck,
   ContactRound,
   Database,
   Files,
@@ -335,6 +336,13 @@ export default async function AdminControlCenterPage() {
           >
             <ContactRound className="h-4 w-4" />
             Member CRM
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/compliance"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            Required forms
           </Link>
         </div>
       </section>
