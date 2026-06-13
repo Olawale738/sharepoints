@@ -71,5 +71,10 @@ export const activityActions = {
   complianceFormSubmitted: "compliance.form_submitted",
   complianceAssignmentReviewed: "compliance.assignment_reviewed",
   memberSanctionIssued: "member.sanction_issued",
-  memberSanctionLifted: "member.sanction_lifted"
+  memberSanctionLifted: "member.sanction_lifted",
+  ministryDeleted: "church.ministry_deleted",
+  churchEventDeleted: "church.event_deleted",
+  pastoralFollowUpDeleted: "church.follow_up_deleted",
+  churchResourceDeleted: "church.resource_deleted",
+  resourceBookingDeleted: "church.booking_deleted"
 } as const;

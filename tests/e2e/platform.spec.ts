@@ -28,6 +28,16 @@ test("people operations and its APIs require authentication", async ({ page, req
   }
 });
 
+test("church operation deletion requires an authenticated administrator", async ({ request }) => {
+  const response = await request.delete("/api/church/operations", {
+    data: {
+      entity: "RESOURCE",
+      id: "test-resource"
+    }
+  });
+  expect(response.status()).toBe(401);
+});
+
 test("AI, CRM, and activity deletion enforce authentication", async ({ request }) => {
   const aiResponse = await request.get("/api/ai-assistant");
   expect(aiResponse.status()).toBe(401);

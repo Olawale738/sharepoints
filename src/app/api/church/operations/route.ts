@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
@@ -64,6 +65,11 @@ const operationSchema = z.discriminatedUnion("entity", [
     endsAt: z.string().datetime()
   })
 ]);
+
+const deleteOperationSchema = z.object({
+  entity: z.enum(["MINISTRY", "EVENT", "FOLLOW_UP", "RESOURCE", "BOOKING"]),
+  id: z.string().trim().min(1).max(64)
+});
 
 export async function GET() {
   try {
@@ -218,6 +224,92 @@ export async function PATCH(request: Request) {
         }
       })
     });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireUser();
+    await requireAnyWorkspaceAdmin(user.id, "Only administrators can delete church operation records.");
+    const parsed = deleteOperationSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid delete request.");
+    }
+
+    const { entity, id } = parsed.data;
+    let label = "";
+    let action: (typeof activityActions)[keyof typeof activityActions];
+    let cleanup: Record<string, number> = {};
+
+    if (entity === "MINISTRY") {
+      const ministry = await prisma.ministry.findUnique({ where: { id } });
+      if (!ministry) throw new ApiError(404, "Ministry not found.");
+      label = ministry.name;
+      action = activityActions.ministryDeleted;
+      cleanup = await prisma.$transaction(async (tx) => {
+        const [events, volunteers] = await Promise.all([
+          tx.churchEvent.updateMany({ where: { ministryId: id }, data: { ministryId: null } }),
+          tx.volunteerAssignment.updateMany({ where: { ministryId: id }, data: { ministryId: null } })
+        ]);
+        await tx.ministry.delete({ where: { id } });
+        return { eventsDetached: events.count, volunteersDetached: volunteers.count };
+      });
+    } else if (entity === "EVENT") {
+      const event = await prisma.churchEvent.findUnique({ where: { id } });
+      if (!event) throw new ApiError(404, "Event not found.");
+      label = event.title;
+      action = activityActions.churchEventDeleted;
+      cleanup = await prisma.$transaction(async (tx) => {
+        const [attendance, volunteers, bookings] = await Promise.all([
+          tx.churchAttendance.deleteMany({ where: { eventId: id } }),
+          tx.volunteerAssignment.deleteMany({ where: { eventId: id } }),
+          tx.resourceBooking.updateMany({ where: { eventId: id }, data: { eventId: null } })
+        ]);
+        await tx.churchEvent.delete({ where: { id } });
+        return {
+          attendanceDeleted: attendance.count,
+          volunteersDeleted: volunteers.count,
+          bookingsDetached: bookings.count
+        };
+      });
+    } else if (entity === "FOLLOW_UP") {
+      const followUp = await prisma.pastoralFollowUp.findUnique({ where: { id } });
+      if (!followUp) throw new ApiError(404, "Pastoral follow-up not found.");
+      label = followUp.personName;
+      action = activityActions.pastoralFollowUpDeleted;
+      await prisma.pastoralFollowUp.delete({ where: { id } });
+    } else if (entity === "RESOURCE") {
+      const resource = await prisma.churchResource.findUnique({ where: { id } });
+      if (!resource) throw new ApiError(404, "Resource not found.");
+      label = resource.name;
+      action = activityActions.churchResourceDeleted;
+      cleanup = await prisma.$transaction(async (tx) => {
+        const bookings = await tx.resourceBooking.deleteMany({ where: { resourceId: id } });
+        await tx.churchResource.delete({ where: { id } });
+        return { bookingsDeleted: bookings.count };
+      });
+    } else {
+      const booking = await prisma.resourceBooking.findUnique({ where: { id } });
+      if (!booking) throw new ApiError(404, "Booking not found.");
+      label = booking.title;
+      action = activityActions.resourceBookingDeleted;
+      await prisma.resourceBooking.delete({ where: { id } });
+    }
+
+    await logActivity({
+      userId: user.id,
+      action,
+      targetId: id,
+      metadata: {
+        entity,
+        label: entity === "FOLLOW_UP" ? "Pastoral follow-up record" : label,
+        ...cleanup
+      }
+    });
+
+    return ok({ deleted: true, entity, id, cleanup });
   } catch (error) {
     return handleRouteError(error);
   }
