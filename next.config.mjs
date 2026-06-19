@@ -6,6 +6,9 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: projectRoot,
+  experimental: {
+    cpus: 2
+  },
   webpack(config, { isServer }) {
     if (isServer && config.optimization) {
       config.optimization.splitChunks = false;

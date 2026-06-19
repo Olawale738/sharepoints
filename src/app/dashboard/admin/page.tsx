@@ -21,6 +21,7 @@ import { AdminOrganizationPanel } from "@/components/dashboard/admin-organizatio
 import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
 import { ApprovalQueue } from "@/components/dashboard/approval-queue";
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
+import { ClearOrganizationActivityButton } from "@/components/dashboard/clear-organization-activity-button";
 import { SecurityCenterPanel } from "@/components/dashboard/security-center-panel";
 import { Badge } from "@/components/ui/badge";
 import { normalizeEmail } from "@/lib/email-policy";
@@ -529,9 +530,12 @@ export default async function AdminControlCenterPage() {
           </section>
 
           <section className="rounded-lg border border-ink/10 bg-white">
-            <div className="flex items-center gap-2 border-b border-ink/10 px-4 py-3">
-              <Activity className="h-4 w-4 text-moss" />
-              <h2 className="text-sm font-semibold">Activity logs</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/10 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-moss" />
+                <h2 className="text-sm font-semibold">Activity logs</h2>
+              </div>
+              <ClearOrganizationActivityButton />
             </div>
             <div className="divide-y divide-ink/10">
               {activities.map((activity) => (

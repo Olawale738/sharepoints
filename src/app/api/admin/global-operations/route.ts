@@ -120,7 +120,8 @@ const updateSchema = z.discriminatedUnion("entity", [
   z.object({
     entity: z.literal("MEMBERSHIP_CARD"),
     id: z.string().cuid(),
-    status: z.nativeEnum(MembershipCardStatus)
+    status: z.nativeEnum(MembershipCardStatus),
+    rotateToken: z.boolean().optional()
   }),
   z.object({
     entity: z.literal("GOVERNANCE_HOLD"),
@@ -420,13 +421,14 @@ export async function GET() {
       holds,
       resources,
       resourcePasses,
-      resourceCheckIns
+      resourceCheckIns,
+      identityVerifications
     ] = await Promise.all([
       prisma.organizationUnit.findMany({ orderBy: [{ type: "asc" }, { name: "asc" }] }),
       prisma.organizationUnitLeader.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.user.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true, email: true, memberProfile: { select: { membershipNumber: true } } },
+        select: { id: true, name: true, email: true, image: true, memberProfile: { select: { membershipNumber: true } } },
         orderBy: { name: "asc" }
       }),
       prisma.workspace.findMany({
@@ -449,7 +451,8 @@ export async function GET() {
       prisma.governanceHold.findMany({ orderBy: { createdAt: "desc" }, take: 300 }),
       prisma.churchResource.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
       prisma.smartResourcePass.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.resourceCheckIn.findMany({ orderBy: { checkedInAt: "desc" }, take: 200 })
+      prisma.resourceCheckIn.findMany({ orderBy: { checkedInAt: "desc" }, take: 200 }),
+      prisma.digitalIdentityVerification.findMany({ orderBy: { createdAt: "desc" }, take: 100 })
     ]);
     const responseCounts = await prisma.emergencyWelfareResponse.groupBy({
       by: ["incidentId", "status"],
@@ -471,7 +474,8 @@ export async function GET() {
       holds,
       resources,
       resourcePasses,
-      resourceCheckIns
+      resourceCheckIns,
+      identityVerifications
     });
   } catch (error) {
     return handleRouteError(error);
@@ -595,6 +599,7 @@ export async function POST(request: Request) {
           userId: data.userId,
           qrToken: randomUUID(),
           cardNumber: `LETW-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+          organizationId: `LETW.ORG-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
           expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
           issuedById: user.id
         }
@@ -716,7 +721,8 @@ export async function PATCH(request: Request) {
         where: { id: data.id },
         data: {
           status: data.status,
-          revokedAt: data.status === MembershipCardStatus.REVOKED ? new Date() : null
+          revokedAt: data.status === MembershipCardStatus.REVOKED ? new Date() : null,
+          qrToken: data.rotateToken ? randomUUID() : undefined
         }
       });
       action = activityActions.membershipCardUpdated;

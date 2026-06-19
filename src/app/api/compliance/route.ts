@@ -39,6 +39,7 @@ export async function GET() {
                       id: true,
                       name: true,
                       email: true,
+                      image: true,
                       department: { select: { name: true } },
                       workspaceMemberships: { select: { role: true } }
                     }
@@ -83,6 +84,21 @@ export async function GET() {
             },
             orderBy: { createdAt: "desc" },
             take: 100
+          }),
+          prisma.workspaceFormResponse.findMany({
+            include: {
+              respondent: { select: { id: true, name: true, email: true, image: true } },
+              form: {
+                select: {
+                  id: true,
+                  title: true,
+                  fields: true,
+                  workspace: { select: { id: true, name: true } }
+                }
+              }
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 500
           })
         ])
       : null;
@@ -110,7 +126,8 @@ export async function GET() {
             users: adminData[1],
             departments: adminData[2],
             workspaces: adminData[3],
-            sanctions: adminData[4]
+            sanctions: adminData[4],
+            workspaceFormResponses: adminData[5]
           }
         : null
     });

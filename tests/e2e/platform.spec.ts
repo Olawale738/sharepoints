@@ -103,6 +103,30 @@ test("global church network controls require authentication", async ({ page, req
   expect(resourceResponse.status()).toBe(401);
 });
 
+test("form administration, photos, and global log clearing require authentication", async ({ request }) => {
+  const complianceDelete = await request.delete("/api/compliance/assignments/not-an-assignment");
+  expect(complianceDelete.status()).toBe(401);
+
+  const workspaceResponseEdit = await request.patch("/api/admin/form-responses/not-a-response", {
+    data: { answers: {} }
+  });
+  expect(workspaceResponseEdit.status()).toBe(401);
+
+  const activityClear = await request.delete("/api/admin/activity", {
+    data: { confirmation: "CLEAR ALL LETW ACTIVITY" }
+  });
+  expect(activityClear.status()).toBe(401);
+
+  const photoUpload = await request.post("/api/profile/photo");
+  expect(photoUpload.status()).toBe(401);
+});
+
+test("unknown digital identity QR codes show a safe invalid result", async ({ page }) => {
+  await page.goto("/verify/member/not-a-real-letw-token");
+  await expect(page.getByRole("heading", { name: "This LETW.ORG identity is not valid" })).toBeVisible();
+  await expect(page.getByText(/do not accept it as proof/i)).toBeVisible();
+});
+
 test("authenticated dashboard controls render when test credentials are supplied", async ({ page }) => {
   test.skip(!process.env.E2E_EMAIL || !process.env.E2E_PASSWORD, "E2E credentials are not configured.");
   await page.goto("/login");

@@ -1,9 +1,10 @@
+import { BadgeCheck, Building2, CalendarDays, QrCode, ShieldCheck } from "lucide-react";
 import Image from "next/image";
-import { BadgeCheck, Building2, ShieldCheck } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
+import { PrintIdButton } from "@/components/dashboard/print-id-button";
 import { prisma } from "@/lib/prisma";
 
 export default async function MembershipCardPage() {
@@ -17,7 +18,15 @@ export default async function MembershipCardPage() {
         name: true,
         email: true,
         image: true,
-        memberProfile: { select: { membershipNumber: true, membershipStatus: true } }
+        memberProfile: {
+          select: {
+            membershipNumber: true,
+            membershipStatus: true,
+            city: true,
+            country: true,
+            membershipStartedAt: true
+          }
+        }
       }
     }),
     prisma.workspaceMember.findMany({
@@ -30,9 +39,10 @@ export default async function MembershipCardPage() {
   return (
     <div className="space-y-5">
       <section className="rounded-lg border border-ink/10 bg-white p-5 shadow-soft">
-        <p className="flex items-center gap-2 text-sm font-medium text-moss"><BadgeCheck className="h-4 w-4" />Verified LETW identity</p>
+        <p className="flex items-center gap-2 text-sm font-medium text-moss"><BadgeCheck className="h-4 w-4" />Verified LETTW identity</p>
         <h1 className="mt-2 text-3xl font-semibold">Digital Membership Card</h1>
-        <p className="mt-2 text-sm text-ink/60">Use this secure QR identity for LETW events, attendance, certificates, branch transfers, volunteer duty, and access checks.</p>
+        <p className="mt-2 text-sm text-ink/60">A printable plastic-format identity for Light Encounter Tabernacle Worldwide (LETTW), with secure QR verification through LETW.ORG.</p>
+        <div className="mt-4"><PrintIdButton /></div>
       </section>
 
       {!card ? (
@@ -42,36 +52,75 @@ export default async function MembershipCardPage() {
           <p className="mt-1 text-sm text-ink/55">An administrator can issue your digital card from the Global Church Network.</p>
         </section>
       ) : (
-        <section className="mx-auto max-w-3xl overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
-          <div className="flex flex-col gap-6 border-b border-ink/10 bg-paper p-6 md:flex-row md:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-4">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-white">
-                {account?.image ? <Image alt="" className="h-full w-full object-cover" height={160} src={account.image} width={160} /> : <ShieldCheck className="h-9 w-9 text-moss" />}
+        <div className="digital-id-print-sheet mx-auto space-y-5">
+          <section className={`plastic-id-card plastic-id-card-front ${card.status !== "ACTIVE" ? "plastic-id-card-invalid" : ""}`}>
+            <div className="plastic-id-brand">
+              <div className="flex min-w-0 items-center gap-2">
+                <Image alt="LETTW logo" className="h-10 w-10 shrink-0 rounded-md bg-white object-contain" height={80} src="/letw-logo.png" width={80} priority />
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-semibold uppercase text-moss">Light Encounter Tabernacle Worldwide</p>
+                  <p className="text-[8px] text-ink/50">LETTW • LETW.ORG</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase text-moss">Light Encounter Tabernacle Worldwide</p>
-                <h2 className="mt-1 truncate text-2xl font-semibold">{account?.name ?? "LETW Member"}</h2>
-                <p className="truncate text-sm text-ink/55">{account?.email}</p>
+              <Badge className={card.status === "ACTIVE" ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>{card.status.toLowerCase()}</Badge>
+            </div>
+
+            <div className="plastic-id-content">
+              <div className="plastic-id-photo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {account?.image ? <img alt={`${account.name ?? "Member"} profile`} className="h-full w-full object-cover" src={account.image} /> : <ShieldCheck className="h-9 w-9 text-moss" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[8px] font-medium uppercase text-ink/45">Member name</p>
+                <h2 className="truncate text-lg font-semibold leading-tight">{account?.name ?? "LETTW Member"}</h2>
+                <p className="mt-2 text-[8px] font-medium uppercase text-ink/45">Organization ID</p>
+                <p className="truncate font-mono text-[11px] font-semibold text-moss">{card.organizationId}</p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                  <div><p className="text-[7px] uppercase text-ink/40">Member no.</p><p className="truncate text-[9px] font-medium">{account?.memberProfile?.membershipNumber ?? "Pending"}</p></div>
+                  <div><p className="text-[7px] uppercase text-ink/40">Member since</p><p className="truncate text-[9px] font-medium">{account?.memberProfile?.membershipStartedAt?.getFullYear() ?? card.issuedAt.getFullYear()}</p></div>
+                  <div className="col-span-2"><p className="text-[7px] uppercase text-ink/40">Location</p><p className="truncate text-[9px] font-medium">{[account?.memberProfile?.city, account?.memberProfile?.country].filter(Boolean).join(", ") || "LETTW Worldwide"}</p></div>
+                </div>
+              </div>
+              <div className="plastic-id-qr">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt="Secure LETTW membership QR code" className="h-full w-full" src="/api/membership-card/qr" />
               </div>
             </div>
-            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-md border border-ink/10 bg-white p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img alt="Secure LETW membership QR code" className="h-full w-full" src="/api/membership-card/qr" />
+
+            <div className="plastic-id-footer">
+              <span>{card.cardNumber}</span>
+              <span>{card.expiresAt ? `Valid to ${card.expiresAt.toLocaleDateString()}` : "No expiry"}</span>
             </div>
-          </div>
-          <div className="grid gap-4 p-6 sm:grid-cols-2">
-            <div><p className="text-xs text-ink/45">Card number</p><p className="mt-1 font-semibold">{card.cardNumber}</p></div>
-            <div><p className="text-xs text-ink/45">Membership number</p><p className="mt-1 font-semibold">{account?.memberProfile?.membershipNumber ?? "Pending"}</p></div>
-            <div><p className="text-xs text-ink/45">Status</p><Badge className="mt-1">{card.status.toLowerCase()}</Badge></div>
-            <div><p className="text-xs text-ink/45">Expiry</p><p className="mt-1 font-semibold">{card.expiresAt ? card.expiresAt.toLocaleDateString() : "No expiry"}</p></div>
-          </div>
-          <div className="border-t border-ink/10 p-6">
-            <p className="flex items-center gap-2 text-sm font-semibold"><Building2 className="h-4 w-4 text-moss" />Workspace roles</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {memberships.map((membership) => <Badge key={`${membership.workspace.name}-${membership.role}`}>{membership.workspace.name}: {membership.role.toLowerCase()}</Badge>)}
+          </section>
+
+          <section className="plastic-id-card plastic-id-card-back">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold text-moss">LETTW DIGITAL ID</p>
+                <p className="mt-1 max-w-[15rem] text-[8px] leading-4 text-ink/60">This card identifies an authorized member of Light Encounter Tabernacle Worldwide. Scan the QR code to verify current status.</p>
+              </div>
+              <ShieldCheck className="h-7 w-7 text-moss" />
             </div>
-          </div>
-        </section>
+            <div className="mt-4 grid grid-cols-[5.25rem_minmax(0,1fr)] gap-4">
+              <div className="rounded-md border border-ink/10 bg-white p-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img alt="LETTW identity verification QR" className="h-full w-full" src="/api/membership-card/qr" />
+              </div>
+              <div className="space-y-2">
+                <p className="flex items-center gap-2 text-[9px] font-semibold"><QrCode className="h-3.5 w-3.5 text-moss" />SCAN TO VERIFY</p>
+                <p className="font-mono text-[10px] font-semibold">{card.organizationId}</p>
+                <p className="flex items-center gap-2 text-[8px] text-ink/55"><CalendarDays className="h-3 w-3" />Issued {card.issuedAt.toLocaleDateString()}</p>
+                <p className="text-[8px] leading-4 text-ink/55">If found, return to LETTW administration. This card remains the property of Light Encounter Tabernacle Worldwide.</p>
+              </div>
+            </div>
+            <div className="plastic-id-back-footer">LETW.ORG • SECURE MEMBER IDENTITY</div>
+          </section>
+
+          <section className="rounded-lg border border-ink/10 bg-white p-4 print:hidden">
+            <p className="flex items-center gap-2 text-sm font-semibold"><Building2 className="h-4 w-4 text-moss" />Authorized workspaces and roles</p>
+            <div className="mt-3 flex flex-wrap gap-2">{memberships.map((membership) => <Badge key={`${membership.workspace.name}-${membership.role}`}>{membership.workspace.name}: {membership.role.toLowerCase()}</Badge>)}</div>
+          </section>
+        </div>
       )}
     </div>
   );

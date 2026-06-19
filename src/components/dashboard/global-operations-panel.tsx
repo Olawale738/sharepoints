@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   Bot,
   Building2,
+  Copy,
   FileClock,
   Gavel,
   HeartPulse,
@@ -13,7 +14,9 @@ import {
   QrCode,
   RadioTower,
   RefreshCw,
+  RotateCcw,
   ShieldAlert,
+  ShieldX,
   UsersRound
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -26,7 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 type GlobalData = {
   units: Array<{ id: string; parentId: string | null; type: string; name: string; countryCode: string | null; active: boolean }>;
   leaders: Array<{ id: string; unitId: string; userId: string; title: string; canCreateWorkspaces: boolean; inheritToChildren: boolean }>;
-  users: Array<{ id: string; name: string | null; email: string | null; memberProfile: { membershipNumber: string | null } | null }>;
+  users: Array<{ id: string; name: string | null; email: string | null; image: string | null; memberProfile: { membershipNumber: string | null } | null }>;
   workspaces: Array<{ id: string; name: string; organizationUnitId: string | null; scopeType: string | null }>;
   safeguardingCases: Array<{ id: string; reference: string; subjectName: string; category: string; severity: string; status: string; createdAt: string }>;
   aiAgents: Array<{ id: string; name: string; description: string | null; workspaceId: string | null; enabled: boolean; allowedSourceTypes: unknown }>;
@@ -34,7 +37,8 @@ type GlobalData = {
   safetyCases: Array<{ id: string; sourceType: string; category: string; severity: string; status: string; summary: string }>;
   emergencies: Array<{ id: string; title: string; instructions: string; severity: string; status: string; location: string | null; createdAt: string }>;
   emergencyResponseCounts: Array<{ incidentId: string; status: string; _count: { _all: number } }>;
-  cards: Array<{ id: string; userId: string; cardNumber: string; status: string; expiresAt: string | null }>;
+  cards: Array<{ id: string; userId: string; cardNumber: string; organizationId: string; status: string; expiresAt: string | null }>;
+  identityVerifications: Array<{ id: string; cardId: string | null; organizationId: string | null; outcome: string; createdAt: string }>;
   holds: Array<{ id: string; name: string; targetType: string; targetId: string; reason: string; status: string; preserveUntil: string | null }>;
   resources: Array<{ id: string; name: string; category: string; location: string | null }>;
   resourcePasses: Array<{ id: string; resourceId: string; enabled: boolean }>;
@@ -55,6 +59,7 @@ const emptyData: GlobalData = {
   emergencies: [],
   emergencyResponseCounts: [],
   cards: [],
+  identityVerifications: [],
   holds: [],
   resources: [],
   resourcePasses: [],
@@ -449,10 +454,18 @@ export function GlobalOperationsPanel() {
               {data.cards.length === 0 ? <EmptyState>No digital cards issued.</EmptyState> : null}
               {data.cards.map((card) => (
                 <div className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between" key={card.id}>
-                  <div><p className="text-sm font-medium">{userName.get(card.userId)}</p><p className="text-xs text-ink/50">{card.cardNumber} - {card.expiresAt ? `expires ${new Date(card.expiresAt).toLocaleDateString()}` : "no expiry"}</p></div>
-                  <select className={`${selectClassName()} md:w-36`} value={card.status} onChange={(event) => void mutate("PATCH", { entity: "MEMBERSHIP_CARD", id: card.id, status: event.target.value }, "Membership card updated.")}>
-                    {["ACTIVE", "SUSPENDED", "REVOKED"].map((status) => <option key={status}>{status}</option>)}
-                  </select>
+                  <div>
+                    <p className="text-sm font-medium">{userName.get(card.userId)}</p>
+                    <p className="text-xs font-medium text-moss">{card.organizationId}</p>
+                    <p className="text-xs text-ink/50">{card.cardNumber} - {card.expiresAt ? `expires ${new Date(card.expiresAt).toLocaleDateString()}` : "no expiry"} - {data.identityVerifications.filter((item) => item.cardId === card.id).length} recent scans</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" disabled={busy} onClick={() => { void navigator.clipboard.writeText(card.organizationId); setMessage("Organization ID copied."); }}><Copy className="h-4 w-4" />Copy ID</Button>
+                    <Button variant="secondary" disabled={busy} onClick={() => void mutate("PATCH", { entity: "MEMBERSHIP_CARD", id: card.id, status: "ACTIVE", rotateToken: true }, "Digital ID reissued with a new QR code.")}><RotateCcw className="h-4 w-4" />Reissue QR</Button>
+                    {card.status !== "REVOKED" ? (
+                      <Button variant="danger" disabled={busy} onClick={() => { if (window.confirm("Revoke this digital ID immediately? Its QR code will fail verification.")) void mutate("PATCH", { entity: "MEMBERSHIP_CARD", id: card.id, status: "REVOKED" }, "Digital ID revoked."); }}><ShieldX className="h-4 w-4" />Revoke</Button>
+                    ) : <Badge className="bg-clay/10 text-clay">revoked</Badge>}
+                  </div>
                 </div>
               ))}
             </div>

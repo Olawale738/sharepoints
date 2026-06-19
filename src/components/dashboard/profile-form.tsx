@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { Camera, Loader2, Save } from "lucide-react";
 import { FormEvent, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageUrl, setImageUrl] = useState(user.image ?? "");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,12 +32,27 @@ export function ProfileForm({ user }: ProfileFormProps) {
     setIsSaving(true);
 
     const formData = new FormData(event.currentTarget);
+    const photo = formData.get("photo");
+    let nextImageUrl = imageUrl;
+    if (photo instanceof File && photo.size > 0) {
+      const uploadData = new FormData();
+      uploadData.set("photo", photo);
+      const uploadResponse = await fetch("/api/profile/photo", { method: "POST", body: uploadData });
+      const uploadResult = (await uploadResponse.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+      if (!uploadResponse.ok || !uploadResult?.imageUrl) {
+        setIsSaving(false);
+        setError(uploadResult?.error ?? "Profile photo could not be uploaded.");
+        return;
+      }
+      nextImageUrl = uploadResult.imageUrl;
+      setImageUrl(nextImageUrl);
+    }
     const response = await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: String(formData.get("name")),
-        image: String(formData.get("image") ?? ""),
+        image: nextImageUrl,
         locale: String(formData.get("locale") ?? "en")
       })
     });
@@ -64,8 +80,17 @@ export function ProfileForm({ user }: ProfileFormProps) {
         <Input id="profile-email" value={user.email ?? ""} disabled readOnly />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="profile-image">Image URL</Label>
-        <Input id="profile-image" name="image" type="url" defaultValue={user.image ?? ""} />
+        <Label htmlFor="profile-photo">Profile photo</Label>
+        <div className="flex items-center gap-4">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-paper">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {imageUrl ? <img alt="Current profile" className="h-full w-full object-cover" src={imageUrl} /> : <Camera className="h-7 w-7 text-ink/35" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <Input id="profile-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" />
+            <p className="mt-1 text-xs text-ink/45">JPEG, PNG, or WebP. Maximum 5 MB.</p>
+          </div>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="profile-locale">Interface language</Label>

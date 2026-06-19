@@ -1,4 +1,4 @@
-import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { ApiError, handleRouteError, ok } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -7,7 +7,6 @@ type RouteContext = {
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
-    await requireUser();
     const { token } = await context.params;
     const card = await prisma.digitalMembershipCard.findUnique({ where: { qrToken: token } });
     if (!card) throw new ApiError(404, "Membership card not found.");
@@ -22,9 +21,12 @@ export async function GET(_request: Request, context: RouteContext) {
     return ok({
       valid: card.status === "ACTIVE" && (!card.expiresAt || card.expiresAt > new Date()),
       cardNumber: card.cardNumber,
+      organization: "LETW.ORG",
+      organizationId: card.organizationId,
       status: card.status,
       expiresAt: card.expiresAt,
-      member: account
+      member: card.status === "ACTIVE" ? account : null,
+      photoUrl: card.status === "ACTIVE" ? `/api/profile/photo/${card.userId}?token=${card.qrToken}` : null
     });
   } catch (error) {
     return handleRouteError(error);

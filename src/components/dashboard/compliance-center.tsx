@@ -8,11 +8,15 @@ import {
   ClipboardCheck,
   Clock3,
   HeartHandshake,
+  FileText,
   Loader2,
+  Pencil,
   RotateCcw,
+  Save,
   Send,
   ShieldAlert,
   Sparkles,
+  Trash2,
   UsersRound
 } from "lucide-react";
 
@@ -63,8 +67,28 @@ type AdminAssignment = Omit<Assignment, "campaign"> & {
     id: string;
     name: string | null;
     email: string | null;
+    image: string | null;
     department: { name: string } | null;
     workspaceMemberships: Array<{ role: string }>;
+  };
+};
+
+type SubmissionAnswer = string | number | boolean | string[];
+
+type WorkspaceFormSubmission = {
+  id: string;
+  answers: Record<string, SubmissionAnswer>;
+  approvalStatus: string;
+  signatureName: string | null;
+  paymentReference: string | null;
+  createdAt: string;
+  updatedAt: string;
+  respondent: { id: string; name: string | null; email: string | null; image: string | null };
+  form: {
+    id: string;
+    title: string;
+    fields: Array<{ id: string; label: string; type: string }>;
+    workspace: { id: string; name: string };
   };
 };
 
@@ -100,6 +124,7 @@ type ComplianceData = {
       user: { name: string | null; email: string | null };
       issuedBy: { name: string | null; email: string | null };
     }>;
+    workspaceFormResponses: WorkspaceFormSubmission[];
   } | null;
 };
 
@@ -124,6 +149,79 @@ function dateTimeLocal(value: Date) {
 
 function fieldValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value.join(", ") : value ?? "";
+}
+
+function SubmittedAnswerEditor({
+  fields,
+  initialAnswers,
+  busy,
+  onSave,
+  onDelete
+}: {
+  fields: Array<{ key: string; label: string }>;
+  initialAnswers: Record<string, SubmissionAnswer>;
+  busy: boolean;
+  onSave: (answers: Record<string, SubmissionAnswer>) => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initialAnswers);
+
+  useEffect(() => setDraft(initialAnswers), [initialAnswers]);
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        {fields.map((field) => {
+          const rawValue = draft[field.key];
+          const displayValue = Array.isArray(rawValue) ? rawValue.join(", ") : String(rawValue ?? "");
+          return (
+            <label className="space-y-1 text-xs font-medium text-ink/60" key={field.key}>
+              <span>{field.label}</span>
+              {editing ? (
+                <Input
+                  value={displayValue}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      [field.key]: Array.isArray(rawValue)
+                        ? event.target.value.split(",").map((item) => item.trim()).filter(Boolean)
+                        : event.target.value
+                    }))
+                  }
+                />
+              ) : (
+                <p className="min-h-10 rounded-md border border-ink/10 bg-paper px-3 py-2 text-sm font-normal text-ink">
+                  {displayValue || "Not provided"}
+                </p>
+              )}
+            </label>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {editing ? (
+          <Button disabled={busy} onClick={() => void onSave(draft)}>
+            <Save className="h-4 w-4" />Save changes
+          </Button>
+        ) : (
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            <Pencil className="h-4 w-4" />Edit submission
+          </Button>
+        )}
+        {editing ? <Button variant="ghost" onClick={() => { setDraft(initialAnswers); setEditing(false); }}>Cancel</Button> : null}
+        <Button
+          variant="danger"
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm("Delete this submitted form? This cannot be undone.")) void onDelete();
+          }}
+        >
+          <Trash2 className="h-4 w-4" />Delete submission
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function ComplianceCenter() {
@@ -323,6 +421,70 @@ export function ComplianceCenter() {
     await load();
   }
 
+  async function editComplianceSubmission(assignmentId: string, nextAnswers: Record<string, SubmissionAnswer>) {
+    setBusy(`edit-${assignmentId}`);
+    setError("");
+    const response = await fetch(`/api/compliance/assignments/${assignmentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ADMIN_EDIT", answers: nextAnswers, note: "Submission corrected by an administrator." })
+    });
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(result?.error ?? "Submitted member information could not be edited.");
+      return;
+    }
+    setMessage("Submitted member information updated.");
+    await load();
+  }
+
+  async function deleteComplianceSubmission(assignmentId: string) {
+    setBusy(`delete-${assignmentId}`);
+    setError("");
+    const response = await fetch(`/api/compliance/assignments/${assignmentId}`, { method: "DELETE" });
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(result?.error ?? "Submitted member information could not be deleted.");
+      return;
+    }
+    setMessage("Submitted member information deleted. The security event was preserved.");
+    await load();
+  }
+
+  async function editWorkspaceSubmission(responseId: string, nextAnswers: Record<string, SubmissionAnswer>) {
+    setBusy(`workspace-edit-${responseId}`);
+    setError("");
+    const response = await fetch(`/api/admin/form-responses/${responseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers: nextAnswers })
+    });
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(result?.error ?? "Workspace form response could not be edited.");
+      return;
+    }
+    setMessage("Workspace form response updated.");
+    await load();
+  }
+
+  async function deleteWorkspaceSubmission(responseId: string) {
+    setBusy(`workspace-delete-${responseId}`);
+    setError("");
+    const response = await fetch(`/api/admin/form-responses/${responseId}`, { method: "DELETE" });
+    const result = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(result?.error ?? "Workspace form response could not be deleted.");
+      return;
+    }
+    setMessage("Workspace form response deleted. The security event was preserved.");
+    await load();
+  }
+
   if (loading) {
     return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-moss" /></div>;
   }
@@ -453,6 +615,75 @@ export function ComplianceCenter() {
 
       {data.isAdmin && data.admin ? (
         <>
+          <section className="rounded-lg border border-ink/10 bg-white">
+            <div className="border-b border-ink/10 px-4 py-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4 text-moss" />All submitted forms</h2>
+              <p className="mt-1 text-xs text-ink/50">View, correct, or delete every required-information and workspace form submitted across LETW.ORG.</p>
+            </div>
+            <div className="grid gap-5 p-4 xl:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-semibold">Required member information</h3>
+                <div className="mt-3 max-h-[42rem] space-y-2 overflow-y-auto">
+                  {data.admin.campaigns.flatMap((campaign) =>
+                    campaign.assignments
+                      .filter((assignment) => Boolean(assignment.answers || assignment.submittedAt))
+                      .map((assignment) => (
+                        <details className="rounded-md border border-ink/10 bg-paper p-3" key={assignment.id}>
+                          <summary className="cursor-pointer list-none">
+                            <div className="flex items-center gap-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              {assignment.user.image ? <img alt="" className="h-10 w-10 rounded-md object-cover" src={assignment.user.image} /> : <span className="flex h-10 w-10 items-center justify-center rounded-md bg-mint text-sm font-semibold">{(assignment.user.name ?? assignment.user.email ?? "M").slice(0, 1)}</span>}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold">{assignment.user.name ?? assignment.user.email}</p>
+                                <p className="truncate text-xs text-ink/50">{campaign.title} - {assignment.submittedAt ? new Date(assignment.submittedAt).toLocaleString() : "saved response"}</p>
+                              </div>
+                              <Badge className={statusClasses[assignment.effectiveStatus]}>{displayStatus(assignment.effectiveStatus)}</Badge>
+                            </div>
+                          </summary>
+                          <SubmittedAnswerEditor
+                            fields={campaign.requiredFields.map((key) => ({ key, label: fieldMap.get(key)?.label ?? key }))}
+                            initialAnswers={(assignment.answers ?? {}) as Record<string, SubmissionAnswer>}
+                            busy={busy.endsWith(assignment.id)}
+                            onSave={(nextAnswers) => editComplianceSubmission(assignment.id, nextAnswers)}
+                            onDelete={() => deleteComplianceSubmission(assignment.id)}
+                          />
+                        </details>
+                      ))
+                  )}
+                  {data.admin.campaigns.every((campaign) => campaign.assignments.every((assignment) => !assignment.answers && !assignment.submittedAt)) ? <p className="rounded-md bg-paper p-4 text-sm text-ink/50">No required-information submissions yet.</p> : null}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">Workspace form submissions</h3>
+                <div className="mt-3 max-h-[42rem] space-y-2 overflow-y-auto">
+                  {data.admin.workspaceFormResponses.map((submission) => (
+                    <details className="rounded-md border border-ink/10 bg-paper p-3" key={submission.id}>
+                      <summary className="cursor-pointer list-none">
+                        <div className="flex items-center gap-3">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          {submission.respondent.image ? <img alt="" className="h-10 w-10 rounded-md object-cover" src={submission.respondent.image} /> : <span className="flex h-10 w-10 items-center justify-center rounded-md bg-mint text-sm font-semibold">{(submission.respondent.name ?? submission.respondent.email ?? "M").slice(0, 1)}</span>}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{submission.respondent.name ?? submission.respondent.email}</p>
+                            <p className="truncate text-xs text-ink/50">{submission.form.title} - {submission.form.workspace.name} - {new Date(submission.updatedAt).toLocaleString()}</p>
+                          </div>
+                          <Badge>{displayStatus(submission.approvalStatus)}</Badge>
+                        </div>
+                      </summary>
+                      <SubmittedAnswerEditor
+                        fields={(Array.isArray(submission.form.fields) ? submission.form.fields : []).map((field) => ({ key: field.id, label: field.label }))}
+                        initialAnswers={submission.answers}
+                        busy={busy.endsWith(submission.id)}
+                        onSave={(nextAnswers) => editWorkspaceSubmission(submission.id, nextAnswers)}
+                        onDelete={() => deleteWorkspaceSubmission(submission.id)}
+                      />
+                    </details>
+                  ))}
+                  {data.admin.workspaceFormResponses.length === 0 ? <p className="rounded-md bg-paper p-4 text-sm text-ink/50">No workspace form submissions yet.</p> : null}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section className="rounded-lg border border-ink/10 bg-white p-5">
             <p className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-moss" />Create accountability campaign</p>
             <form className="mt-4 space-y-4" onSubmit={createCampaign}>

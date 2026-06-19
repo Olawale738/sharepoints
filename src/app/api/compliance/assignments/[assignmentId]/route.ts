@@ -25,6 +25,11 @@ const memberActionSchema = z.discriminatedUnion("action", [
 ]);
 
 const adminActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("ADMIN_EDIT"),
+    answers: z.record(z.union([z.string().max(2_000), z.array(z.string().max(160)).max(30)])),
+    note: z.string().trim().max(2_000).optional().default("")
+  }),
   z.object({ action: z.literal("APPROVE"), note: z.string().trim().max(2_000).optional().default("") }),
   z.object({ action: z.literal("REQUEST_CHANGES"), note: z.string().trim().min(3).max(2_000) }),
   z.object({ action: z.literal("EXEMPT"), note: z.string().trim().min(3).max(2_000) }),
@@ -151,6 +156,42 @@ export async function PATCH(request: Request, context: { params: Promise<{ assig
     const parsed = adminActionSchema.safeParse(body);
     if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid review action.");
     const targetIsAdmin = assignment.user.workspaceMemberships.some((membership) => membership.role === "ADMIN");
+    if (parsed.data.action === "ADMIN_EDIT") {
+      const editData = parsed.data;
+      if (!assignment.answers) throw new ApiError(409, "This member has not submitted information yet.");
+      const fields = (assignment.campaign.requiredFields as string[]).filter(
+        isMemberEditableProfileField
+      ) as MemberEditableProfileField[];
+      validateAnswers(fields, editData.answers);
+      const profileData = profileUpdateFromAnswers(fields, editData.answers);
+      const updated = await prisma.$transaction(async (tx) => {
+        if (assignment.status === "APPROVED") {
+          await tx.memberProfile.upsert({
+            where: { userId: assignment.userId },
+            update: profileData,
+            create: { userId: assignment.userId, ...profileData }
+          });
+        }
+        return tx.memberComplianceAssignment.update({
+          where: { id: assignment.id },
+          data: {
+            answers: editData.answers,
+            completionPercent: 100,
+            submittedAt: assignment.submittedAt ?? new Date(),
+            reviewedById: actor.id,
+            reviewedAt: new Date(),
+            reviewNote: editData.note || assignment.reviewNote
+          }
+        });
+      });
+      await logActivity({
+        userId: actor.id,
+        action: activityActions.complianceFormEdited,
+        targetId: assignment.id,
+        metadata: { campaignId: assignment.campaignId, targetUserId: assignment.userId }
+      });
+      return ok({ assignment: updated });
+    }
     if (parsed.data.action === "SANCTION") {
       const sanctionData = parsed.data;
       if (targetIsAdmin) throw new ApiError(409, "Administrator accounts cannot be sanctioned.");
@@ -275,6 +316,52 @@ export async function PATCH(request: Request, context: { params: Promise<{ assig
       metadata: { status: nextStatus, targetUserId: assignment.userId }
     });
     return ok({ assignment: updated });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function DELETE(_request: Request, context: { params: Promise<{ assignmentId: string }> }) {
+  try {
+    const actor = await requireUser();
+    await requireAnyWorkspaceAdmin(actor.id, "Only administrators can delete submitted member forms.");
+    const { assignmentId } = await context.params;
+    const assignment = await prisma.memberComplianceAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { campaign: { select: { id: true, title: true } } }
+    });
+    if (!assignment) throw new ApiError(404, "Required form assignment not found.");
+    if (!assignment.answers && !assignment.submittedAt) {
+      throw new ApiError(409, "This assignment has no submitted response to delete.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.memberSanction.updateMany({
+        where: { assignmentId: assignment.id },
+        data: { assignmentId: null }
+      });
+      await tx.memberComplianceAssignment.delete({ where: { id: assignment.id } });
+      await tx.securityEvent.create({
+        data: {
+          userId: actor.id,
+          email: actor.email,
+          type: "COMPLIANCE_RESPONSE_DELETED",
+          metadata: {
+            operation: "COMPLIANCE_RESPONSE_DELETED",
+            assignmentId: assignment.id,
+            campaignId: assignment.campaign.id,
+            targetUserId: assignment.userId
+          }
+        }
+      });
+    });
+    await logActivity({
+      userId: actor.id,
+      action: activityActions.complianceFormDeleted,
+      targetId: assignment.id,
+      metadata: { campaignId: assignment.campaign.id, targetUserId: assignment.userId }
+    });
+    return ok({ deleted: true });
   } catch (error) {
     return handleRouteError(error);
   }

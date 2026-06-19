@@ -84,7 +84,14 @@ export const updateWorkspaceRolePermissionSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
-  image: z.string().url().max(2048).optional().or(z.literal("")),
+  image: z
+    .string()
+    .max(2048)
+    .refine(
+      (value) => value === "" || value.startsWith("/api/profile/photo/") || z.string().url().safeParse(value).success,
+      "Profile image must be a valid LETW photo or URL."
+    )
+    .optional(),
   locale: z.enum(supportedLocales).optional()
 });
 

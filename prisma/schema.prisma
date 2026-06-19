@@ -82,6 +82,8 @@ enum SecurityEventType {
   ACTIVITY_LOGS_CLEARED
   MEMBER_SANCTION_ISSUED
   MEMBER_SANCTION_LIFTED
+  COMPLIANCE_RESPONSE_DELETED
+  WORKSPACE_FORM_RESPONSE_DELETED
 }
 
 enum FileScanStatus {
@@ -2148,18 +2150,34 @@ model EmergencyWelfareResponse {
 }
 
 model DigitalMembershipCard {
-  id         String               @id @default(cuid())
-  userId     String               @unique
-  qrToken    String               @unique
-  cardNumber String               @unique
-  status     MembershipCardStatus @default(ACTIVE)
-  issuedById String
-  issuedAt   DateTime             @default(now())
-  expiresAt  DateTime?
-  revokedAt  DateTime?
-  updatedAt  DateTime             @updatedAt
+  id             String               @id @default(cuid())
+  userId         String               @unique
+  qrToken        String               @unique
+  cardNumber     String               @unique
+  organizationId String               @unique
+  status         MembershipCardStatus @default(ACTIVE)
+  issuedById     String
+  issuedAt       DateTime             @default(now())
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  updatedAt      DateTime             @updatedAt
 
   @@index([status, expiresAt])
+}
+
+model DigitalIdentityVerification {
+  id             String   @id @default(cuid())
+  cardId         String?
+  organizationId String?
+  outcome        String
+  scannedById    String?
+  ipHash         String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  @@index([cardId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([outcome, createdAt])
 }
 
 model GovernanceHold {
