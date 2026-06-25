@@ -25,6 +25,8 @@ const profileSchema = z.object({
   salvationAt: z.string().date().nullable().optional(),
   baptismAt: z.string().date().nullable().optional(),
   membershipStartedAt: z.string().date().nullable().optional(),
+  organizationPosition: nullableText(120),
+  digitalIdLocation: z.string().trim().min(2).max(160),
   communicationPreference: nullableText(80),
   ministryInterests: z.array(z.string().trim().min(1).max(120)).max(30),
   skills: z.array(z.string().trim().min(1).max(120)).max(30),

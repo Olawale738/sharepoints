@@ -29,7 +29,19 @@ import { Textarea } from "@/components/ui/textarea";
 type GlobalData = {
   units: Array<{ id: string; parentId: string | null; type: string; name: string; countryCode: string | null; active: boolean }>;
   leaders: Array<{ id: string; unitId: string; userId: string; title: string; canCreateWorkspaces: boolean; inheritToChildren: boolean }>;
-  users: Array<{ id: string; name: string | null; email: string | null; image: string | null; memberProfile: { membershipNumber: string | null } | null }>;
+  users: Array<{
+    id: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+    memberProfile: {
+      membershipNumber: string | null;
+      membershipStartedAt: string | null;
+      membershipStatus: string;
+      organizationPosition: string | null;
+      digitalIdLocation: string;
+    } | null;
+  }>;
   workspaces: Array<{ id: string; name: string; organizationUnitId: string | null; scopeType: string | null }>;
   safeguardingCases: Array<{ id: string; reference: string; subjectName: string; category: string; severity: string; status: string; createdAt: string }>;
   aiAgents: Array<{ id: string; name: string; description: string | null; workspaceId: string | null; enabled: boolean; allowedSourceTypes: unknown }>;
@@ -37,7 +49,15 @@ type GlobalData = {
   safetyCases: Array<{ id: string; sourceType: string; category: string; severity: string; status: string; summary: string }>;
   emergencies: Array<{ id: string; title: string; instructions: string; severity: string; status: string; location: string | null; createdAt: string }>;
   emergencyResponseCounts: Array<{ incidentId: string; status: string; _count: { _all: number } }>;
-  cards: Array<{ id: string; userId: string; cardNumber: string; organizationId: string; status: string; expiresAt: string | null }>;
+  cards: Array<{
+    id: string;
+    userId: string;
+    cardNumber: string;
+    organizationId: string;
+    status: string;
+    issuedAt: string;
+    expiresAt: string | null;
+  }>;
   identityVerifications: Array<{ id: string; cardId: string | null; organizationId: string | null; outcome: string; createdAt: string }>;
   holds: Array<{ id: string; name: string; targetType: string; targetId: string; reason: string; status: string; preserveUntil: string | null }>;
   resources: Array<{ id: string; name: string; category: string; location: string | null }>;
@@ -133,7 +153,7 @@ export function GlobalOperationsPanel() {
     void load();
   }, []);
 
-  async function mutate(method: "POST" | "PATCH", payload: Record<string, unknown>, success: string) {
+  async function mutate(method: "POST" | "PATCH" | "DELETE", payload: Record<string, unknown>, success: string) {
     setBusy(true);
     setError("");
     setMessage("");
@@ -450,24 +470,105 @@ export function GlobalOperationsPanel() {
             </form>
           </FormSection>
           <FormSection title={`Issued cards (${data.cards.length})`}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-ink/10 bg-paper p-3">
+              <div>
+                <p className="text-sm font-medium">QR authentication history</p>
+                <p className="text-xs text-ink/50">{data.identityVerifications.length} recent verification records</p>
+              </div>
+              <Button
+                variant="danger"
+                disabled={busy || data.identityVerifications.length === 0}
+                onClick={() => {
+                  if (!window.confirm("Clear all Digital ID QR verification history?")) return;
+                  void mutate(
+                    "DELETE",
+                    {
+                      entity: "IDENTITY_VERIFICATIONS",
+                      confirmation: "CLEAR QR VERIFICATION LOG"
+                    },
+                    "QR verification history cleared."
+                  );
+                }}
+              >
+                <ShieldX className="h-4 w-4" />
+                Clear QR scan log
+              </Button>
+            </div>
             <div className="divide-y divide-ink/10">
               {data.cards.length === 0 ? <EmptyState>No digital cards issued.</EmptyState> : null}
-              {data.cards.map((card) => (
-                <div className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between" key={card.id}>
-                  <div>
-                    <p className="text-sm font-medium">{userName.get(card.userId)}</p>
-                    <p className="text-xs font-medium text-moss">{card.organizationId}</p>
-                    <p className="text-xs text-ink/50">{card.cardNumber} - {card.expiresAt ? `expires ${new Date(card.expiresAt).toLocaleDateString()}` : "no expiry"} - {data.identityVerifications.filter((item) => item.cardId === card.id).length} recent scans</p>
+              {data.cards.map((card) => {
+                const cardUser = data.users.find((item) => item.id === card.userId);
+                const profile = cardUser?.memberProfile;
+                return (
+                  <div className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between" key={card.id}>
+                    <div>
+                      <p className="text-sm font-medium">{userName.get(card.userId)}</p>
+                      <p className="text-xs font-semibold text-moss">{card.organizationId}</p>
+                      <p className="mt-1 text-xs text-ink/55">
+                        Member no. {profile?.membershipNumber ?? "Pending"} - {profile?.organizationPosition ?? "Member"} -{" "}
+                        {profile?.digitalIdLocation ?? "LETTW Worldwide"}
+                      </p>
+                      <p className="text-xs text-ink/45">
+                        {card.cardNumber} - issued {new Date(card.issuedAt).toLocaleDateString()} -{" "}
+                        {card.expiresAt ? `expires ${new Date(card.expiresAt).toLocaleDateString()}` : "no expiry"} -{" "}
+                        {data.identityVerifications.filter((item) => item.cardId === card.id).length} recent scans
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" disabled={busy} onClick={() => { void navigator.clipboard.writeText(card.organizationId); setMessage("Organization ID copied."); }}><Copy className="h-4 w-4" />Copy ID</Button>
+                      {card.status === "REVOKED" ? (
+                        <>
+                          <Button
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              void mutate(
+                                "PATCH",
+                                { entity: "MEMBERSHIP_CARD", id: card.id, operation: "REISSUE" },
+                                "Digital ID reissued. The new QR code is active and the old code is invalid."
+                              )
+                            }
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Reissue QR
+                          </Button>
+                          <Button
+                            variant="danger"
+                            disabled={busy}
+                            onClick={() => {
+                              if (!window.confirm("Permanently remove this revoked Digital ID from the active register?")) return;
+                              void mutate(
+                                "PATCH",
+                                { entity: "MEMBERSHIP_CARD", id: card.id, operation: "DELETE" },
+                                "Revoked Digital ID and its QR scan history deleted."
+                              );
+                            }}
+                          >
+                            <ShieldX className="h-4 w-4" />
+                            Delete revoked QR
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            if (!window.confirm("Revoke this Digital ID immediately? Its current QR code will fail verification.")) return;
+                            void mutate(
+                              "PATCH",
+                              { entity: "MEMBERSHIP_CARD", id: card.id, operation: "REVOKE" },
+                              "Digital ID revoked. Its QR code is no longer accepted."
+                            );
+                          }}
+                        >
+                          <ShieldX className="h-4 w-4" />
+                          Revoke
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="secondary" disabled={busy} onClick={() => { void navigator.clipboard.writeText(card.organizationId); setMessage("Organization ID copied."); }}><Copy className="h-4 w-4" />Copy ID</Button>
-                    <Button variant="secondary" disabled={busy} onClick={() => void mutate("PATCH", { entity: "MEMBERSHIP_CARD", id: card.id, status: "ACTIVE", rotateToken: true }, "Digital ID reissued with a new QR code.")}><RotateCcw className="h-4 w-4" />Reissue QR</Button>
-                    {card.status !== "REVOKED" ? (
-                      <Button variant="danger" disabled={busy} onClick={() => { if (window.confirm("Revoke this digital ID immediately? Its QR code will fail verification.")) void mutate("PATCH", { entity: "MEMBERSHIP_CARD", id: card.id, status: "REVOKED" }, "Digital ID revoked."); }}><ShieldX className="h-4 w-4" />Revoke</Button>
-                    ) : <Badge className="bg-clay/10 text-clay">revoked</Badge>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </FormSection>
         </div>

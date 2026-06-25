@@ -120,8 +120,7 @@ const updateSchema = z.discriminatedUnion("entity", [
   z.object({
     entity: z.literal("MEMBERSHIP_CARD"),
     id: z.string().cuid(),
-    status: z.nativeEnum(MembershipCardStatus),
-    rotateToken: z.boolean().optional()
+    operation: z.enum(["REVOKE", "REISSUE", "DELETE"])
   }),
   z.object({
     entity: z.literal("GOVERNANCE_HOLD"),
@@ -428,7 +427,21 @@ export async function GET() {
       prisma.organizationUnitLeader.findMany({ orderBy: { createdAt: "desc" } }),
       prisma.user.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true, email: true, image: true, memberProfile: { select: { membershipNumber: true } } },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          memberProfile: {
+            select: {
+              membershipNumber: true,
+              membershipStartedAt: true,
+              membershipStatus: true,
+              organizationPosition: true,
+              digitalIdLocation: true
+            }
+          }
+        },
         orderBy: { name: "asc" }
       }),
       prisma.workspace.findMany({
@@ -447,7 +460,11 @@ export async function GET() {
         take: 300
       }),
       prisma.emergencyIncident.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
-      prisma.digitalMembershipCard.findMany({ orderBy: { issuedAt: "desc" }, take: 500 }),
+      prisma.digitalMembershipCard.findMany({
+        where: { deletedAt: null },
+        orderBy: { issuedAt: "desc" },
+        take: 500
+      }),
       prisma.governanceHold.findMany({ orderBy: { createdAt: "desc" }, take: 300 }),
       prisma.churchResource.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
       prisma.smartResourcePass.findMany({ orderBy: { createdAt: "desc" } }),
@@ -587,19 +604,26 @@ export async function POST(request: Request) {
       action = activityActions.emergencyCreated;
       targetId = (result as { id: string }).id;
     } else if (data.entity === "MEMBERSHIP_CARD") {
+      const issuedAt = new Date();
       result = await prisma.digitalMembershipCard.upsert({
         where: { userId: data.userId },
         update: {
           status: MembershipCardStatus.ACTIVE,
+          qrToken: randomUUID(),
+          issuedAt,
           expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
           revokedAt: null,
+          revokedById: null,
+          deletedAt: null,
+          deletedById: null,
           issuedById: user.id
         },
         create: {
           userId: data.userId,
           qrToken: randomUUID(),
           cardNumber: `LETW-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
-          organizationId: `LETW.ORG-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
+          organizationId: `LETW.ORG-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
+          issuedAt,
           expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
           issuedById: user.id
         }
@@ -717,15 +741,49 @@ export async function PATCH(request: Request) {
       if (data.status === EmergencyIncidentStatus.ACTIVE) await notifyEmergency(result as never);
       action = activityActions.emergencyUpdated;
     } else if (data.entity === "MEMBERSHIP_CARD") {
-      result = await prisma.digitalMembershipCard.update({
-        where: { id: data.id },
-        data: {
-          status: data.status,
-          revokedAt: data.status === MembershipCardStatus.REVOKED ? new Date() : null,
-          qrToken: data.rotateToken ? randomUUID() : undefined
-        }
+      const card = await prisma.digitalMembershipCard.findFirst({
+        where: { id: data.id, deletedAt: null }
       });
-      action = activityActions.membershipCardUpdated;
+      if (!card) throw new ApiError(404, "Digital membership card not found.");
+
+      if (data.operation === "REVOKE") {
+        result = await prisma.digitalMembershipCard.update({
+          where: { id: card.id },
+          data: {
+            status: MembershipCardStatus.REVOKED,
+            revokedAt: new Date(),
+            revokedById: user.id
+          }
+        });
+        action = activityActions.membershipCardRevoked;
+      } else if (data.operation === "REISSUE") {
+        result = await prisma.digitalMembershipCard.update({
+          where: { id: card.id },
+          data: {
+            status: MembershipCardStatus.ACTIVE,
+            qrToken: randomUUID(),
+            issuedAt: new Date(),
+            revokedAt: null,
+            revokedById: null
+          }
+        });
+        action = activityActions.membershipCardReissued;
+      } else {
+        if (card.status !== MembershipCardStatus.REVOKED) {
+          throw new ApiError(409, "Revoke this Digital ID before deleting it.");
+        }
+        result = await prisma.$transaction(async (tx) => {
+          await tx.digitalIdentityVerification.deleteMany({ where: { cardId: card.id } });
+          return tx.digitalMembershipCard.update({
+            where: { id: card.id },
+            data: {
+              deletedAt: new Date(),
+              deletedById: user.id
+            }
+          });
+        });
+        action = activityActions.membershipCardDeleted;
+      }
     } else if (data.entity === "AI_AGENT") {
       result = await prisma.workspaceAiAgent.update({
         where: { id: data.id },
@@ -765,6 +823,31 @@ export async function PATCH(request: Request) {
       metadata: { entity: data.entity }
     });
     return ok({ result });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await requireUser();
+    await requireAnyWorkspaceAdmin(user.id);
+    const body = (await request.json().catch(() => null)) as
+      | { entity?: string; confirmation?: string }
+      | null;
+    if (
+      body?.entity !== "IDENTITY_VERIFICATIONS" ||
+      body.confirmation !== "CLEAR QR VERIFICATION LOG"
+    ) {
+      throw new ApiError(422, "Enter the required QR verification confirmation phrase.");
+    }
+    const cleared = await prisma.digitalIdentityVerification.deleteMany({});
+    await logActivity({
+      userId: user.id,
+      action: activityActions.membershipVerificationLogsCleared,
+      metadata: { clearedCount: cleared.count }
+    });
+    return ok({ cleared: true, count: cleared.count });
   } catch (error) {
     return handleRouteError(error);
   }

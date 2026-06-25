@@ -15,6 +15,10 @@ type ProfileFormProps = {
     email?: string | null;
     image?: string | null;
     locale?: string | null;
+    memberProfile?: {
+      organizationPosition?: string | null;
+      digitalIdLocation?: string | null;
+    } | null;
   };
 };
 
@@ -53,6 +57,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
       body: JSON.stringify({
         name: String(formData.get("name")),
         image: nextImageUrl,
+        organizationPosition: String(formData.get("organizationPosition") ?? ""),
+        digitalIdLocation: String(formData.get("digitalIdLocation") ?? ""),
         locale: String(formData.get("locale") ?? "en")
       })
     });
@@ -78,6 +84,26 @@ export function ProfileForm({ user }: ProfileFormProps) {
       <div className="space-y-2">
         <Label htmlFor="profile-email">Email</Label>
         <Input id="profile-email" value={user.email ?? ""} disabled readOnly />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="profile-position">Position in Light Encounter Tabernacle Worldwide</Label>
+          <Input
+            id="profile-position"
+            name="organizationPosition"
+            defaultValue={user.memberProfile?.organizationPosition ?? ""}
+            placeholder="Pastor, leader, worker, member..."
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="profile-id-location">Digital ID location</Label>
+          <Input
+            id="profile-id-location"
+            name="digitalIdLocation"
+            defaultValue={user.memberProfile?.digitalIdLocation ?? "LETTW Worldwide"}
+            placeholder="Branch, city, region, or LETTW Worldwide"
+          />
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="profile-photo">Profile photo</Label>

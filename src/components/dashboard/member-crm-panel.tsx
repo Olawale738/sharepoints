@@ -27,6 +27,8 @@ type MemberProfile = {
   salvationAt: string | null;
   baptismAt: string | null;
   membershipStartedAt: string | null;
+  organizationPosition: string | null;
+  digitalIdLocation: string;
   communicationPreference: string | null;
   ministryInterests: string[];
   skills: string[];
@@ -68,6 +70,8 @@ const blankProfile: MemberProfile = {
   salvationAt: null,
   baptismAt: null,
   membershipStartedAt: null,
+  organizationPosition: null,
+  digitalIdLocation: "LETTW Worldwide",
   communicationPreference: null,
   ministryInterests: [],
   skills: [],
@@ -97,6 +101,8 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
         member.department?.name,
         member.category,
         member.profile.membershipNumber,
+        member.profile.organizationPosition,
+        member.profile.digitalIdLocation,
         member.profile.phone,
         member.profile.membershipStatus
       ]
@@ -210,6 +216,8 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
               <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <label className={fieldClass}>Membership number<Input value={draft.membershipNumber ?? ""} onChange={(e) => setField("membershipNumber", e.target.value || null)} /></label>
                 <label className={fieldClass}>Membership status<Input value={draft.membershipStatus} onChange={(e) => setField("membershipStatus", e.target.value)} /></label>
+                <label className={fieldClass}>LETTW position<Input value={draft.organizationPosition ?? ""} onChange={(e) => setField("organizationPosition", e.target.value || null)} placeholder="Pastor, leader, worker, member..." /></label>
+                <label className={fieldClass}>Digital ID location<Input value={draft.digitalIdLocation} onChange={(e) => setField("digitalIdLocation", e.target.value)} placeholder="Branch, city, region, or LETTW Worldwide" /></label>
                 <label className={fieldClass}>Date of birth<Input type="date" value={dateInput(draft.dateOfBirth)} onChange={(e) => setField("dateOfBirth", e.target.value || null)} /></label>
                 <label className={fieldClass}>Phone<Input value={draft.phone ?? ""} onChange={(e) => setField("phone", e.target.value || null)} /></label>
                 <label className={fieldClass}>Alternate phone<Input value={draft.alternatePhone ?? ""} onChange={(e) => setField("alternatePhone", e.target.value || null)} /></label>

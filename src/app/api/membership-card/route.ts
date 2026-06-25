@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     const [card, profile, memberships] = await Promise.all([
-      prisma.digitalMembershipCard.findUnique({ where: { userId: user.id } }),
+      prisma.digitalMembershipCard.findFirst({ where: { userId: user.id, deletedAt: null } }),
       prisma.memberProfile.findUnique({ where: { userId: user.id } }),
       prisma.workspaceMember.findMany({
         where: { userId: user.id, workspace: { deletedAt: null } },
@@ -18,7 +18,20 @@ export async function GET() {
     ]);
     const account = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { name: true, email: true, image: true }
+      select: {
+        name: true,
+        email: true,
+        image: true,
+        memberProfile: {
+          select: {
+            membershipNumber: true,
+            membershipStatus: true,
+            membershipStartedAt: true,
+            organizationPosition: true,
+            digitalIdLocation: true
+          }
+        }
+      }
     });
 
     return ok({ card, profile, memberships, account });

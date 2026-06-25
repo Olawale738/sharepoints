@@ -92,6 +92,8 @@ export const updateProfileSchema = z.object({
       "Profile image must be a valid LETW photo or URL."
     )
     .optional(),
+  organizationPosition: z.string().trim().max(120).optional().or(z.literal("")),
+  digitalIdLocation: z.string().trim().max(160).optional().or(z.literal("")),
   locale: z.enum(supportedLocales).optional()
 });
 

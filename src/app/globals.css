@@ -70,17 +70,21 @@ select {
   width: 100%;
   aspect-ratio: 85.6 / 53.98;
   overflow: hidden;
-  border: 1px solid rgb(24 32 31 / 12%);
+  border: 1px solid rgb(11 31 51 / 20%);
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 12px 32px rgb(24 32 31 / 10%);
+  background: #0b1f33;
+  box-shadow: 0 14px 34px rgb(11 31 51 / 22%);
 }
 
 .plastic-id-card-front {
   display: flex;
   flex-direction: column;
   padding: 1rem;
-  border-top: 5px solid #1d6a58;
+  border-top: 5px solid #c79a3b;
+  color: #ffffff;
+  background:
+    linear-gradient(120deg, rgb(255 255 255 / 5%) 0 20%, transparent 20% 100%),
+    #0b1f33;
 }
 
 .plastic-id-brand,
@@ -105,9 +109,9 @@ select {
 .plastic-id-qr {
   aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid rgb(24 32 31 / 12%);
+  border: 1px solid rgb(255 255 255 / 25%);
   border-radius: 6px;
-  background: #f8f6f0;
+  background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -119,27 +123,30 @@ select {
 }
 
 .plastic-id-footer {
-  border-top: 1px solid rgb(24 32 31 / 10%);
+  border-top: 1px solid rgb(255 255 255 / 18%);
   padding-top: 0.4rem;
   font-size: 0.47rem;
-  color: rgb(24 32 31 / 55%);
+  color: rgb(255 255 255 / 65%);
 }
 
 .plastic-id-card-back {
   padding: 1rem;
-  border-bottom: 5px solid #1d6a58;
-  background: #f8f6f0;
+  border-bottom: 5px solid #c79a3b;
+  color: #ffffff;
+  background:
+    linear-gradient(145deg, transparent 0 58%, rgb(199 154 59 / 12%) 58% 100%),
+    #0b1f33;
 }
 
 .plastic-id-back-footer {
   position: absolute;
   inset: auto 1rem 0.55rem;
-  border-top: 1px solid rgb(24 32 31 / 10%);
+  border-top: 1px solid rgb(255 255 255 / 18%);
   padding-top: 0.35rem;
   text-align: center;
   font-size: 0.45rem;
   font-weight: 600;
-  color: #1d6a58;
+  color: #e6c36b;
 }
 
 .plastic-id-card-invalid::after {

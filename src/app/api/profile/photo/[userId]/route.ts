@@ -18,17 +18,26 @@ export async function GET(request: Request, context: RouteContext) {
     const session = await auth();
     if (!session?.user?.id) {
       const token = new URL(request.url).searchParams.get("token");
-      const card = token
-        ? await prisma.digitalMembershipCard.findFirst({
-            where: {
-              userId,
-              qrToken: token,
-              status: "ACTIVE",
-              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
-            }
-          })
-        : null;
-      if (!card) throw new ApiError(401, "Authentication required.");
+      const [card, account] = token
+        ? await Promise.all([
+            prisma.digitalMembershipCard.findFirst({
+              where: {
+                userId,
+                qrToken: token,
+                status: "ACTIVE",
+                deletedAt: null,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+              }
+            }),
+            prisma.user.findUnique({
+              where: { id: userId },
+              select: { suspendedAt: true, accessRevokedAt: true, deletedAt: true }
+            })
+          ])
+        : [null, null];
+      if (!card || !account || account.suspendedAt || account.accessRevokedAt || account.deletedAt) {
+        throw new ApiError(401, "Authentication required.");
+      }
     }
     const body = await getObjectBuffer(`profiles/${userId}/avatar`);
     if (!body.length) throw new ApiError(404, "Profile photo not found.");

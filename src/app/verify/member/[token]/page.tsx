@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 import { createHash } from "node:crypto";
 
-import { BadgeCheck, Ban, Building2, CalendarDays, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Ban, Building2, CalendarDays, MapPin, ShieldCheck, UserRoundCheck } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,11 +19,10 @@ export const metadata: Metadata = {
 export default async function VerifyMemberPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const [card, session, requestHeaders] = await Promise.all([
-    prisma.digitalMembershipCard.findUnique({ where: { qrToken: token } }),
+    prisma.digitalMembershipCard.findFirst({ where: { qrToken: token, deletedAt: null } }),
     auth(),
     headers()
   ]);
-  const valid = Boolean(card && card.status === "ACTIVE" && (!card.expiresAt || card.expiresAt > new Date()));
   const account = card
     ? await prisma.user.findUnique({
         where: { id: card.userId },
@@ -30,19 +30,35 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
           id: true,
           name: true,
           image: true,
-          memberProfile: { select: { membershipNumber: true, membershipStatus: true } },
-          workspaceMemberships: {
-            where: { workspace: { deletedAt: null } },
-            select: { role: true, workspace: { select: { name: true } } },
-            take: 8
+          suspendedAt: true,
+          accessRevokedAt: true,
+          deletedAt: true,
+          memberProfile: {
+            select: {
+              membershipNumber: true,
+              membershipStatus: true,
+              membershipStartedAt: true,
+              organizationPosition: true,
+              digitalIdLocation: true
+            }
           }
         }
       })
     : null;
+  const valid = Boolean(
+    card &&
+      card.status === "ACTIVE" &&
+      (!card.expiresAt || card.expiresAt > new Date()) &&
+      account &&
+      !account.suspendedAt &&
+      !account.accessRevokedAt &&
+      !account.deletedAt
+  );
   const forwardedIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const ipHash = createHash("sha256")
     .update(`${process.env.AUTH_SECRET ?? "letw-verification"}:${forwardedIp}`)
     .digest("hex");
+
   if (card) {
     await prisma.digitalIdentityVerification.create({
       data: {
@@ -55,57 +71,124 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
       }
     });
   }
-  const photoUrl = account?.image?.startsWith("/api/profile/photo/")
-    ? `/api/profile/photo/${account.id}?token=${token}`
-    : account?.image;
+
+  const photoUrl =
+    valid && account?.image?.startsWith("/api/profile/photo/")
+      ? `/api/profile/photo/${account.id}?token=${token}`
+      : valid
+        ? account?.image
+        : null;
+  const memberSince = account?.memberProfile?.membershipStartedAt ?? card?.issuedAt;
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-8 text-ink sm:py-14">
-      <section className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
-        <header className="flex items-center justify-between gap-4 border-b border-ink/10 bg-paper p-5">
+    <main className="min-h-screen bg-[#edf1f5] px-4 py-8 text-[#0b1f33] sm:py-14">
+      <section className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-[#0b1f33]/15 bg-white shadow-xl">
+        <header className="flex items-center justify-between gap-4 bg-[#0b1f33] p-5 text-white">
           <div className="flex items-center gap-3">
-            <Image alt="LETW logo" className="h-12 w-12 rounded-md border border-ink/10 bg-white object-contain" height={96} src="/letw-logo.png" width={96} priority />
-            <div><p className="font-semibold">LETW.ORG</p><p className="text-xs text-ink/50">Digital Identity Verification</p></div>
+            <Image
+              alt="LETTW logo"
+              className="h-12 w-12 rounded-md bg-white object-contain"
+              height={96}
+              src="/letw-logo.png"
+              width={96}
+              priority
+            />
+            <div>
+              <p className="font-semibold">Light Encounter Tabernacle Worldwide</p>
+              <p className="text-xs text-white/65">LETTW Digital Identity Authentication</p>
+            </div>
           </div>
-          <Badge className={valid ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>{valid ? "verified" : "not valid"}</Badge>
+          <Badge className={valid ? "bg-amber-300 text-[#0b1f33]" : "bg-red-100 text-red-800"}>
+            {valid ? "confirmed" : "rejected"}
+          </Badge>
         </header>
 
         {valid && card && account ? (
           <div className="p-6">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-md border border-ink/10 bg-paper">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {photoUrl ? <img alt={`${account.name ?? "Member"} profile`} className="h-full w-full object-cover" src={photoUrl} /> : <ShieldCheck className="h-10 w-10 text-moss" />}
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#0b1f33]/15 bg-[#edf1f5]">
+                {photoUrl ? (
+                  <img alt={`${account.name ?? "Member"} profile`} className="h-full w-full object-cover" src={photoUrl} />
+                ) : (
+                  <ShieldCheck className="h-10 w-10 text-[#b78727]" />
+                )}
               </div>
               <div className="min-w-0">
-                <p className="flex items-center gap-2 text-sm font-semibold text-moss"><BadgeCheck className="h-4 w-4" />Authentic LETW.ORG member</p>
-                <h1 className="mt-2 text-3xl font-semibold">{account.name ?? "LETW Member"}</h1>
-                <p className="mt-1 text-sm text-ink/55">Organization: LETW.ORG</p>
+                <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                  <BadgeCheck className="h-4 w-4" />
+                  QR code authentication confirmed
+                </p>
+                <h1 className="mt-2 text-3xl font-semibold">{account.name ?? "LETTW Member"}</h1>
+                <p className="mt-1 text-sm text-[#0b1f33]/60">Authorized LETTW member identity</p>
               </div>
             </div>
-            <dl className="mt-6 grid gap-4 rounded-md border border-ink/10 bg-paper p-4 sm:grid-cols-2">
-              <div><dt className="text-xs text-ink/45">Organization ID</dt><dd className="mt-1 font-semibold">{card.organizationId}</dd></div>
-              <div><dt className="text-xs text-ink/45">Digital card number</dt><dd className="mt-1 font-semibold">{card.cardNumber}</dd></div>
-              <div><dt className="text-xs text-ink/45">Membership number</dt><dd className="mt-1 font-semibold">{account.memberProfile?.membershipNumber ?? "Pending"}</dd></div>
-              <div><dt className="text-xs text-ink/45">Membership status</dt><dd className="mt-1 font-semibold">{account.memberProfile?.membershipStatus?.toLowerCase() ?? "active"}</dd></div>
-              <div><dt className="text-xs text-ink/45">Issued</dt><dd className="mt-1 flex items-center gap-2 font-semibold"><CalendarDays className="h-4 w-4 text-moss" />{card.issuedAt.toLocaleDateString()}</dd></div>
-              <div><dt className="text-xs text-ink/45">Expires</dt><dd className="mt-1 font-semibold">{card.expiresAt ? card.expiresAt.toLocaleDateString() : "No expiry"}</dd></div>
+
+            <dl className="mt-6 grid gap-4 rounded-md border border-[#0b1f33]/10 bg-[#f5f7fa] p-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-[#0b1f33]/50">Organization ID</dt>
+                <dd className="mt-1 font-mono font-semibold text-[#9a6b13]">{card.organizationId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#0b1f33]/50">Member number</dt>
+                <dd className="mt-1 font-semibold">{account.memberProfile?.membershipNumber ?? "Pending"}</dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1 text-xs text-[#0b1f33]/50">
+                  <UserRoundCheck className="h-3.5 w-3.5" />
+                  Position
+                </dt>
+                <dd className="mt-1 font-semibold">{account.memberProfile?.organizationPosition ?? "Member"}</dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1 text-xs text-[#0b1f33]/50">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Location
+                </dt>
+                <dd className="mt-1 font-semibold">
+                  {account.memberProfile?.digitalIdLocation ?? "LETTW Worldwide"}
+                </dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1 text-xs text-[#0b1f33]/50">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Member since
+                </dt>
+                <dd className="mt-1 font-semibold">{memberSince?.getFullYear() ?? card.issuedAt.getFullYear()}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#0b1f33]/50">Membership status</dt>
+                <dd className="mt-1 font-semibold">
+                  {account.memberProfile?.membershipStatus?.toLowerCase() ?? "active"}
+                </dd>
+              </div>
             </dl>
-            <div className="mt-5">
-              <p className="flex items-center gap-2 text-sm font-semibold"><Building2 className="h-4 w-4 text-moss" />LETW participation</p>
-              <div className="mt-2 flex flex-wrap gap-2">{account.workspaceMemberships.map((membership) => <Badge key={`${membership.workspace.name}-${membership.role}`}>{membership.workspace.name}: {membership.role.toLowerCase()}</Badge>)}</div>
-            </div>
+
+            <p className="mt-5 flex items-center gap-2 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <Building2 className="h-4 w-4" />
+              This credential is currently accepted by Light Encounter Tabernacle Worldwide.
+            </p>
           </div>
         ) : (
           <div className="p-8 text-center">
-            <Ban className="mx-auto h-12 w-12 text-clay" />
-            <h1 className="mt-4 text-2xl font-semibold">This LETW.ORG identity is not valid</h1>
-            <p className="mt-2 text-sm text-ink/60">The ID was not found, has expired, is suspended, or was revoked by an administrator. Do not accept it as proof of active membership.</p>
-            {card ? <p className="mt-4 rounded-md bg-paper px-3 py-2 text-sm">Organization ID: {card.organizationId}</p> : null}
+            <Ban className="mx-auto h-12 w-12 text-red-700" />
+            <h1 className="mt-4 text-2xl font-semibold">QR code authentication failed</h1>
+            <p className="mt-2 text-sm text-[#0b1f33]/60">
+              This credential was not found, has expired, was revoked, was deleted, or belongs to an inactive
+              account. Do not accept it as proof of active membership.
+            </p>
+            {card ? (
+              <p className="mt-4 rounded-md bg-[#f5f7fa] px-3 py-2 text-sm">
+                Organization ID: {card.organizationId}
+              </p>
+            ) : null}
           </div>
         )}
-        <footer className="border-t border-ink/10 bg-paper px-5 py-4 text-center text-xs text-ink/45">
-          Verification result recorded by LETW.ORG. <Link className="font-medium text-moss" href="/login">Member sign in</Link>
+
+        <footer className="border-t border-[#0b1f33]/10 bg-[#f5f7fa] px-5 py-4 text-center text-xs text-[#0b1f33]/50">
+          Verification result recorded by LETW.ORG.{" "}
+          <Link className="font-medium text-[#9a6b13]" href="/login">
+            Member sign in
+          </Link>
         </footer>
       </section>
     </main>
