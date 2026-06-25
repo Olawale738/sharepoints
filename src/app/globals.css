@@ -36,6 +36,22 @@ select {
 }
 
 @media print {
+  @page {
+    size: letter portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 215.9mm !important;
+    min-width: 215.9mm !important;
+    height: 279.4mm !important;
+    min-height: 279.4mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -43,24 +59,186 @@ select {
   .digital-id-print-sheet,
   .digital-id-print-sheet * {
     visibility: visible;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   .digital-id-print-sheet {
-    position: absolute;
-    inset: 0 auto auto 0;
+    position: fixed;
+    inset: 0;
     display: grid !important;
     grid-template-columns: repeat(2, 53.98mm) !important;
+    align-content: start !important;
+    justify-content: center !important;
     gap: 8mm !important;
-    width: auto;
-    max-width: none;
-    box-shadow: none;
+    width: 215.9mm !important;
+    height: 279.4mm !important;
+    max-width: 215.9mm !important;
+    margin: 0 !important;
+    padding: 18mm 0 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
   }
 
   .plastic-id-card {
+    flex: none !important;
     width: 53.98mm !important;
     height: 85.6mm !important;
+    min-width: 53.98mm !important;
+    min-height: 85.6mm !important;
+    max-width: 53.98mm !important;
+    max-height: 85.6mm !important;
+    border-radius: 2mm !important;
+    box-shadow: none !important;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .plastic-id-portrait-header {
+    flex: 0 0 19mm !important;
+    min-height: 19mm !important;
+    gap: 2mm !important;
+    padding: 2.5mm 3mm !important;
+    border-bottom-width: 1mm !important;
+  }
+
+  .plastic-id-portrait-header img {
+    width: 13mm !important;
+    height: 13mm !important;
+  }
+
+  .plastic-id-portrait-header p {
+    font-size: 2.25mm !important;
+    line-height: 1.15 !important;
+  }
+
+  .plastic-id-portrait-header span {
+    margin-top: 0.5mm !important;
+    font-size: 1.55mm !important;
+  }
+
+  .plastic-id-front-body {
+    padding: 3mm 4mm 1.5mm !important;
+  }
+
+  .plastic-id-front-body::after {
+    display: none !important;
+  }
+
+  .plastic-id-portrait-photo {
+    flex: 0 0 22mm !important;
+    width: 22mm !important;
+    height: 22mm !important;
+    min-width: 22mm !important;
+    min-height: 22mm !important;
+    border-width: 1mm !important;
+  }
+
+  .plastic-id-member-name {
+    flex: none !important;
+    min-height: 4mm !important;
+    margin-top: 1.5mm !important;
+    font-size: 3.4mm !important;
+    line-height: 1.15 !important;
+    overflow: visible !important;
+  }
+
+  .plastic-id-position {
+    flex: none !important;
+    min-height: 2.4mm !important;
+    margin-top: 0.3mm !important;
+    font-size: 1.9mm !important;
+    line-height: 1.2 !important;
+  }
+
+  .plastic-id-details {
+    flex: none !important;
+    margin-top: 1mm !important;
+  }
+
+  .plastic-id-detail-row {
+    grid-template-columns: 20mm minmax(0, 1fr) !important;
+    gap: 1mm !important;
+    min-height: 4mm !important;
+    padding: 0.7mm 0 !important;
+    font-size: 1.7mm !important;
+    line-height: 1.15 !important;
+  }
+
+  .plastic-id-portrait-footer {
+    flex: 0 0 8mm !important;
+    min-height: 8mm !important;
+    padding: 1.5mm 3mm !important;
+    background: #0b1f33 !important;
+    font-size: 1.8mm !important;
+  }
+
+  .plastic-id-back-header {
+    flex: 0 0 18mm !important;
+    min-height: 18mm !important;
+    padding: 3mm 4mm !important;
+    border-bottom-width: 1mm !important;
+  }
+
+  .plastic-id-back-header p {
+    font-size: 3mm !important;
+  }
+
+  .plastic-id-back-header span {
+    margin-top: 0.4mm !important;
+    font-size: 1.55mm !important;
+  }
+
+  .plastic-id-back-body {
+    padding: 3mm 4mm 1.5mm !important;
+  }
+
+  .plastic-id-terms {
+    font-size: 1.55mm !important;
+    line-height: 1.25 !important;
+  }
+
+  .plastic-id-terms p {
+    margin-bottom: 0.8mm !important;
+    padding-left: 2.4mm !important;
+  }
+
+  .plastic-id-terms p::before {
+    top: 0.7mm !important;
+    width: 0.9mm !important;
+    height: 0.9mm !important;
+  }
+
+  .plastic-id-large-qr {
+    flex: 0 0 31mm !important;
+    width: 31mm !important;
+    height: 31mm !important;
+    min-width: 31mm !important;
+    min-height: 31mm !important;
+    margin-top: 1mm !important;
+    border-width: 0.5mm !important;
+  }
+
+  .plastic-id-scan-label {
+    margin-top: 1mm !important;
+    font-size: 2mm !important;
+  }
+
+  .plastic-id-back-org-id {
+    margin-top: 0.4mm !important;
+    font-size: 1.7mm !important;
+  }
+
+  .plastic-id-validity {
+    font-size: 1.4mm !important;
+  }
+
+  .plastic-id-back-footer {
+    flex: 0 0 8mm !important;
+    min-height: 8mm !important;
+    padding: 2.3mm 2mm !important;
+    font-size: 1.35mm !important;
   }
 }
 
