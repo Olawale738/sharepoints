@@ -130,7 +130,7 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
               </div>
               <div>
                 <dt className="text-xs text-[#0b1f33]/50">Member number</dt>
-                <dd className="mt-1 font-semibold">{account.memberProfile?.membershipNumber ?? "Pending"}</dd>
+                <dd className="mt-1 font-semibold">{account.memberProfile?.membershipNumber || card.cardNumber}</dd>
               </div>
               <div>
                 <dt className="flex items-center gap-1 text-xs text-[#0b1f33]/50">

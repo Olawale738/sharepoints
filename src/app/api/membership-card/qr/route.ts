@@ -18,8 +18,9 @@ export async function GET(request: Request) {
     const origin = new URL(request.url).origin;
     const svg = await QRCode.toString(`${origin}/verify/member/${card.qrToken}`, {
       type: "svg",
-      margin: 1,
-      color: { dark: "#0b1f33", light: "#ffffff" }
+      errorCorrectionLevel: "M",
+      margin: 4,
+      color: { dark: "#000000", light: "#ffffff" }
     });
     return new Response(svg, {
       headers: {

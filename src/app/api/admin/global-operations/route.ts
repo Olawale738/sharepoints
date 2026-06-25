@@ -605,28 +605,49 @@ export async function POST(request: Request) {
       targetId = (result as { id: string }).id;
     } else if (data.entity === "MEMBERSHIP_CARD") {
       const issuedAt = new Date();
-      result = await prisma.digitalMembershipCard.upsert({
-        where: { userId: data.userId },
-        update: {
-          status: MembershipCardStatus.ACTIVE,
-          qrToken: randomUUID(),
-          issuedAt,
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-          revokedAt: null,
-          revokedById: null,
-          deletedAt: null,
-          deletedById: null,
-          issuedById: user.id
-        },
-        create: {
-          userId: data.userId,
-          qrToken: randomUUID(),
-          cardNumber: `LETW-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
-          organizationId: `LETW.ORG-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
-          issuedAt,
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-          issuedById: user.id
+      result = await prisma.$transaction(async (tx) => {
+        const card = await tx.digitalMembershipCard.upsert({
+          where: { userId: data.userId },
+          update: {
+            status: MembershipCardStatus.ACTIVE,
+            qrToken: randomUUID(),
+            issuedAt,
+            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+            revokedAt: null,
+            revokedById: null,
+            deletedAt: null,
+            deletedById: null,
+            issuedById: user.id
+          },
+          create: {
+            userId: data.userId,
+            qrToken: randomUUID(),
+            cardNumber: `LETW-${new Date().getUTCFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+            organizationId: `LETW.ORG-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
+            issuedAt,
+            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+            issuedById: user.id
+          }
+        });
+        const profile = await tx.memberProfile.findUnique({
+          where: { userId: data.userId },
+          select: { membershipNumber: true }
+        });
+        if (!profile) {
+          await tx.memberProfile.create({
+            data: {
+              userId: data.userId,
+              membershipNumber: card.cardNumber,
+              digitalIdLocation: "LETTW Worldwide"
+            }
+          });
+        } else if (!profile.membershipNumber?.trim()) {
+          await tx.memberProfile.update({
+            where: { userId: data.userId },
+            data: { membershipNumber: card.cardNumber }
+          });
         }
+        return card;
       });
       action = activityActions.membershipCardIssued;
       targetId = (result as { id: string }).id;

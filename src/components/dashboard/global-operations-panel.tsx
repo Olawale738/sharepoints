@@ -505,7 +505,7 @@ export function GlobalOperationsPanel() {
                       <p className="text-sm font-medium">{userName.get(card.userId)}</p>
                       <p className="text-xs font-semibold text-moss">{card.organizationId}</p>
                       <p className="mt-1 text-xs text-ink/55">
-                        Member no. {profile?.membershipNumber ?? "Pending"} - {profile?.organizationPosition ?? "Member"} -{" "}
+                        Member no. {profile?.membershipNumber || card.cardNumber} - {profile?.organizationPosition ?? "Member"} -{" "}
                         {profile?.digitalIdLocation ?? "LETTW Worldwide"}
                       </p>
                       <p className="text-xs text-ink/45">

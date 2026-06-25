@@ -53,7 +53,7 @@ export async function GET(_request: Request, context: RouteContext) {
       member: valid
         ? {
             name: account?.name ?? "LETTW Member",
-            membershipNumber: account?.memberProfile?.membershipNumber ?? "Pending",
+            membershipNumber: account?.memberProfile?.membershipNumber || card.cardNumber,
             membershipStatus: account?.memberProfile?.membershipStatus ?? "ACTIVE",
             memberSince: account?.memberProfile?.membershipStartedAt ?? card.issuedAt,
             position: account?.memberProfile?.organizationPosition ?? "Member",
