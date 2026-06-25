@@ -2152,23 +2152,30 @@ model EmergencyWelfareResponse {
 }
 
 model DigitalMembershipCard {
-  id             String               @id @default(cuid())
-  userId         String               @unique
-  qrToken        String               @unique
-  cardNumber     String               @unique
-  organizationId String               @unique
-  status         MembershipCardStatus @default(ACTIVE)
-  issuedById     String
-  issuedAt       DateTime             @default(now())
-  expiresAt      DateTime?
-  revokedAt      DateTime?
-  revokedById    String?
-  deletedAt      DateTime?
-  deletedById    String?
-  updatedAt      DateTime             @updatedAt
+  id                    String               @id @default(cuid())
+  userId                String               @unique
+  qrToken               String               @unique
+  cardNumber            String               @unique
+  organizationId        String               @unique
+  status                MembershipCardStatus @default(ACTIVE)
+  issuedById            String
+  issuedAt              DateTime             @default(now())
+  expiresAt             DateTime?
+  revokedAt             DateTime?
+  revokedById           String?
+  deletedAt             DateTime?
+  deletedById           String?
+  credentialId          String?              @unique
+  credentialJwt         String?              @db.Text
+  credentialKeyId       String?
+  credentialFingerprint String?
+  credentialIssuedAt    DateTime?
+  credentialVersion     Int                  @default(0)
+  updatedAt             DateTime             @updatedAt
 
   @@index([status, expiresAt])
   @@index([status, deletedAt])
+  @@index([credentialKeyId])
 }
 
 model DigitalIdentityVerification {
@@ -2179,11 +2186,29 @@ model DigitalIdentityVerification {
   scannedById    String?
   ipHash         String?
   userAgent      String?
+  credentialId   String?
+  keyId          String?
+  signatureValid Boolean?
+  statusValid    Boolean?
   createdAt      DateTime @default(now())
 
   @@index([cardId, createdAt])
   @@index([organizationId, createdAt])
   @@index([outcome, createdAt])
+  @@index([credentialId, createdAt])
+}
+
+model CredentialSigningKey {
+  id                  String    @id @default(cuid())
+  kid                 String    @unique
+  algorithm           String    @default("EdDSA")
+  publicJwk           Json
+  encryptedPrivateJwk String    @db.Text
+  active              Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  retiredAt           DateTime?
+
+  @@index([active, createdAt])
 }
 
 model GovernanceHold {

@@ -96,6 +96,7 @@ export const activityActions = {
   membershipCardReissued: "membership.card_reissued",
   membershipCardDeleted: "membership.card_deleted",
   membershipVerificationLogsCleared: "membership.verification_logs_cleared",
+  credentialSigningKeyRotated: "membership.credential_signing_key_rotated",
   profilePhotoUploaded: "profile.photo_uploaded",
   governanceHoldCreated: "governance.hold_created",
   governanceHoldReleased: "governance.hold_released",

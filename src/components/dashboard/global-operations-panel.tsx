@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { CredentialSigningKeyPanel } from "@/components/dashboard/credential-signing-key-panel";
 
 type GlobalData = {
   units: Array<{ id: string; parentId: string | null; type: string; name: string; countryCode: string | null; active: boolean }>;
@@ -469,6 +470,7 @@ export function GlobalOperationsPanel() {
               <Button className="w-full" disabled={busy} type="submit"><BadgeCheck className="h-4 w-4" />Issue secure card</Button>
             </form>
           </FormSection>
+          <CredentialSigningKeyPanel />
           <FormSection title={`Issued cards (${data.cards.length})`}>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-ink/10 bg-paper p-3">
               <div>

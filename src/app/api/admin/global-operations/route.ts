@@ -617,6 +617,11 @@ export async function POST(request: Request) {
             revokedById: null,
             deletedAt: null,
             deletedById: null,
+            credentialId: null,
+            credentialJwt: null,
+            credentialKeyId: null,
+            credentialFingerprint: null,
+            credentialIssuedAt: null,
             issuedById: user.id
           },
           create: {
@@ -786,7 +791,12 @@ export async function PATCH(request: Request) {
             issuedAt: new Date(),
             expiresAt: null,
             revokedAt: null,
-            revokedById: null
+            revokedById: null,
+            credentialId: null,
+            credentialJwt: null,
+            credentialKeyId: null,
+            credentialFingerprint: null,
+            credentialIssuedAt: null
           }
         });
         action = activityActions.membershipCardReissued;

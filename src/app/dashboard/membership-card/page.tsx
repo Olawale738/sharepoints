@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { BadgeCheck, Building2, CalendarDays, QrCode, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Building2, CalendarDays, Download, KeyRound, QrCode, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { PrintIdButton } from "@/components/dashboard/print-id-button";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
+import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
 function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -50,6 +51,10 @@ export default async function MembershipCardPage() {
       orderBy: { joinedAt: "asc" }
     })
   ]);
+  const signedCredential = card ? await ensureMembershipCredential(card.id) : null;
+  const credentialVerification = signedCredential
+    ? await verifyMembershipCredential(signedCredential.card)
+    : null;
 
   const location =
     account?.memberProfile?.digitalIdLocation ||
@@ -185,6 +190,48 @@ export default async function MembershipCardPage() {
               </footer>
             </section>
           </div>
+
+          <section className="mx-auto max-w-3xl rounded-lg border border-ink/10 bg-white p-4 print:hidden">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <KeyRound className="h-4 w-4 text-moss" />
+                  Cryptographically verifiable credential
+                </p>
+                <p className="mt-1 text-xs text-ink/50">
+                  {credentialVerification?.signatureValid
+                    ? "Ed25519 signature verified. The credential can be independently checked with LETW's public key."
+                    : "The signed credential could not be verified."}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Badge className={credentialVerification?.signatureValid ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>
+                    signature {credentialVerification?.signatureValid ? "verified" : "invalid"}
+                  </Badge>
+                  <Badge className={credentialVerification?.statusValid ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>
+                    live status {credentialVerification?.statusValid ? "valid" : "inactive"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
+                  href={`/api/credentials/member/${card.qrToken}`}
+                >
+                  <Download className="h-4 w-4" />
+                  Download signed credential
+                </a>
+                <a
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
+                  href="/api/credentials/jwks"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Public verification keys
+                </a>
+              </div>
+            </div>
+          </section>
 
           <section className="mx-auto max-w-3xl rounded-lg border border-ink/10 bg-white p-4 print:hidden">
             <p className="flex items-center gap-2 text-sm font-semibold">

@@ -1,7 +1,17 @@
 /* eslint-disable @next/next/no-img-element */
 import { createHash } from "node:crypto";
 
-import { BadgeCheck, Ban, Building2, CalendarDays, MapPin, ShieldCheck, UserRoundCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Ban,
+  Building2,
+  CalendarDays,
+  Download,
+  KeyRound,
+  MapPin,
+  ShieldCheck,
+  UserRoundCheck
+} from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,6 +20,7 @@ import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
+import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
 export const metadata: Metadata = {
   title: "Verify LETW.ORG Digital ID",
@@ -18,42 +29,16 @@ export const metadata: Metadata = {
 
 export default async function VerifyMemberPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const [card, session, requestHeaders] = await Promise.all([
+  const [existing, session, requestHeaders] = await Promise.all([
     prisma.digitalMembershipCard.findFirst({ where: { qrToken: token, deletedAt: null } }),
     auth(),
     headers()
   ]);
-  const account = card
-    ? await prisma.user.findUnique({
-        where: { id: card.userId },
-        select: {
-          id: true,
-          name: true,
-          image: true,
-          suspendedAt: true,
-          accessRevokedAt: true,
-          deletedAt: true,
-          memberProfile: {
-            select: {
-              membershipNumber: true,
-              membershipStatus: true,
-              membershipStartedAt: true,
-              organizationPosition: true,
-              digitalIdLocation: true
-            }
-          }
-        }
-      })
-    : null;
-  const valid = Boolean(
-    card &&
-      card.status === "ACTIVE" &&
-      (!card.expiresAt || card.expiresAt > new Date()) &&
-      account &&
-      !account.suspendedAt &&
-      !account.accessRevokedAt &&
-      !account.deletedAt
-  );
+  const issued = existing ? await ensureMembershipCredential(existing.id) : null;
+  const card = issued?.card ?? null;
+  const account = issued?.account ?? null;
+  const credentialVerification = card ? await verifyMembershipCredential(card) : null;
+  const valid = credentialVerification?.valid ?? false;
   const forwardedIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const ipHash = createHash("sha256")
     .update(`${process.env.AUTH_SECRET ?? "letw-verification"}:${forwardedIp}`)
@@ -67,7 +52,11 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
         outcome: valid ? "VALID" : card.status,
         scannedById: session?.user?.id ?? null,
         ipHash,
-        userAgent: requestHeaders.get("user-agent")?.slice(0, 500) ?? null
+        userAgent: requestHeaders.get("user-agent")?.slice(0, 500) ?? null,
+        credentialId: credentialVerification?.credentialId ?? null,
+        keyId: credentialVerification?.keyId ?? null,
+        signatureValid: credentialVerification?.signatureValid ?? false,
+        statusValid: credentialVerification?.statusValid ?? false
       }
     });
   }
@@ -116,7 +105,7 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
                   <BadgeCheck className="h-4 w-4" />
-                  QR code authentication confirmed
+                  Cryptographic signature and live status confirmed
                 </p>
                 <h1 className="mt-2 text-3xl font-semibold">{account.name ?? "LETTW Member"}</h1>
                 <p className="mt-1 text-sm text-[#0b1f33]/60">Authorized LETTW member identity</p>
@@ -161,20 +150,53 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
                   {account.memberProfile?.membershipStatus?.toLowerCase() ?? "active"}
                 </dd>
               </div>
+              <div>
+                <dt className="flex items-center gap-1 text-xs text-[#0b1f33]/50">
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Digital signature
+                </dt>
+                <dd className="mt-1 font-semibold text-emerald-700">Verified with Ed25519</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-[#0b1f33]/50">Credential ID</dt>
+                <dd className="mt-1 truncate font-mono text-xs font-semibold">
+                  {credentialVerification?.credentialId}
+                </dd>
+              </div>
             </dl>
 
-            <p className="mt-5 flex items-center gap-2 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              <Building2 className="h-4 w-4" />
-              This credential is currently accepted by Light Encounter Tabernacle Worldwide.
-            </p>
+            <div className="mt-5 flex flex-col gap-3 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                This credential is signed by LETW and currently accepted.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-700/20 bg-white px-3 text-xs font-semibold"
+                  href={`/api/credentials/member/${token}`}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Signed credential
+                </a>
+                <a
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-700/20 bg-white px-3 text-xs font-semibold"
+                  href="/api/credentials/jwks"
+                >
+                  <KeyRound className="h-3.5 w-3.5" />
+                  Public keys
+                </a>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="p-8 text-center">
             <Ban className="mx-auto h-12 w-12 text-red-700" />
             <h1 className="mt-4 text-2xl font-semibold">QR code authentication failed</h1>
             <p className="mt-2 text-sm text-[#0b1f33]/60">
-              This credential was not found, has expired, was revoked, was deleted, or belongs to an inactive
-              account. Do not accept it as proof of active membership.
+              {credentialVerification && !credentialVerification.signatureValid
+                ? "The digital signature is invalid or the signed information was altered."
+                : "The signature may be authentic, but this credential is expired, revoked, deleted, superseded, or belongs to an inactive account."}{" "}
+              Do not accept it as proof of active membership.
             </p>
             {card ? (
               <p className="mt-4 rounded-md bg-[#f5f7fa] px-3 py-2 text-sm">
