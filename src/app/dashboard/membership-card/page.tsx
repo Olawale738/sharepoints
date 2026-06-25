@@ -60,6 +60,10 @@ export default async function MembershipCardPage() {
   const memberSince = String(
     account?.memberProfile?.membershipStartedAt?.getFullYear() ?? card?.issuedAt.getFullYear() ?? new Date().getFullYear()
   );
+  const cardValid = Boolean(
+    card && card.status === "ACTIVE" && (!card.expiresAt || card.expiresAt > new Date())
+  );
+  const cardDisplayStatus = cardValid ? "active" : card?.status === "ACTIVE" ? "expired" : card?.status.toLowerCase();
 
   return (
     <div className="space-y-5">
@@ -90,9 +94,9 @@ export default async function MembershipCardPage() {
         <>
           <div className="digital-id-print-sheet mx-auto">
             <section
-              className={`plastic-id-card plastic-id-card-front ${
-                card.status !== "ACTIVE" ? "plastic-id-card-invalid" : ""
-              }`}
+            className={`plastic-id-card plastic-id-card-front ${
+              !cardValid ? "plastic-id-card-invalid" : ""
+            }`}
             >
               <header className="plastic-id-portrait-header">
                 <Image
@@ -135,8 +139,8 @@ export default async function MembershipCardPage() {
 
               <footer className="plastic-id-portrait-footer">
                 <span>letw.org</span>
-                <Badge className={card.status === "ACTIVE" ? "bg-amber-300 text-[#0b1f33]" : "bg-red-100 text-red-800"}>
-                  {card.status.toLowerCase()}
+                <Badge className={cardValid ? "bg-amber-300 text-[#0b1f33]" : "bg-red-100 text-red-800"}>
+                  {cardDisplayStatus}
                 </Badge>
               </footer>
             </section>
@@ -158,7 +162,7 @@ export default async function MembershipCardPage() {
                 </div>
 
                 <div className="plastic-id-large-qr">
-                  {card.status === "ACTIVE" ? (
+                  {cardValid ? (
                     <img alt="Scan to verify LETTW membership" src="/api/membership-card/qr" />
                   ) : (
                     <ShieldCheck className="h-14 w-14 text-red-700" />

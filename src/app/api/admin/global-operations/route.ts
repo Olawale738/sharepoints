@@ -784,6 +784,7 @@ export async function PATCH(request: Request) {
             status: MembershipCardStatus.ACTIVE,
             qrToken: randomUUID(),
             issuedAt: new Date(),
+            expiresAt: null,
             revokedAt: null,
             revokedById: null
           }
