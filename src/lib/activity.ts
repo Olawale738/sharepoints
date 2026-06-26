@@ -123,5 +123,19 @@ export const activityActions = {
   branchTransferRequested: "branch_transfer.requested",
   branchTransferReviewed: "branch_transfer.reviewed",
   organizationUnitDeleted: "organization.unit_deleted",
-  organizationUnitLogsCleared: "organization.unit_logs_cleared"
+  organizationUnitLogsCleared: "organization.unit_logs_cleared",
+  volunteerOpportunityCreated: "volunteer.opportunity_created",
+  volunteerMatchesGenerated: "volunteer.matches_generated",
+  branchLaunchPlanCreated: "branch_launch.plan_created",
+  branchLaunchStepUpdated: "branch_launch.step_updated",
+  translationRecordCreated: "translation.record_created",
+  marketplaceListingCreated: "marketplace.listing_created",
+  marketplaceRequestCreated: "marketplace.request_created",
+  rosterPlanGenerated: "roster.plan_generated",
+  rosterPlanUpdated: "roster.plan_updated",
+  leadershipCandidatesGenerated: "leadership.candidates_generated",
+  leadershipCandidateUpdated: "leadership.candidate_updated",
+  boardRecordCreated: "board.record_created",
+  boardRecordUpdated: "board.record_updated",
+  boardRecordDeleted: "board.record_deleted"
 } as const;

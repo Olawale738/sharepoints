@@ -375,7 +375,7 @@ export function GlobalOperationsPanel() {
                       disabled={busy}
                       variant="danger"
                       onClick={() => {
-                        if (confirm(`Delete ${unit.name}? Delete child units first if this unit has any.`)) {
+                        if (confirm(`Delete ${unit.name} and all child countries, regions, branches, churches, and ministries under it? Connected records will be detached safely.`)) {
                           void mutate(
                             "DELETE",
                             { entity: "UNIT", id: unit.id, confirmation: "DELETE NETWORK UNIT" },
@@ -384,7 +384,7 @@ export function GlobalOperationsPanel() {
                         }
                       }}
                     >
-                      <Trash2 className="h-4 w-4" />Delete
+                      <Trash2 className="h-4 w-4" />Delete all
                     </Button>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
+import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -109,6 +109,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               >
                 <Sparkles className="h-4 w-4" />
                 <span className="hidden 2xl:inline">{messages.aiAssistant}</span>
+              </Link>
+              <Link
+                aria-label="Private board portal"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/board"
+              >
+                <FileLock2 className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Board</span>
               </Link>
               <Link
                 aria-label="Internal news feed"

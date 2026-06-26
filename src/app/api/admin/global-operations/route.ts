@@ -887,34 +887,84 @@ export async function DELETE(request: Request) {
       }
       const unit = await prisma.organizationUnit.findUnique({ where: { id: body.id } });
       if (!unit) throw new ApiError(404, "Network unit not found.");
-      const children = await prisma.organizationUnit.count({ where: { parentId: unit.id } });
-      if (children > 0) {
-        throw new ApiError(409, "Delete child countries, regions, churches, branches, or ministries before deleting this parent.");
+      const units = await prisma.organizationUnit.findMany({ select: { id: true, parentId: true, name: true, type: true } });
+      const ids = new Set<string>([unit.id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const item of units) {
+          if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
+            ids.add(item.id);
+            changed = true;
+          }
+        }
       }
+      const unitIds = [...ids];
       const cleanup = await prisma.$transaction(async (tx) => {
-        const [leaders, workspaces, profiles, fromTransfers, toTransfers] = await Promise.all([
-          tx.organizationUnitLeader.deleteMany({ where: { unitId: unit.id } }),
-          tx.workspace.updateMany({ where: { organizationUnitId: unit.id }, data: { organizationUnitId: null, scopeType: null } }),
-          tx.memberProfile.updateMany({ where: { currentOrganizationUnitId: unit.id }, data: { currentOrganizationUnitId: null } }),
-          tx.branchTransferRequest.updateMany({ where: { fromUnitId: unit.id }, data: { fromUnitId: null } }),
-          unit.parentId
-            ? tx.branchTransferRequest.updateMany({ where: { toUnitId: unit.id }, data: { toUnitId: unit.parentId } })
-            : tx.branchTransferRequest.deleteMany({ where: { toUnitId: unit.id } })
+        const [
+          leaders,
+          workspaces,
+          profiles,
+          transfers,
+          safeguarding,
+          emergencies,
+          agents,
+          projects,
+          counselling,
+          attendance,
+          launchPlans,
+          opportunities,
+          listings,
+          requests,
+          rosterPlans,
+          candidates,
+          boardRecords
+        ] = await Promise.all([
+          tx.organizationUnitLeader.deleteMany({ where: { unitId: { in: unitIds } } }),
+          tx.workspace.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null, scopeType: null } }),
+          tx.memberProfile.updateMany({ where: { currentOrganizationUnitId: { in: unitIds } }, data: { currentOrganizationUnitId: null } }),
+          tx.branchTransferRequest.deleteMany({ where: { OR: [{ fromUnitId: { in: unitIds } }, { toUnitId: { in: unitIds } }] } }),
+          tx.safeguardingCase.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.emergencyIncident.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.workspaceAiAgent.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.churchProject.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.counsellingCase.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.smartAttendanceSession.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.branchLaunchPlan.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.volunteerOpportunity.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.resourceMarketplaceListing.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.resourceMarketplaceRequest.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.rosterPlan.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.leadershipCandidate.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.boardRecord.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } })
         ]);
-        await tx.organizationUnit.delete({ where: { id: unit.id } });
+        await tx.organizationUnit.deleteMany({ where: { id: { in: unitIds } } });
         return {
+          unitsDeleted: unitIds.length,
           leadersDeleted: leaders.count,
           workspacesDetached: workspaces.count,
           profilesDetached: profiles.count,
-          transferOriginsCleared: fromTransfers.count,
-          transferDestinationsMoved: toTransfers.count
+          transfersDeleted: transfers.count,
+          safeguardingDetached: safeguarding.count,
+          emergenciesDetached: emergencies.count,
+          agentsDetached: agents.count,
+          projectsDetached: projects.count,
+          counsellingDetached: counselling.count,
+          attendanceDetached: attendance.count,
+          branchLaunchesDetached: launchPlans.count,
+          opportunitiesDetached: opportunities.count,
+          marketplaceListingsDetached: listings.count,
+          marketplaceRequestsDetached: requests.count,
+          rosterPlansDetached: rosterPlans.count,
+          leadershipCandidatesDetached: candidates.count,
+          boardRecordsDetached: boardRecords.count
         };
       });
       await logActivity({
         userId: user.id,
         action: activityActions.organizationUnitDeleted,
         targetId: unit.id,
-        metadata: { name: unit.name, type: unit.type, ...cleanup }
+        metadata: { name: unit.name, type: unit.type, deletedUnitIds: unitIds, ...cleanup }
       });
       return ok({ deleted: true, id: unit.id, cleanup });
     }
@@ -924,12 +974,27 @@ export async function DELETE(request: Request) {
       if (body.confirmation !== "CLEAR NETWORK UNIT LOG") {
         throw new ApiError(422, "Enter CLEAR NETWORK UNIT LOG to clear logs for this unit.");
       }
+      const units = await prisma.organizationUnit.findMany({ select: { id: true, parentId: true } });
+      const ids = new Set<string>([body.id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const item of units) {
+          if (item.parentId && ids.has(item.parentId) && !ids.has(item.id)) {
+            ids.add(item.id);
+            changed = true;
+          }
+        }
+      }
+      const unitIds = [...ids];
       const cleared = await prisma.activityLog.deleteMany({
         where: {
           OR: [
-            { targetId: body.id },
-            { metadata: { path: ["unitId"], equals: body.id } },
-            { metadata: { path: ["organizationUnitId"], equals: body.id } }
+            { targetId: { in: unitIds } },
+            ...unitIds.flatMap((id) => [
+              { metadata: { path: ["unitId"], equals: id } },
+              { metadata: { path: ["organizationUnitId"], equals: id } }
+            ])
           ]
         }
       });
@@ -937,7 +1002,7 @@ export async function DELETE(request: Request) {
         userId: user.id,
         action: activityActions.organizationUnitLogsCleared,
         targetId: body.id,
-        metadata: { clearedCount: cleared.count }
+        metadata: { clearedCount: cleared.count, unitIds }
       });
       return ok({ cleared: true, count: cleared.count });
     }

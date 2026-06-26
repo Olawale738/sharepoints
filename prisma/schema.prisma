@@ -476,6 +476,90 @@ enum BranchTransferStatus {
   CANCELLED
 }
 
+enum VolunteerOpportunityStatus {
+  OPEN
+  PAUSED
+  FILLED
+  CLOSED
+}
+
+enum BranchLaunchStatus {
+  PLANNING
+  ACTIVE
+  LAUNCHED
+  CLOSED
+}
+
+enum BranchLaunchStepStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum TranslationSourceType {
+  ANNOUNCEMENT
+  SERMON
+  CHAT
+  POLICY
+  TRAINING
+  DOCUMENT
+  OTHER
+}
+
+enum TranslationRecordStatus {
+  DRAFT
+  COMPLETED
+  APPROVED
+  ARCHIVED
+}
+
+enum MarketplaceListingStatus {
+  AVAILABLE
+  REQUESTED
+  RESERVED
+  SHARED
+  ARCHIVED
+}
+
+enum MarketplaceRequestStatus {
+  OPEN
+  OFFERED
+  FULFILLED
+  CANCELLED
+}
+
+enum RosterPlanStatus {
+  DRAFT
+  GENERATED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LeadershipPipelineStatus {
+  WATCHLIST
+  TRAINING
+  READY
+  APPOINTED
+  NOT_READY
+}
+
+enum BoardRecordType {
+  MINUTES
+  RESOLUTION
+  LEGAL
+  FINANCE
+  APPROVAL
+  DOCUMENT
+}
+
+enum BoardRecordStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  ARCHIVED
+}
+
 model User {
   id                         String                       @id @default(cuid())
   name                       String?
@@ -2089,6 +2173,225 @@ model BranchTransferRequest {
   @@index([userId, status, createdAt])
   @@index([toUnitId, status])
   @@index([fromUnitId, status])
+}
+
+model VolunteerOpportunity {
+  id                 String                     @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  ministryId         String?
+  title              String
+  role               String
+  location           String?
+  requiredSkills     Json?
+  spiritualGifts     Json?
+  languages          Json?
+  interests          Json?
+  status             VolunteerOpportunityStatus @default(OPEN)
+  createdById        String
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@index([organizationUnitId, status])
+  @@index([ministryId, status])
+  @@index([workspaceId, status])
+}
+
+model VolunteerMatch {
+  id            String   @id @default(cuid())
+  opportunityId String
+  userId        String
+  score         Int
+  reasons       Json
+  createdAt     DateTime @default(now())
+
+  @@unique([opportunityId, userId])
+  @@index([opportunityId, score])
+  @@index([userId, score])
+}
+
+model BranchLaunchPlan {
+  id                 String             @id @default(cuid())
+  organizationUnitId String?
+  name               String
+  country            String?
+  city               String?
+  targetLaunchAt     DateTime?
+  status             BranchLaunchStatus @default(PLANNING)
+  leaderId           String?
+  budgetAmount       Int?
+  budgetCurrency     String             @default("GBP")
+  createdById        String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([organizationUnitId, status])
+  @@index([leaderId, status])
+  @@index([targetLaunchAt, status])
+}
+
+model BranchLaunchStep {
+  id        String                 @id @default(cuid())
+  planId    String
+  title     String
+  category  String
+  status    BranchLaunchStepStatus @default(NOT_STARTED)
+  dueAt     DateTime?
+  ownerId   String?
+  notes     String?
+  sortOrder Int
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  @@index([planId, sortOrder])
+  @@index([ownerId, status])
+}
+
+model TranslationRecord {
+  id             String                  @id @default(cuid())
+  sourceType     TranslationSourceType
+  sourceId       String?
+  title          String
+  sourceLanguage String                  @default("en")
+  targetLanguage String
+  originalText   String                  @db.Text
+  translatedText String                  @db.Text
+  status         TranslationRecordStatus @default(COMPLETED)
+  createdById    String
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([sourceType, sourceId])
+  @@index([targetLanguage, status])
+  @@index([createdById, createdAt])
+}
+
+model ResourceMarketplaceListing {
+  id                 String                   @id @default(cuid())
+  resourceId         String?
+  organizationUnitId String?
+  title              String
+  category           String
+  description        String?
+  quantity           Int                      @default(1)
+  location           String?
+  availableFrom      DateTime?
+  status             MarketplaceListingStatus @default(AVAILABLE)
+  offeredById        String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([organizationUnitId, status])
+  @@index([category, status])
+  @@index([offeredById, createdAt])
+}
+
+model ResourceMarketplaceRequest {
+  id                 String                   @id @default(cuid())
+  listingId          String?
+  organizationUnitId String?
+  title              String
+  category           String
+  quantity           Int                      @default(1)
+  neededBy           DateTime?
+  status             MarketplaceRequestStatus @default(OPEN)
+  requestedById      String
+  notes              String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([listingId, status])
+  @@index([organizationUnitId, status])
+  @@index([category, status])
+}
+
+model RosterPlan {
+  id                 String           @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  ministryId         String?
+  title              String
+  startsAt           DateTime
+  endsAt             DateTime
+  status             RosterPlanStatus @default(DRAFT)
+  createdById        String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([workspaceId, status, startsAt])
+  @@index([organizationUnitId, status, startsAt])
+  @@index([ministryId, status])
+}
+
+model RosterAssignment {
+  id           String   @id @default(cuid())
+  rosterPlanId String
+  userId       String
+  role         String
+  dutyDate     DateTime
+  status       String   @default("SCHEDULED")
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  @@unique([rosterPlanId, userId, role, dutyDate])
+  @@index([userId, dutyDate])
+  @@index([rosterPlanId, role])
+}
+
+model LeadershipCandidate {
+  id                 String                   @id @default(cuid())
+  userId             String
+  organizationUnitId String?
+  ministryId         String?
+  score              Int
+  status             LeadershipPipelineStatus @default(WATCHLIST)
+  strengths          Json?
+  risks              Json?
+  recommendation     String?                  @db.Text
+  nominatedById      String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([userId, organizationUnitId, ministryId])
+  @@index([status, score])
+  @@index([organizationUnitId, status])
+  @@index([ministryId, status])
+}
+
+model BoardRecord {
+  id                 String            @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  recordType         BoardRecordType
+  title              String
+  body               String            @db.Text
+  confidential       Boolean           @default(true)
+  status             BoardRecordStatus @default(DRAFT)
+  createdById        String
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([recordType, status, createdAt])
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+}
+
+model BoardDecision {
+  id          String    @id @default(cuid())
+  recordId    String
+  title       String
+  outcome     String
+  ownerId     String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recordId, createdAt])
+  @@index([ownerId, dueAt])
 }
 
 model VisitorJourney {
