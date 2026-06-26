@@ -395,6 +395,87 @@ enum DutyScheduleStatus {
   CANCELLED
 }
 
+enum ChurchProjectType {
+  BUILDING
+  MISSION
+  OUTREACH
+  CRUSADE
+  ADMINISTRATIVE
+  OTHER
+}
+
+enum ChurchProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum BudgetLineStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum CounsellingCaseStatus {
+  OPEN
+  ACTIVE
+  FOLLOW_UP
+  CLOSED
+}
+
+enum CounsellingSensitivity {
+  PASTORAL
+  SAFEGUARDING
+  HIGHLY_RESTRICTED
+}
+
+enum SmartAttendanceTargetType {
+  SERVICE
+  MEETING
+  EVENT
+}
+
+enum DocumentExpiryTargetType {
+  FILE
+  POLICY
+  CERTIFICATE
+  FORM
+  PERMIT
+  OTHER
+}
+
+enum DocumentExpiryStatus {
+  ACTIVE
+  REVIEW_DUE
+  EXPIRED
+  RENEWED
+  ARCHIVED
+}
+
+enum NewsAudienceType {
+  LETW_WIDE
+  ORGANIZATION_UNIT
+  WORKSPACE
+  LEADERSHIP
+}
+
+enum NewsReactionType {
+  LIKE
+  AMEN
+  PRAYING
+  CELEBRATE
+}
+
+enum BranchTransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id                         String                       @id @default(cuid())
   name                       String?
@@ -737,40 +818,42 @@ model WorkspaceRolePermission {
 }
 
 model MemberProfile {
-  id                      String    @id @default(cuid())
-  userId                  String    @unique
-  phone                   String?
-  alternatePhone          String?
-  membershipNumber        String?   @unique
-  membershipStatus        String    @default("ACTIVE")
-  dateOfBirth             DateTime?
-  gender                  String?
-  maritalStatus           String?
-  address                 String?
-  city                    String?
-  country                 String?
-  occupation              String?
-  employer                String?
-  emergencyContactName    String?
-  emergencyContactPhone   String?
-  firstVisitAt            DateTime?
-  salvationAt             DateTime?
-  baptismAt               DateTime?
-  membershipStartedAt     DateTime?
-  organizationPosition    String?
-  digitalIdLocation       String    @default("LETTW Worldwide")
-  communicationPreference String?
-  ministryInterests       Json?
-  skills                  Json?
-  pastoralCareStatus      String?
-  adminNotes              String?   @db.Text
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                        String    @id @default(cuid())
+  userId                    String    @unique
+  phone                     String?
+  alternatePhone            String?
+  membershipNumber          String?   @unique
+  membershipStatus          String    @default("ACTIVE")
+  dateOfBirth               DateTime?
+  gender                    String?
+  maritalStatus             String?
+  address                   String?
+  city                      String?
+  country                   String?
+  occupation                String?
+  employer                  String?
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  firstVisitAt              DateTime?
+  salvationAt               DateTime?
+  baptismAt                 DateTime?
+  membershipStartedAt       DateTime?
+  organizationPosition      String?
+  digitalIdLocation         String    @default("LETTW Worldwide")
+  communicationPreference   String?
+  ministryInterests         Json?
+  skills                    Json?
+  pastoralCareStatus        String?
+  currentOrganizationUnitId String?
+  adminNotes                String?   @db.Text
+  user                      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   @@index([membershipStatus])
   @@index([city])
   @@index([pastoralCareStatus])
+  @@index([currentOrganizationUnitId])
 }
 
 model AiAssistantThread {
@@ -1774,6 +1857,238 @@ model ResourceBooking {
 
   @@index([resourceId, startsAt, endsAt])
   @@index([workspaceId, status])
+}
+
+model ChurchProject {
+  id                 String              @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  ministryId         String?
+  name               String
+  description        String?             @db.Text
+  projectType        ChurchProjectType
+  status             ChurchProjectStatus @default(PLANNING)
+  budgetAmount       Int?
+  budgetCurrency     String              @default("GBP")
+  startsAt           DateTime?
+  dueAt              DateTime?
+  completedAt        DateTime?
+  ownerId            String?
+  createdById        String
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([workspaceId, status, dueAt])
+  @@index([organizationUnitId, status])
+  @@index([ownerId, status])
+  @@index([projectType, status])
+}
+
+model ChurchProjectTask {
+  id           String       @id @default(cuid())
+  projectId    String
+  title        String
+  description  String?
+  status       TaskStatus   @default(TODO)
+  priority     TaskPriority @default(NORMAL)
+  dueDate      DateTime?
+  assignedToId String?
+  createdById  String
+  completedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([projectId, status, dueDate])
+  @@index([assignedToId, status])
+}
+
+model ChurchProjectBudgetLine {
+  id           String           @id @default(cuid())
+  projectId    String
+  title        String
+  category     String?
+  amount       Int
+  currency     String           @default("GBP")
+  status       BudgetLineStatus @default(REQUESTED)
+  approvedById String?
+  paidAt       DateTime?
+  notes        String?
+  createdById  String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([projectId, status])
+  @@index([createdById, createdAt])
+}
+
+model ChurchProjectDocument {
+  id        String   @id @default(cuid())
+  projectId String
+  fileId    String
+  title     String?
+  notes     String?
+  addedById String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, fileId])
+  @@index([fileId])
+}
+
+model CounsellingCase {
+  id                 String                 @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  subjectUserId      String?
+  subjectName        String
+  category           String
+  status             CounsellingCaseStatus  @default(OPEN)
+  sensitivity        CounsellingSensitivity @default(PASTORAL)
+  summary            String                 @db.Text
+  assignedToId       String?
+  createdById        String
+  closedAt           DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+  @@index([assignedToId, status])
+  @@index([subjectUserId, status])
+}
+
+model CounsellingNote {
+  id            String    @id @default(cuid())
+  caseId        String
+  authorId      String
+  body          String    @db.Text
+  restricted    Boolean   @default(true)
+  nextContactAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([caseId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model SmartAttendanceSession {
+  id                 String                    @id @default(cuid())
+  targetType         SmartAttendanceTargetType
+  targetId           String?
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  qrToken            String                    @unique
+  active             Boolean                   @default(true)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  createdById        String
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([workspaceId, active])
+  @@index([organizationUnitId, active])
+  @@index([active, startsAt])
+}
+
+model SmartAttendanceRecord {
+  id          String   @id @default(cuid())
+  sessionId   String
+  userId      String?
+  displayName String
+  email       String?
+  method      String   @default("QR")
+  checkedInAt DateTime @default(now())
+  notes       String?
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, checkedInAt])
+  @@index([userId, checkedInAt])
+}
+
+model DocumentExpiryItem {
+  id           String                   @id @default(cuid())
+  workspaceId  String?
+  targetType   DocumentExpiryTargetType
+  targetId     String?
+  title        String
+  ownerId      String?
+  reviewDueAt  DateTime?
+  expiresAt    DateTime?
+  status       DocumentExpiryStatus     @default(ACTIVE)
+  notes        String?
+  createdById  String
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([workspaceId, status, reviewDueAt])
+  @@index([targetType, targetId])
+  @@index([ownerId, status])
+  @@index([expiresAt, status])
+}
+
+model InternalNewsPost {
+  id                 String           @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  audienceType       NewsAudienceType @default(LETW_WIDE)
+  title              String
+  body               String           @db.Text
+  pinned             Boolean          @default(false)
+  commentsEnabled    Boolean          @default(true)
+  authorId           String
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([audienceType, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([organizationUnitId, createdAt])
+  @@index([pinned, createdAt])
+}
+
+model InternalNewsComment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model InternalNewsReaction {
+  id        String           @id @default(cuid())
+  postId    String
+  userId    String
+  reaction  NewsReactionType
+  createdAt DateTime         @default(now())
+
+  @@unique([postId, userId, reaction])
+  @@index([postId, reaction])
+  @@index([userId, createdAt])
+}
+
+model BranchTransferRequest {
+  id            String               @id @default(cuid())
+  userId        String
+  fromUnitId    String?
+  toUnitId      String
+  status        BranchTransferStatus @default(PENDING)
+  reason        String?
+  requestedById String
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNote    String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([toUnitId, status])
+  @@index([fromUnitId, status])
 }
 
 model VisitorJourney {

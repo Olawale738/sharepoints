@@ -17,6 +17,7 @@ import {
   RotateCcw,
   ShieldAlert,
   ShieldX,
+  Trash2,
   UsersRound
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -353,7 +354,39 @@ export function GlobalOperationsPanel() {
                     <p className="text-sm font-medium">{unit.name}</p>
                     <p className="text-xs text-ink/45">{unit.type.toLowerCase()} {unit.countryCode ? `- ${unit.countryCode}` : ""}</p>
                   </div>
-                  <Badge>{unit.parentId ? `under ${unitName.get(unit.parentId) ?? "network"}` : "top level"}</Badge>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <Badge>{unit.parentId ? `under ${unitName.get(unit.parentId) ?? "network"}` : "top level"}</Badge>
+                    <Button
+                      disabled={busy}
+                      variant="secondary"
+                      onClick={() => {
+                        if (confirm(`Clear audit logs connected to ${unit.name}?`)) {
+                          void mutate(
+                            "DELETE",
+                            { entity: "UNIT_ACTIVITY", id: unit.id, confirmation: "CLEAR NETWORK UNIT LOG" },
+                            "Network unit logs cleared."
+                          );
+                        }
+                      }}
+                    >
+                      Clear log
+                    </Button>
+                    <Button
+                      disabled={busy}
+                      variant="danger"
+                      onClick={() => {
+                        if (confirm(`Delete ${unit.name}? Delete child units first if this unit has any.`)) {
+                          void mutate(
+                            "DELETE",
+                            { entity: "UNIT", id: unit.id, confirmation: "DELETE NETWORK UNIT" },
+                            "Network unit deleted."
+                          );
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />Delete
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

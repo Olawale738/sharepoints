@@ -865,21 +865,84 @@ export async function DELETE(request: Request) {
     const user = await requireUser();
     await requireAnyWorkspaceAdmin(user.id);
     const body = (await request.json().catch(() => null)) as
-      | { entity?: string; confirmation?: string }
+      | { entity?: string; id?: string; confirmation?: string }
       | null;
-    if (
-      body?.entity !== "IDENTITY_VERIFICATIONS" ||
-      body.confirmation !== "CLEAR QR VERIFICATION LOG"
-    ) {
-      throw new ApiError(422, "Enter the required QR verification confirmation phrase.");
+    if (body?.entity === "IDENTITY_VERIFICATIONS") {
+      if (body.confirmation !== "CLEAR QR VERIFICATION LOG") {
+        throw new ApiError(422, "Enter the required QR verification confirmation phrase.");
+      }
+      const cleared = await prisma.digitalIdentityVerification.deleteMany({});
+      await logActivity({
+        userId: user.id,
+        action: activityActions.membershipVerificationLogsCleared,
+        metadata: { clearedCount: cleared.count }
+      });
+      return ok({ cleared: true, count: cleared.count });
     }
-    const cleared = await prisma.digitalIdentityVerification.deleteMany({});
-    await logActivity({
-      userId: user.id,
-      action: activityActions.membershipVerificationLogsCleared,
-      metadata: { clearedCount: cleared.count }
-    });
-    return ok({ cleared: true, count: cleared.count });
+
+    if (body?.entity === "UNIT") {
+      if (!body.id) throw new ApiError(422, "Network unit ID is required.");
+      if (body.confirmation !== "DELETE NETWORK UNIT") {
+        throw new ApiError(422, "Enter DELETE NETWORK UNIT to remove this network unit.");
+      }
+      const unit = await prisma.organizationUnit.findUnique({ where: { id: body.id } });
+      if (!unit) throw new ApiError(404, "Network unit not found.");
+      const children = await prisma.organizationUnit.count({ where: { parentId: unit.id } });
+      if (children > 0) {
+        throw new ApiError(409, "Delete child countries, regions, churches, branches, or ministries before deleting this parent.");
+      }
+      const cleanup = await prisma.$transaction(async (tx) => {
+        const [leaders, workspaces, profiles, fromTransfers, toTransfers] = await Promise.all([
+          tx.organizationUnitLeader.deleteMany({ where: { unitId: unit.id } }),
+          tx.workspace.updateMany({ where: { organizationUnitId: unit.id }, data: { organizationUnitId: null, scopeType: null } }),
+          tx.memberProfile.updateMany({ where: { currentOrganizationUnitId: unit.id }, data: { currentOrganizationUnitId: null } }),
+          tx.branchTransferRequest.updateMany({ where: { fromUnitId: unit.id }, data: { fromUnitId: null } }),
+          unit.parentId
+            ? tx.branchTransferRequest.updateMany({ where: { toUnitId: unit.id }, data: { toUnitId: unit.parentId } })
+            : tx.branchTransferRequest.deleteMany({ where: { toUnitId: unit.id } })
+        ]);
+        await tx.organizationUnit.delete({ where: { id: unit.id } });
+        return {
+          leadersDeleted: leaders.count,
+          workspacesDetached: workspaces.count,
+          profilesDetached: profiles.count,
+          transferOriginsCleared: fromTransfers.count,
+          transferDestinationsMoved: toTransfers.count
+        };
+      });
+      await logActivity({
+        userId: user.id,
+        action: activityActions.organizationUnitDeleted,
+        targetId: unit.id,
+        metadata: { name: unit.name, type: unit.type, ...cleanup }
+      });
+      return ok({ deleted: true, id: unit.id, cleanup });
+    }
+
+    if (body?.entity === "UNIT_ACTIVITY") {
+      if (!body.id) throw new ApiError(422, "Network unit ID is required.");
+      if (body.confirmation !== "CLEAR NETWORK UNIT LOG") {
+        throw new ApiError(422, "Enter CLEAR NETWORK UNIT LOG to clear logs for this unit.");
+      }
+      const cleared = await prisma.activityLog.deleteMany({
+        where: {
+          OR: [
+            { targetId: body.id },
+            { metadata: { path: ["unitId"], equals: body.id } },
+            { metadata: { path: ["organizationUnitId"], equals: body.id } }
+          ]
+        }
+      });
+      await logActivity({
+        userId: user.id,
+        action: activityActions.organizationUnitLogsCleared,
+        targetId: body.id,
+        metadata: { clearedCount: cleared.count }
+      });
+      return ok({ cleared: true, count: cleared.count });
+    }
+
+    throw new ApiError(422, "Unknown administrative delete operation.");
   } catch (error) {
     return handleRouteError(error);
   }

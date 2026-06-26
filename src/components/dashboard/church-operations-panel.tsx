@@ -2,10 +2,15 @@
 
 import {
   AlertTriangle,
+  ArrowRightLeft,
   CalendarDays,
+  ClipboardList,
+  FileWarning,
   HeartHandshake,
   Loader2,
   Plus,
+  QrCode,
+  ShieldAlert,
   Trash2,
   UsersRound,
   Wrench,
@@ -15,6 +20,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Operations = {
   ministries: Array<{ id: string; name: string; description?: string | null }>;
@@ -25,9 +31,34 @@ type Operations = {
   resources: Array<{ id: string; name: string; category: string; location?: string | null }>;
   bookings: Array<{ id: string; resourceId: string; title: string; status: string; startsAt: string; endsAt: string }>;
   users: Array<{ id: string; name?: string | null; email?: string | null }>;
+  workspaces: Array<{ id: string; name: string }>;
+  units: Array<{ id: string; name: string; type: string; parentId?: string | null }>;
+  projects: Array<{ id: string; name: string; projectType: string; status: string; budgetAmount?: number | null; budgetCurrency: string; dueAt?: string | null }>;
+  projectTasks: Array<{ id: string; projectId: string; title: string; status: string; priority: string; dueDate?: string | null }>;
+  projectBudgets: Array<{ id: string; projectId: string; title: string; amount: number; currency: string; status: string }>;
+  counsellingCases: Array<{ id: string; subjectName: string; category: string; status: string; sensitivity: string; assignedToId?: string | null; createdAt: string }>;
+  counsellingNotes: Array<{ id: string; caseId: string; body: string; createdAt: string }>;
+  attendanceSessions: Array<{ id: string; title: string; targetType: string; qrToken: string; active: boolean; startsAt?: string | null }>;
+  smartAttendanceRecords: Array<{ id: string; sessionId: string; displayName: string; checkedInAt: string }>;
+  expiryItems: Array<{ id: string; title: string; targetType: string; status: string; reviewDueAt?: string | null; expiresAt?: string | null }>;
+  branchTransfers: Array<{ id: string; userId: string; fromUnitId?: string | null; toUnitId: string; status: string; reason?: string | null; createdAt: string }>;
 };
 
-type CreateMode = "MINISTRY" | "EVENT" | "FOLLOW_UP" | "RESOURCE" | "BOOKING";
+type CreateMode =
+  | "MINISTRY"
+  | "EVENT"
+  | "FOLLOW_UP"
+  | "RESOURCE"
+  | "BOOKING"
+  | "PROJECT"
+  | "PROJECT_TASK"
+  | "PROJECT_BUDGET"
+  | "COUNSELLING_CASE"
+  | "COUNSELLING_NOTE"
+  | "ATTENDANCE_SESSION"
+  | "ATTENDANCE_CHECK_IN"
+  | "EXPIRY_ITEM"
+  | "BRANCH_TRANSFER";
 type DeleteTarget = {
   entity: CreateMode;
   id: string;
@@ -43,7 +74,18 @@ const emptyOperations: Operations = {
   followUps: [],
   resources: [],
   bookings: [],
-  users: []
+  users: [],
+  workspaces: [],
+  units: [],
+  projects: [],
+  projectTasks: [],
+  projectBudgets: [],
+  counsellingCases: [],
+  counsellingNotes: [],
+  attendanceSessions: [],
+  smartAttendanceRecords: [],
+  expiryItems: [],
+  branchTransfers: []
 };
 
 function displayEntity(value: string) {
@@ -82,7 +124,11 @@ export function ChurchOperationsPanel() {
       value: data.followUps.filter((item) => item.status !== "CLOSED").length,
       icon: HeartHandshake
     },
-    { label: "Resources", value: data.resources.length, icon: Wrench }
+    { label: "Resources", value: data.resources.length, icon: Wrench },
+    { label: "Projects", value: data.projects.length, icon: ClipboardList },
+    { label: "Counselling", value: data.counsellingCases.filter((item) => item.status !== "CLOSED").length, icon: ShieldAlert },
+    { label: "QR sessions", value: data.attendanceSessions.filter((item) => item.active).length, icon: QrCode },
+    { label: "Expiry alerts", value: data.expiryItems.filter((item) => item.status !== "ARCHIVED").length, icon: FileWarning }
   ];
 
   async function load() {
@@ -106,12 +152,48 @@ export function ChurchOperationsPanel() {
     setMessage("");
     const values = Object.fromEntries(new FormData(event.currentTarget).entries());
     const payload: Record<string, unknown> = { entity: mode, ...values };
-    for (const optionalKey of ["leaderId", "ministryId", "assignedToId", "eventId", "email", "phone"]) {
+    for (const optionalKey of [
+      "leaderId",
+      "ministryId",
+      "assignedToId",
+      "eventId",
+      "email",
+      "phone",
+      "workspaceId",
+      "organizationUnitId",
+      "ownerId",
+      "subjectUserId",
+      "fromUnitId",
+      "targetId",
+      "userId"
+    ]) {
       if (payload[optionalKey] === "") payload[optionalKey] = null;
     }
     if (mode === "EVENT" || mode === "BOOKING") {
       payload.startsAt = new Date(String(values.startsAt)).toISOString();
       payload.endsAt = new Date(String(values.endsAt)).toISOString();
+    }
+    if (mode === "PROJECT") {
+      payload.startsAt = values.startsAt ? new Date(String(values.startsAt)).toISOString() : null;
+      payload.dueAt = values.dueAt ? new Date(String(values.dueAt)).toISOString() : null;
+      payload.budgetAmount = values.budgetAmount ? Number(values.budgetAmount) : null;
+    }
+    if (mode === "PROJECT_TASK") {
+      payload.dueDate = values.dueDate ? new Date(String(values.dueDate)).toISOString() : null;
+    }
+    if (mode === "PROJECT_BUDGET") {
+      payload.amount = Number(values.amount);
+    }
+    if (mode === "COUNSELLING_NOTE") {
+      payload.nextContactAt = values.nextContactAt ? new Date(String(values.nextContactAt)).toISOString() : null;
+    }
+    if (mode === "ATTENDANCE_SESSION") {
+      payload.startsAt = values.startsAt ? new Date(String(values.startsAt)).toISOString() : null;
+      payload.endsAt = values.endsAt ? new Date(String(values.endsAt)).toISOString() : null;
+    }
+    if (mode === "EXPIRY_ITEM") {
+      payload.reviewDueAt = values.reviewDueAt ? new Date(String(values.reviewDueAt)).toISOString() : null;
+      payload.expiresAt = values.expiresAt ? new Date(String(values.expiresAt)).toISOString() : null;
     }
     if (mode === "FOLLOW_UP") {
       payload.nextContactAt = values.nextContactAt ? new Date(String(values.nextContactAt)).toISOString() : null;
@@ -156,6 +238,31 @@ export function ChurchOperationsPanel() {
     return data.resources.find((resource) => resource.id === resourceId)?.name ?? "Deleted resource";
   }
 
+  function userName(userId?: string | null) {
+    const user = data.users.find((item) => item.id === userId);
+    return user?.name ?? user?.email ?? "Unassigned";
+  }
+
+  function unitName(unitId?: string | null) {
+    return data.units.find((item) => item.id === unitId)?.name ?? "No branch";
+  }
+
+  async function updateRecord(entity: string, id: string, status?: string, active?: boolean) {
+    setError("");
+    const response = await fetch("/api/church/operations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity, id, status, active })
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) {
+      setError(body?.error ?? "Record could not be updated.");
+      return;
+    }
+    setMessage("Record updated.");
+    await load();
+  }
+
   return (
     <div className="space-y-6">
       {message ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{message}</p> : null}
@@ -173,7 +280,22 @@ export function ChurchOperationsPanel() {
 
       <section className="rounded-lg border border-ink/10 bg-white">
         <div className="flex flex-wrap gap-1 border-b border-ink/10 p-2">
-          {(["MINISTRY", "EVENT", "FOLLOW_UP", "RESOURCE", "BOOKING"] as const).map((item) => (
+          {([
+            "MINISTRY",
+            "EVENT",
+            "FOLLOW_UP",
+            "RESOURCE",
+            "BOOKING",
+            "PROJECT",
+            "PROJECT_TASK",
+            "PROJECT_BUDGET",
+            "COUNSELLING_CASE",
+            "COUNSELLING_NOTE",
+            "ATTENDANCE_SESSION",
+            "ATTENDANCE_CHECK_IN",
+            "EXPIRY_ITEM",
+            "BRANCH_TRANSFER"
+          ] as const).map((item) => (
             <button
               key={item}
               className={`rounded-md px-3 py-2 text-sm font-medium ${mode === item ? "bg-moss text-white" : "hover:bg-mint/50"}`}
@@ -244,6 +366,161 @@ export function ChurchOperationsPanel() {
               <Input name="title" placeholder="Booking purpose" required />
               <Input name="startsAt" type="datetime-local" required />
               <Input name="endsAt" type="datetime-local" required />
+            </>
+          ) : null}
+          {mode === "PROJECT" ? (
+            <>
+              <Input name="name" placeholder="Project name" required />
+              <select name="projectType" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                {["BUILDING", "MISSION", "OUTREACH", "CRUSADE", "ADMINISTRATIVE", "OTHER"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+              <select name="organizationUnitId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No branch scope</option>
+                {data.units.map((item) => <option key={item.id} value={item.id}>{item.type.toLowerCase()}: {item.name}</option>)}
+              </select>
+              <select name="ministryId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No ministry</option>
+                {data.ministries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              <select name="ownerId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No owner</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <Input name="budgetAmount" type="number" min="0" placeholder="Budget amount in minor units" />
+              <Input name="budgetCurrency" defaultValue="GBP" placeholder="Currency" maxLength={3} />
+              <Input name="startsAt" type="datetime-local" />
+              <Input name="dueAt" type="datetime-local" />
+              <Textarea className="md:col-span-2" name="description" placeholder="Project description, scope, and success outcome" />
+            </>
+          ) : null}
+          {mode === "PROJECT_TASK" ? (
+            <>
+              <select name="projectId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Choose project</option>
+                {data.projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              <Input name="title" placeholder="Task title" required />
+              <select name="assignedToId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Unassigned</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <select name="priority" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                {["LOW", "NORMAL", "HIGH", "URGENT"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+              <Input name="dueDate" type="datetime-local" />
+              <Input name="description" placeholder="Short task description" />
+            </>
+          ) : null}
+          {mode === "PROJECT_BUDGET" ? (
+            <>
+              <select name="projectId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Choose project</option>
+                {data.projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              <Input name="title" placeholder="Budget item" required />
+              <Input name="category" placeholder="Materials, transport, media..." />
+              <Input name="amount" type="number" min="1" placeholder="Amount in minor units" required />
+              <Input name="currency" defaultValue="GBP" placeholder="Currency" maxLength={3} />
+              <Input name="notes" placeholder="Notes" />
+            </>
+          ) : null}
+          {mode === "COUNSELLING_CASE" ? (
+            <>
+              <Input name="subjectName" placeholder="Person or confidential reference" required />
+              <Input name="category" placeholder="Marriage, prayer, welfare, safeguarding..." required />
+              <select name="subjectUserId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No linked member</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <select name="assignedToId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Unassigned</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <select name="organizationUnitId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No branch scope</option>
+                {data.units.map((item) => <option key={item.id} value={item.id}>{item.type.toLowerCase()}: {item.name}</option>)}
+              </select>
+              <select name="sensitivity" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option>PASTORAL</option>
+                <option>SAFEGUARDING</option>
+                <option>HIGHLY_RESTRICTED</option>
+              </select>
+              <Textarea className="md:col-span-2" name="summary" placeholder="Restricted counselling summary. Excluded from AI search." required />
+            </>
+          ) : null}
+          {mode === "COUNSELLING_NOTE" ? (
+            <>
+              <select name="caseId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Choose counselling case</option>
+                {data.counsellingCases.map((item) => <option key={item.id} value={item.id}>{item.subjectName} - {item.status}</option>)}
+              </select>
+              <Input name="nextContactAt" type="datetime-local" />
+              <Textarea className="md:col-span-2" name="body" placeholder="Private counselling note" required />
+            </>
+          ) : null}
+          {mode === "ATTENDANCE_SESSION" ? (
+            <>
+              <Input name="title" placeholder="Service, meeting, or event title" required />
+              <select name="targetType" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option>SERVICE</option>
+                <option>MEETING</option>
+                <option>EVENT</option>
+              </select>
+              <select name="organizationUnitId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No branch scope</option>
+                {data.units.map((item) => <option key={item.id} value={item.id}>{item.type.toLowerCase()}: {item.name}</option>)}
+              </select>
+              <Input name="targetId" placeholder="Optional service/meeting/event reference" />
+              <Input name="startsAt" type="datetime-local" />
+              <Input name="endsAt" type="datetime-local" />
+            </>
+          ) : null}
+          {mode === "ATTENDANCE_CHECK_IN" ? (
+            <>
+              <select name="sessionId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Choose attendance session</option>
+                {data.attendanceSessions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+              <select name="userId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Current admin account</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <Input name="displayName" placeholder="Display name" required />
+              <Input name="email" type="email" placeholder="Email" />
+              <Input className="md:col-span-2" name="notes" placeholder="Check-in note" />
+            </>
+          ) : null}
+          {mode === "EXPIRY_ITEM" ? (
+            <>
+              <Input name="title" placeholder="Document, policy, permit, or certificate title" required />
+              <select name="targetType" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                {["FILE", "POLICY", "CERTIFICATE", "FORM", "PERMIT", "OTHER"].map((item) => <option key={item}>{item}</option>)}
+              </select>
+              <Input name="targetId" placeholder="Optional file/policy/form ID" />
+              <select name="ownerId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">No owner</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <Input name="reviewDueAt" type="datetime-local" />
+              <Input name="expiresAt" type="datetime-local" />
+              <Input className="md:col-span-2" name="notes" placeholder="Review notes" />
+            </>
+          ) : null}
+          {mode === "BRANCH_TRANSFER" ? (
+            <>
+              <select name="userId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Choose member</option>
+                {data.users.map((user) => <option key={user.id} value={user.id}>{user.name ?? user.email}</option>)}
+              </select>
+              <select name="fromUnitId" className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">Current branch unknown</option>
+                {data.units.map((item) => <option key={item.id} value={item.id}>{item.type.toLowerCase()}: {item.name}</option>)}
+              </select>
+              <select name="toUnitId" required className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm">
+                <option value="">New branch/church/ministry</option>
+                {data.units.map((item) => <option key={item.id} value={item.id}>{item.type.toLowerCase()}: {item.name}</option>)}
+              </select>
+              <Input name="reason" placeholder="Reason for transfer" />
             </>
           ) : null}
           <Button className="md:col-span-2" type="submit">
@@ -372,6 +649,202 @@ export function ChurchOperationsPanel() {
                     id: item.id,
                     label: item.title,
                     warning: "This resource booking will be permanently removed."
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Projects, missions, outreach and crusades</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {data.projects.length === 0 ? <p className="p-4 text-sm text-ink/55">No projects created.</p> : null}
+            {data.projects.map((item) => (
+              <div className="flex items-start justify-between gap-3 px-4 py-3" key={item.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.name}</p>
+                  <p className="text-xs text-ink/50">
+                    {displayEntity(item.projectType)} - {displayEntity(item.status)} - budget {item.budgetAmount ?? 0} {item.budgetCurrency}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"].map((status) => (
+                      <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("PROJECT", item.id, status)}>
+                        {displayEntity(status)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <DeleteButton
+                  label={item.name}
+                  onClick={() => setDeleteTarget({
+                    entity: "PROJECT",
+                    id: item.id,
+                    label: item.name,
+                    warning: "Project tasks, budget lines, and linked project documents will be removed."
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Project tasks and budgets</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {[...data.projectTasks, ...data.projectBudgets].length === 0 ? <p className="p-4 text-sm text-ink/55">No project task or budget records.</p> : null}
+            {data.projectTasks.map((item) => (
+              <div className="px-4 py-3" key={item.id}>
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="text-xs text-ink/50">Task - {displayEntity(item.status)} - {displayEntity(item.priority)}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {["TODO", "IN_PROGRESS", "BLOCKED", "DONE"].map((status) => (
+                    <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("PROJECT_TASK", item.id, status)}>
+                      {displayEntity(status)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {data.projectBudgets.map((item) => (
+              <div className="px-4 py-3" key={item.id}>
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="text-xs text-ink/50">Budget - {item.amount} {item.currency} - {displayEntity(item.status)}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {["REQUESTED", "APPROVED", "PAID", "REJECTED"].map((status) => (
+                    <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("PROJECT_BUDGET", item.id, status)}>
+                      {displayEntity(status)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Restricted counselling cases</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {data.counsellingCases.length === 0 ? <p className="p-4 text-sm text-ink/55">No restricted counselling cases.</p> : null}
+            {data.counsellingCases.map((item) => (
+              <div className="flex items-start justify-between gap-3 px-4 py-3" key={item.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.subjectName}</p>
+                  <p className="text-xs text-ink/50">{item.category} - {displayEntity(item.sensitivity)} - assigned to {userName(item.assignedToId)}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {["OPEN", "ACTIVE", "FOLLOW_UP", "CLOSED"].map((status) => (
+                      <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("COUNSELLING_CASE", item.id, status)}>
+                        {displayEntity(status)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <DeleteButton
+                  label={`${item.subjectName} counselling case`}
+                  onClick={() => setDeleteTarget({
+                    entity: "COUNSELLING_CASE",
+                    id: item.id,
+                    label: `${item.subjectName} counselling case`,
+                    warning: "This will permanently remove the counselling case and private notes."
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Smart QR attendance</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {data.attendanceSessions.length === 0 ? <p className="p-4 text-sm text-ink/55">No QR attendance sessions.</p> : null}
+            {data.attendanceSessions.map((item) => {
+              const count = data.smartAttendanceRecords.filter((record) => record.sessionId === item.id).length;
+              return (
+                <div className="flex items-start justify-between gap-3 px-4 py-3" key={item.id}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-ink/50">{displayEntity(item.targetType)} - {item.active ? "active" : "closed"} - {count} checked in</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <a className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" href={`/api/smart-attendance/${item.id}/qr`} target="_blank">Open QR</a>
+                      <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" type="button" onClick={() => void updateRecord("ATTENDANCE_SESSION", item.id, undefined, !item.active)}>
+                        {item.active ? "Close" : "Reopen"}
+                      </button>
+                    </div>
+                  </div>
+                  <DeleteButton
+                    label={item.title}
+                    onClick={() => setDeleteTarget({
+                      entity: "ATTENDANCE_SESSION",
+                      id: item.id,
+                      label: item.title,
+                      warning: "This QR attendance session and check-in records will be deleted."
+                    })}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Document expiry alerts</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {data.expiryItems.length === 0 ? <p className="p-4 text-sm text-ink/55">No expiry or review alerts.</p> : null}
+            {data.expiryItems.map((item) => (
+              <div className="flex items-start justify-between gap-3 px-4 py-3" key={item.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-ink/50">
+                    {displayEntity(item.targetType)} - {displayEntity(item.status)} - review {item.reviewDueAt ? new Date(item.reviewDueAt).toLocaleDateString() : "not set"} - expires {item.expiresAt ? new Date(item.expiresAt).toLocaleDateString() : "not set"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {["ACTIVE", "REVIEW_DUE", "EXPIRED", "RENEWED", "ARCHIVED"].map((status) => (
+                      <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("EXPIRY_ITEM", item.id, status)}>
+                        {displayEntity(status)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <DeleteButton
+                  label={item.title}
+                  onClick={() => setDeleteTarget({
+                    entity: "EXPIRY_ITEM",
+                    id: item.id,
+                    label: item.title,
+                    warning: "This expiry alert will be deleted."
+                  })}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink/10 bg-white">
+          <h2 className="border-b border-ink/10 px-4 py-3 font-semibold">Branch transfer history</h2>
+          <div className="max-h-96 divide-y divide-ink/10 overflow-y-auto">
+            {data.branchTransfers.length === 0 ? <p className="p-4 text-sm text-ink/55">No branch transfers.</p> : null}
+            {data.branchTransfers.map((item) => (
+              <div className="flex items-start justify-between gap-3 px-4 py-3" key={item.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{userName(item.userId)}</p>
+                  <p className="text-xs text-ink/50">{unitName(item.fromUnitId)} to {unitName(item.toUnitId)} - {displayEntity(item.status)}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {["APPROVED", "REJECTED", "CANCELLED"].map((status) => (
+                      <button className="rounded-md border border-ink/10 px-2 py-1 text-xs hover:bg-mint/50" key={status} type="button" onClick={() => void updateRecord("BRANCH_TRANSFER", item.id, status)}>
+                        {displayEntity(status)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <DeleteButton
+                  label="branch transfer"
+                  onClick={() => setDeleteTarget({
+                    entity: "BRANCH_TRANSFER",
+                    id: item.id,
+                    label: "branch transfer",
+                    warning: "This branch transfer request will be deleted from the history."
                   })}
                 />
               </div>
