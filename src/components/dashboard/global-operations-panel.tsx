@@ -67,6 +67,7 @@ type GlobalData = {
 };
 
 type Tab = "network" | "safeguarding" | "agents" | "freshness" | "safety" | "emergency" | "cards" | "governance" | "resources";
+type OrganizationUnitFormType = "GLOBAL" | "COUNTRY" | "REGION" | "BRANCH" | "CHURCH" | "MINISTRY";
 
 const emptyData: GlobalData = {
   units: [],
@@ -99,6 +100,47 @@ const tabs: Array<{ id: Tab; label: string; icon: typeof Building2 }> = [
   { id: "resources", label: "Smart resources", icon: QrCode }
 ];
 
+const organizationUnitTypes: OrganizationUnitFormType[] = ["GLOBAL", "COUNTRY", "REGION", "BRANCH", "CHURCH", "MINISTRY"];
+
+const unitTypeExamples: Record<OrganizationUnitFormType, { parent: string; code: string; countryCode: string; name: string }> = {
+  GLOBAL: {
+    name: "Light Encounter Tabernacle Worldwide",
+    parent: "No parent",
+    countryCode: "Leave empty",
+    code: "LETW-GLOBAL"
+  },
+  COUNTRY: {
+    name: "Nigeria",
+    parent: "GLOBAL: Light Encounter Tabernacle Worldwide",
+    countryCode: "NG",
+    code: "LETW-NG"
+  },
+  REGION: {
+    name: "Lagos Region",
+    parent: "COUNTRY: Nigeria",
+    countryCode: "NG",
+    code: "LETW-NG-LAG"
+  },
+  BRANCH: {
+    name: "Ikeja Branch",
+    parent: "REGION: Lagos Region",
+    countryCode: "NG",
+    code: "LETW-NG-LAG-IKEJA"
+  },
+  CHURCH: {
+    name: "Ikeja Church",
+    parent: "REGION: Lagos Region",
+    countryCode: "NG",
+    code: "LETW-NG-LAG-IKEJA"
+  },
+  MINISTRY: {
+    name: "Youth Ministry",
+    parent: "CHURCH: Ikeja Church or GLOBAL: Light Encounter Tabernacle Worldwide",
+    countryCode: "Optional",
+    code: "LETW-MIN-YOUTH"
+  }
+};
+
 function selectClassName() {
   return "h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm outline-none focus:border-moss";
 }
@@ -116,9 +158,20 @@ function EmptyState({ children }: { children: React.ReactNode }) {
   return <p className="rounded-md bg-paper px-4 py-6 text-sm text-ink/55">{children}</p>;
 }
 
+function Field({ children, help, label }: { children: React.ReactNode; help?: string; label: string }) {
+  return (
+    <label className="space-y-1.5">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-ink/55">{label}</span>
+      {children}
+      {help ? <span className="block text-xs leading-5 text-ink/45">{help}</span> : null}
+    </label>
+  );
+}
+
 export function GlobalOperationsPanel() {
   const [data, setData] = useState<GlobalData>(emptyData);
   const [tab, setTab] = useState<Tab>("network");
+  const [newUnitType, setNewUnitType] = useState<OrganizationUnitFormType>("GLOBAL");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -213,23 +266,55 @@ export function GlobalOperationsPanel() {
       {tab === "network" ? (
         <div className="grid gap-5 xl:grid-cols-2">
           <FormSection title="Create country, region, branch, church, or ministry">
+            <div className="mb-4 rounded-md border border-ink/10 bg-paper p-4">
+              <p className="text-sm font-semibold text-ink">Create the parent first, then create the child under it.</p>
+              <p className="mt-1 text-xs leading-5 text-ink/55">
+                Example order: GLOBAL LETW root, then COUNTRY, then REGION, then CHURCH or BRANCH, then MINISTRY.
+              </p>
+              <div className="mt-3 grid gap-2 text-xs text-ink/60 md:grid-cols-5">
+                {["1. Global", "2. Country", "3. Region", "4. Church/Branch", "5. Ministry"].map((step) => (
+                  <span className="rounded-md border border-ink/10 bg-white px-2 py-2" key={step}>{step}</span>
+                ))}
+              </div>
+            </div>
             <form className="grid gap-3 md:grid-cols-2" onSubmit={(event) => submitForm(event, "UNIT", "Organization unit created.", (values) => ({
               ...values,
               parentId: values.parentId || null,
               code: values.code || null,
               countryCode: values.countryCode || null
             }))}>
-              <select className={selectClassName()} name="type" required>
-                {["GLOBAL", "COUNTRY", "REGION", "BRANCH", "CHURCH", "MINISTRY"].map((type) => <option key={type}>{type}</option>)}
-              </select>
-              <Input name="name" placeholder="Name" required />
-              <select className={selectClassName()} name="parentId">
-                <option value="">No parent</option>
-                {data.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.type.toLowerCase()}: {unit.name}</option>)}
-              </select>
-              <Input name="countryCode" placeholder="Country code, e.g. GB" maxLength={2} />
-              <Input name="code" placeholder="Internal code" />
-              <Input name="description" placeholder="Description" />
+              <Field help={`Example: ${unitTypeExamples[newUnitType].name}`} label="Unit type">
+                <select
+                  className={selectClassName()}
+                  name="type"
+                  onChange={(event) => setNewUnitType(event.target.value as OrganizationUnitFormType)}
+                  required
+                  value={newUnitType}
+                >
+                  {organizationUnitTypes.map((type) => <option key={type}>{type}</option>)}
+                </select>
+              </Field>
+              <Field help="The public name people will recognize." label="Name">
+                <Input name="name" placeholder={unitTypeExamples[newUnitType].name} required />
+              </Field>
+              <Field
+                help={`For this type, parent should usually be: ${unitTypeExamples[newUnitType].parent}.`}
+                label="Parent unit"
+              >
+                <select className={selectClassName()} name="parentId">
+                  <option value="">No parent - only for the worldwide/global root</option>
+                  {data.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.type.toLowerCase()}: {unit.name}</option>)}
+                </select>
+              </Field>
+              <Field help={`Two-letter country code. Example: ${unitTypeExamples[newUnitType].countryCode}.`} label="Country code">
+                <Input name="countryCode" placeholder="NG, GB, US..." maxLength={2} />
+              </Field>
+              <Field help={`Unique admin code. Example: ${unitTypeExamples[newUnitType].code}.`} label="Internal code">
+                <Input name="code" placeholder={unitTypeExamples[newUnitType].code} />
+              </Field>
+              <Field help="Optional note for admins, reports, or future reference." label="Description">
+                <Input name="description" placeholder="Short description" />
+              </Field>
               <Button className="md:col-span-2" disabled={busy} type="submit"><Plus className="h-4 w-4" />Create network unit</Button>
             </form>
           </FormSection>
