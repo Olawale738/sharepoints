@@ -346,15 +346,56 @@ export function GlobalOperationsPanel() {
           </FormSection>
 
           <FormSection title={`Network structure (${data.units.length})`}>
+            {data.units.length ? (
+              <div className="mb-4 rounded-md border border-clay/20 bg-clay/5 p-4">
+                <p className="text-sm font-semibold text-clay">Network danger zone</p>
+                <p className="mt-1 text-xs leading-5 text-ink/55">
+                  Delete the entire church network structure in one action. This removes all countries, regions,
+                  branches, churches, and ministries listed here. Connected records are detached safely.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    disabled={busy}
+                    variant="secondary"
+                    onClick={() => {
+                      if (confirm("Clear all audit logs connected to every network unit?")) {
+                        void mutate(
+                          "DELETE",
+                          { entity: "ALL_UNIT_ACTIVITY", confirmation: "CLEAR ALL NETWORK LOGS" },
+                          "All network logs cleared."
+                        );
+                      }
+                    }}
+                  >
+                    Clear all network logs
+                  </Button>
+                  <Button
+                    disabled={busy}
+                    variant="danger"
+                    onClick={() => {
+                      if (confirm("Delete the entire LETW network structure? This removes all global, country, region, branch, church, and ministry units.")) {
+                        void mutate(
+                          "DELETE",
+                          { entity: "ALL_UNITS", confirmation: "DELETE ENTIRE NETWORK STRUCTURE" },
+                          "Entire network structure deleted."
+                        );
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />Delete entire network structure
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <div className="max-h-[30rem] divide-y divide-ink/10 overflow-y-auto">
               {data.units.length === 0 ? <EmptyState>Create the global LETW unit first, then countries and their child regions.</EmptyState> : null}
               {data.units.map((unit) => (
-                <div className="flex items-center justify-between gap-3 py-3" key={unit.id}>
+                <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between" key={unit.id}>
                   <div>
                     <p className="text-sm font-medium">{unit.name}</p>
                     <p className="text-xs text-ink/45">{unit.type.toLowerCase()} {unit.countryCode ? `- ${unit.countryCode}` : ""}</p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                     <Badge>{unit.parentId ? `under ${unitName.get(unit.parentId) ?? "network"}` : "top level"}</Badge>
                     <Button
                       disabled={busy}
