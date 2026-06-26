@@ -137,5 +137,19 @@ export const activityActions = {
   leadershipCandidateUpdated: "leadership.candidate_updated",
   boardRecordCreated: "board.record_created",
   boardRecordUpdated: "board.record_updated",
-  boardRecordDeleted: "board.record_deleted"
+  boardRecordDeleted: "board.record_deleted",
+  trainingProgramCreated: "growth.training_program_created",
+  trainingEnrollmentCreated: "growth.training_enrollment_created",
+  trainingEnrollmentUpdated: "growth.training_enrollment_updated",
+  prayerRequestCreated: "growth.prayer_request_created",
+  prayerRequestUpdated: "growth.prayer_request_updated",
+  prayerNoteCreated: "growth.prayer_note_created",
+  assetMaintenanceCreated: "growth.asset_maintenance_created",
+  assetMaintenanceUpdated: "growth.asset_maintenance_updated",
+  ministryCampaignCreated: "growth.ministry_campaign_created",
+  ministryCampaignUpdated: "growth.ministry_campaign_updated",
+  campaignUpdateCreated: "growth.campaign_update_created",
+  sermonResourceCreated: "growth.sermon_resource_created",
+  growthRecordDeleted: "growth.record_deleted",
+  growthLogsCleared: "growth.logs_cleared"
 } as const;

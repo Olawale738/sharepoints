@@ -560,6 +560,64 @@ enum BoardRecordStatus {
   ARCHIVED
 }
 
+enum TrainingProgramStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TrainingEnrollmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  REVOKED
+}
+
+enum PrayerRequestVisibility {
+  PRIVATE
+  PASTORAL
+  WORKSPACE
+}
+
+enum PrayerRequestStatus {
+  OPEN
+  ASSIGNED
+  PRAYED_FOR
+  FOLLOW_UP
+  CLOSED
+}
+
+enum GrowthPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MaintenanceTicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum MinistryCampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum SermonResourceVisibility {
+  PRIVATE
+  LEADERSHIP
+  MEMBERS
+  PUBLIC
+}
+
 model User {
   id                         String                       @id @default(cuid())
   name                       String?
@@ -2392,6 +2450,163 @@ model BoardDecision {
 
   @@index([recordId, createdAt])
   @@index([ownerId, dueAt])
+}
+
+model TrainingProgram {
+  id                 String                @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  description        String?               @db.Text
+  category           String
+  level              String                @default("Foundation")
+  requiredRole       String?
+  durationMinutes    Int?
+  status             TrainingProgramStatus @default(ACTIVE)
+  createdById        String
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+  @@index([category, status])
+}
+
+model TrainingEnrollment {
+  id                String                   @id @default(cuid())
+  programId         String
+  userId            String
+  status            TrainingEnrollmentStatus @default(ASSIGNED)
+  progress          Int                      @default(0)
+  dueAt             DateTime?
+  completedAt       DateTime?
+  certificateNumber String?                  @unique
+  certifiedAt       DateTime?
+  assignedById      String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([programId, userId])
+  @@index([userId, status, dueAt])
+  @@index([programId, status])
+  @@index([certificateNumber])
+}
+
+model PrayerRequest {
+  id                 String                  @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  details            String                  @db.Text
+  visibility         PrayerRequestVisibility @default(PASTORAL)
+  priority           GrowthPriority          @default(NORMAL)
+  status             PrayerRequestStatus     @default(OPEN)
+  createdById        String
+  assignedToId       String?
+  prayedAt           DateTime?
+  closedAt           DateTime?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([createdById, status, createdAt])
+  @@index([assignedToId, status, createdAt])
+  @@index([workspaceId, visibility, status])
+  @@index([organizationUnitId, status])
+}
+
+model PrayerRequestNote {
+  id              String   @id @default(cuid())
+  prayerRequestId String
+  authorId        String
+  body            String   @db.Text
+  createdAt       DateTime @default(now())
+
+  @@index([prayerRequestId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model AssetMaintenanceTicket {
+  id                 String                  @id @default(cuid())
+  resourceId         String?
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  category           String
+  issue              String                  @db.Text
+  priority           GrowthPriority          @default(NORMAL)
+  status             MaintenanceTicketStatus @default(OPEN)
+  assignedToId       String?
+  dueAt              DateTime?
+  completedAt        DateTime?
+  createdById        String
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([resourceId, status])
+  @@index([assignedToId, status, dueAt])
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+}
+
+model MinistryCampaign {
+  id                 String                 @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  ministryId         String?
+  title              String
+  campaignType       String
+  objective          String                 @db.Text
+  targetAudience     String?
+  goalCount          Int?
+  currentCount       Int                    @default(0)
+  budgetAmount       Int?
+  budgetCurrency     String                 @default("GBP")
+  status             MinistryCampaignStatus @default(DRAFT)
+  ownerId            String?
+  createdById        String
+  startsAt           DateTime?
+  endsAt             DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([workspaceId, status, startsAt])
+  @@index([organizationUnitId, status, startsAt])
+  @@index([ministryId, status])
+  @@index([ownerId, status])
+}
+
+model CampaignUpdate {
+  id            String   @id @default(cuid())
+  campaignId    String
+  authorId      String
+  body          String   @db.Text
+  progressCount Int?
+  createdAt     DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model SermonResource {
+  id                 String                   @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  speaker            String
+  scripture          String?
+  language           String                   @default("en")
+  mediaUrl           String?
+  notes              String?                  @db.Text
+  visibility         SermonResourceVisibility @default(MEMBERS)
+  tags               Json?
+  createdById        String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([workspaceId, visibility, createdAt])
+  @@index([organizationUnitId, visibility, createdAt])
+  @@index([speaker, createdAt])
+  @@index([language, visibility])
 }
 
 model VisitorJourney {

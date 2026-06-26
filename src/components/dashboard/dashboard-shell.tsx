@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, UserRound } from "lucide-react";
+import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, Sprout, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -157,6 +157,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               >
                 <HeartHandshake className="h-4 w-4" />
                 <span className="hidden 2xl:inline">{messages.operations}</span>
+              </Link>
+              <Link
+                aria-label="Growth suite"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/growth"
+              >
+                <Sprout className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Growth</span>
               </Link>
               <NotificationCenter />
               <PwaInstallButton />

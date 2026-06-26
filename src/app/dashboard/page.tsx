@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   SlidersHorizontal,
+  Sprout,
   TrendingUp,
   UserCog,
   UsersRound
@@ -791,6 +792,13 @@ export default async function DashboardPage() {
       action: "Open calls",
       href: adminControlWorkspaceHref,
       icon: CalendarClock
+    },
+    {
+      title: "Growth Suite",
+      detail: "Manage training, certificates, prayer requests, maintenance, campaigns, and sermon resources.",
+      action: "Open growth suite",
+      href: "/dashboard/growth",
+      icon: Sprout
     }
   ];
 
