@@ -78,6 +78,10 @@ async function activeSigningKey() {
   });
   if (existing) return existing;
 
+  return createSigningKey();
+}
+
+async function createSigningKey() {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const privateJwk = privateKey.export({ format: "jwk" }) as JWK;
   const publicJwk = publicKey.export({ format: "jwk" }) as JWK;
@@ -91,6 +95,30 @@ async function activeSigningKey() {
       encryptedPrivateJwk: encryptPrivateJwk(privateJwk)
     }
   });
+}
+
+async function importSigningPrivateKey() {
+  let key = await activeSigningKey();
+
+  try {
+    return {
+      key,
+      privateKey: await importJWK(decryptPrivateJwk(key.encryptedPrivateJwk), "EdDSA")
+    };
+  } catch {
+    await prisma.credentialSigningKey
+      .update({
+        where: { id: key.id },
+        data: { active: false, retiredAt: new Date() }
+      })
+      .catch(() => null);
+    key = await createSigningKey();
+
+    return {
+      key,
+      privateKey: await importJWK(decryptPrivateJwk(key.encryptedPrivateJwk), "EdDSA")
+    };
+  }
 }
 
 export async function rotateMembershipCredentialSigningKey() {
@@ -194,8 +222,7 @@ export async function ensureMembershipCredential(cardId: string) {
     return { card, account, credential: card.credentialJwt };
   }
 
-  const key = await activeSigningKey();
-  const privateKey = await importJWK(decryptPrivateJwk(key.encryptedPrivateJwk), "EdDSA");
+  const { key, privateKey } = await importSigningPrivateKey();
   const credentialId = randomUUID();
   const issuedAt = new Date();
   const subjectId = `urn:letw:member:${card.organizationId}`;

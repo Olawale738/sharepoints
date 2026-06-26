@@ -51,10 +51,20 @@ export default async function MembershipCardPage() {
       orderBy: { joinedAt: "asc" }
     })
   ]);
-  const signedCredential = card ? await ensureMembershipCredential(card.id) : null;
-  const credentialVerification = signedCredential
-    ? await verifyMembershipCredential(signedCredential.card)
-    : null;
+  let credentialVerification: Awaited<ReturnType<typeof verifyMembershipCredential>> | null = null;
+  let credentialError: string | null = null;
+
+  if (card) {
+    try {
+      const signedCredential = await ensureMembershipCredential(card.id);
+      credentialVerification = await verifyMembershipCredential(signedCredential.card);
+    } catch (error) {
+      credentialError =
+        error instanceof Error
+          ? error.message
+          : "The signed credential could not be prepared.";
+    }
+  }
 
   const location =
     account?.memberProfile?.digitalIdLocation ||
@@ -68,7 +78,13 @@ export default async function MembershipCardPage() {
   const cardValid = Boolean(
     card && card.status === "ACTIVE" && (!card.expiresAt || card.expiresAt > new Date())
   );
-  const cardDisplayStatus = cardValid ? "active" : card?.status === "ACTIVE" ? "expired" : card?.status.toLowerCase();
+  const cardDisplayStatus = !card
+    ? "not issued"
+    : cardValid
+      ? "active"
+      : card.status === "ACTIVE"
+        ? "expired"
+        : card.status.toLowerCase();
 
   return (
     <div className="space-y-5">
@@ -199,27 +215,36 @@ export default async function MembershipCardPage() {
                   Cryptographically verifiable credential
                 </p>
                 <p className="mt-1 text-xs text-ink/50">
-                  {credentialVerification?.signatureValid
-                    ? "Ed25519 signature verified. The credential can be independently checked with LETW's public key."
-                    : "The signed credential could not be verified."}
+                  {credentialError
+                    ? "The card is loaded, but signed credential verification is temporarily unavailable."
+                    : credentialVerification?.signatureValid
+                      ? "Ed25519 signature verified. The credential can be independently checked with LETW's public key."
+                      : "The signed credential could not be verified."}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge className={credentialVerification?.signatureValid ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>
-                    signature {credentialVerification?.signatureValid ? "verified" : "invalid"}
+                    signature {credentialError ? "unavailable" : credentialVerification?.signatureValid ? "verified" : "invalid"}
                   </Badge>
                   <Badge className={credentialVerification?.statusValid ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>
-                    live status {credentialVerification?.statusValid ? "valid" : "inactive"}
+                    live status {credentialError ? "unavailable" : credentialVerification?.statusValid ? "valid" : "inactive"}
                   </Badge>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <a
-                  className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
-                  href={`/api/credentials/member/${card.qrToken}`}
-                >
-                  <Download className="h-4 w-4" />
-                  Download signed credential
-                </a>
+                {credentialError ? (
+                  <span className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-sm font-medium text-ink/45">
+                    <Download className="h-4 w-4" />
+                    Signed credential unavailable
+                  </span>
+                ) : (
+                  <a
+                    className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
+                    href={`/api/credentials/member/${card.qrToken}`}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download signed credential
+                  </a>
+                )}
                 <a
                   className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
                   href="/api/credentials/jwks"

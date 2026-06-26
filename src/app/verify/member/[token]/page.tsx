@@ -34,10 +34,53 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
     auth(),
     headers()
   ]);
-  const issued = existing ? await ensureMembershipCredential(existing.id) : null;
-  const card = issued?.card ?? null;
-  const account = issued?.account ?? null;
-  const credentialVerification = card ? await verifyMembershipCredential(card) : null;
+  let issued: Awaited<ReturnType<typeof ensureMembershipCredential>> | null = null;
+  let credentialVerification: Awaited<ReturnType<typeof verifyMembershipCredential>> | null = null;
+  let credentialError: string | null = null;
+
+  if (existing) {
+    try {
+      issued = await ensureMembershipCredential(existing.id);
+    } catch (error) {
+      credentialError =
+        error instanceof Error
+          ? error.message
+          : "The signed credential could not be prepared.";
+    }
+  }
+
+  const card = issued?.card ?? existing ?? null;
+  const account =
+    issued?.account ??
+    (card
+      ? await prisma.user.findUnique({
+          where: { id: card.userId },
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            memberProfile: {
+              select: {
+                membershipNumber: true,
+                membershipStatus: true,
+                membershipStartedAt: true,
+                organizationPosition: true,
+                digitalIdLocation: true
+              }
+            }
+          }
+        })
+      : null);
+  if (card) {
+    try {
+      credentialVerification = await verifyMembershipCredential(card);
+    } catch (error) {
+      credentialError =
+        error instanceof Error
+          ? error.message
+          : "The signed credential could not be verified.";
+    }
+  }
   const valid = credentialVerification?.valid ?? false;
   const forwardedIp = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const ipHash = createHash("sha256")
@@ -49,7 +92,7 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
       data: {
         cardId: card.id,
         organizationId: card.organizationId,
-        outcome: valid ? "VALID" : card.status,
+        outcome: credentialError ? "VERIFICATION_UNAVAILABLE" : valid ? "VALID" : card.status,
         scannedById: session?.user?.id ?? null,
         ipHash,
         userAgent: requestHeaders.get("user-agent")?.slice(0, 500) ?? null,
@@ -193,7 +236,9 @@ export default async function VerifyMemberPage({ params }: { params: Promise<{ t
             <Ban className="mx-auto h-12 w-12 text-red-700" />
             <h1 className="mt-4 text-2xl font-semibold">QR code authentication failed</h1>
             <p className="mt-2 text-sm text-[#0b1f33]/60">
-              {credentialVerification && !credentialVerification.signatureValid
+              {credentialError
+                ? "The member record was found, but cryptographic verification is temporarily unavailable. Do not accept it until the status confirms again."
+                : credentialVerification && !credentialVerification.signatureValid
                 ? "The digital signature is invalid or the signed information was altered."
                 : "The signature may be authentic, but this credential is expired, revoked, deleted, superseded, or belongs to an inactive account."}{" "}
               Do not accept it as proof of active membership.
