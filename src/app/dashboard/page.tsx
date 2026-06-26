@@ -5,6 +5,7 @@ import {
   Building2,
   CalendarClock,
   Database,
+  DoorOpen,
   Files,
   FolderPlus,
   Gauge,
@@ -799,6 +800,13 @@ export default async function DashboardPage() {
       action: "Open growth suite",
       href: "/dashboard/growth",
       icon: Sprout
+    },
+    {
+      title: "Access Control Center",
+      detail: "Use LETW Digital ID QR codes for doors, entrances, desks, resources, scanner logs, and future NFC/RFID hardware.",
+      action: "Open access control",
+      href: "/dashboard/access-control",
+      icon: DoorOpen
     }
   ];
 

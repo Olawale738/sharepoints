@@ -905,7 +905,14 @@ export async function DELETE(request: Request) {
           requests,
           rosterPlans,
           candidates,
-          boardRecords
+          boardRecords,
+          trainingPrograms,
+          prayerRequests,
+          maintenanceTickets,
+          campaigns,
+          sermonResources,
+          accessPoints,
+          accessRules
         ] = await Promise.all([
           tx.organizationUnitLeader.deleteMany({ where: { unitId: { in: unitIds } } }),
           tx.workspace.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null, scopeType: null } }),
@@ -923,7 +930,14 @@ export async function DELETE(request: Request) {
           tx.resourceMarketplaceRequest.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
           tx.rosterPlan.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
           tx.leadershipCandidate.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
-          tx.boardRecord.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } })
+          tx.boardRecord.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.trainingProgram.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.prayerRequest.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.assetMaintenanceTicket.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.ministryCampaign.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.sermonResource.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.accessPoint.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.accessRule.deleteMany({ where: { subjectType: "ORGANIZATION_UNIT", subjectId: { in: unitIds } } })
         ]);
         await tx.organizationUnit.deleteMany({ where: { id: { in: unitIds } } });
         return {
@@ -944,7 +958,14 @@ export async function DELETE(request: Request) {
           marketplaceRequestsDetached: requests.count,
           rosterPlansDetached: rosterPlans.count,
           leadershipCandidatesDetached: candidates.count,
-          boardRecordsDetached: boardRecords.count
+          boardRecordsDetached: boardRecords.count,
+          trainingProgramsDetached: trainingPrograms.count,
+          prayerRequestsDetached: prayerRequests.count,
+          maintenanceTicketsDetached: maintenanceTickets.count,
+          campaignsDetached: campaigns.count,
+          sermonResourcesDetached: sermonResources.count,
+          accessPointsDetached: accessPoints.count,
+          accessRulesDeleted: accessRules.count
         };
       });
       await logActivity({
@@ -1023,7 +1044,14 @@ export async function DELETE(request: Request) {
           requests,
           rosterPlans,
           candidates,
-          boardRecords
+          boardRecords,
+          trainingPrograms,
+          prayerRequests,
+          maintenanceTickets,
+          campaigns,
+          sermonResources,
+          accessPoints,
+          accessRules
         ] = await Promise.all([
           tx.organizationUnitLeader.deleteMany({ where: { unitId: { in: unitIds } } }),
           tx.workspace.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null, scopeType: null } }),
@@ -1041,7 +1069,14 @@ export async function DELETE(request: Request) {
           tx.resourceMarketplaceRequest.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
           tx.rosterPlan.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
           tx.leadershipCandidate.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
-          tx.boardRecord.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } })
+          tx.boardRecord.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.trainingProgram.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.prayerRequest.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.assetMaintenanceTicket.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.ministryCampaign.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.sermonResource.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.accessPoint.updateMany({ where: { organizationUnitId: { in: unitIds } }, data: { organizationUnitId: null } }),
+          tx.accessRule.deleteMany({ where: { subjectType: "ORGANIZATION_UNIT", subjectId: { in: unitIds } } })
         ]);
         await tx.organizationUnit.deleteMany({ where: { id: { in: unitIds } } });
         return {
@@ -1062,7 +1097,14 @@ export async function DELETE(request: Request) {
           marketplaceRequestsDetached: requests.count,
           rosterPlansDetached: rosterPlans.count,
           leadershipCandidatesDetached: candidates.count,
-          boardRecordsDetached: boardRecords.count
+          boardRecordsDetached: boardRecords.count,
+          trainingProgramsDetached: trainingPrograms.count,
+          prayerRequestsDetached: prayerRequests.count,
+          maintenanceTicketsDetached: maintenanceTickets.count,
+          campaignsDetached: campaigns.count,
+          sermonResourcesDetached: sermonResources.count,
+          accessPointsDetached: accessPoints.count,
+          accessRulesDeleted: accessRules.count
         };
       });
       await logActivity({

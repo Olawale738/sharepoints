@@ -151,5 +151,11 @@ export const activityActions = {
   campaignUpdateCreated: "growth.campaign_update_created",
   sermonResourceCreated: "growth.sermon_resource_created",
   growthRecordDeleted: "growth.record_deleted",
-  growthLogsCleared: "growth.logs_cleared"
+  growthLogsCleared: "growth.logs_cleared",
+  accessPointCreated: "access.point_created",
+  accessRuleCreated: "access.rule_created",
+  accessHardwareDeviceCreated: "access.hardware_device_created",
+  accessControlUpdated: "access.control_updated",
+  accessControlDeleted: "access.control_deleted",
+  accessLogsCleared: "access.logs_cleared"
 } as const;

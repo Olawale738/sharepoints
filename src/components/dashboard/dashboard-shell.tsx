@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, Sprout, UserRound } from "lucide-react";
+import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, DoorOpen, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, Sprout, UserRound } from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -102,6 +102,16 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                 <BadgeCheck className="h-4 w-4" />
                 <span className="hidden 2xl:inline">Member card</span>
               </Link>
+              {canOpenAdminCenter ? (
+                <Link
+                  aria-label="Access control"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                  href="/dashboard/access-control"
+                >
+                  <DoorOpen className="h-4 w-4" />
+                  <span className="hidden 2xl:inline">Access</span>
+                </Link>
+              ) : null}
               <Link
                 aria-label={messages.aiAssistant}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"

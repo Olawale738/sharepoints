@@ -281,6 +281,42 @@ enum ResourceCheckInStatus {
   CHECKED_OUT
 }
 
+enum AccessPointType {
+  ENTRANCE
+  DOOR
+  ROOM
+  DESK
+  CABINET
+  EQUIPMENT
+  VEHICLE
+  KEY_BOX
+  COMPUTER
+  OTHER
+}
+
+enum AccessMethod {
+  QR
+  NFC_RFID
+  MANUAL
+  HARDWARE_API
+}
+
+enum AccessRuleSubjectType {
+  ALL_ACTIVE
+  USER
+  ROLE
+  DEPARTMENT
+  CATEGORY
+  WORKSPACE
+  ORGANIZATION_UNIT
+}
+
+enum AccessDecision {
+  GRANTED
+  DENIED
+  NEEDS_REVIEW
+}
+
 enum VisitorJourneyType {
   VISITOR
   NEW_CONVERT
@@ -3087,4 +3123,87 @@ model ResourceCheckIn {
   @@index([resourceId, status, checkedInAt])
   @@index([userId, checkedInAt])
   @@index([bookingId])
+}
+
+model AccessPoint {
+  id                 String          @id @default(cuid())
+  name               String
+  pointType          AccessPointType
+  location           String?
+  description        String?
+  workspaceId        String?
+  organizationUnitId String?
+  resourceId         String?
+  active             Boolean         @default(true)
+  requireLiveCard    Boolean         @default(true)
+  createdById        String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([workspaceId, active])
+  @@index([organizationUnitId, active])
+  @@index([resourceId, active])
+  @@index([pointType, active])
+}
+
+model AccessRule {
+  id            String                @id @default(cuid())
+  accessPointId String
+  subjectType   AccessRuleSubjectType
+  subjectId     String?
+  role          String?
+  canAccess     Boolean               @default(true)
+  priority      Int                   @default(100)
+  validFrom     DateTime?
+  validUntil    DateTime?
+  timeStart     String?
+  timeEnd       String?
+  weekdays      Json?
+  createdById   String
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([accessPointId, priority])
+  @@index([subjectType, subjectId])
+  @@index([role])
+}
+
+model AccessHardwareDevice {
+  id              String    @id @default(cuid())
+  accessPointId   String
+  name            String
+  provider        String    @default("generic")
+  deviceIdentifier String?
+  apiEndpoint     String?
+  sharedSecretHash String?
+  active          Boolean   @default(true)
+  lastSeenAt      DateTime?
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([accessPointId, active])
+  @@index([provider, deviceIdentifier])
+}
+
+model AccessScanLog {
+  id             String         @id @default(cuid())
+  accessPointId  String
+  cardId         String?
+  organizationId String?
+  scannedUserId  String?
+  method         AccessMethod
+  decision       AccessDecision
+  reason         String
+  scannedById    String?
+  deviceId       String?
+  ipHash         String?
+  userAgent      String?
+  createdAt      DateTime       @default(now())
+
+  @@index([accessPointId, createdAt])
+  @@index([scannedUserId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([decision, createdAt])
+  @@index([deviceId, createdAt])
 }
