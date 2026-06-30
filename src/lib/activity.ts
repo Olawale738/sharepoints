@@ -81,6 +81,8 @@ export const activityActions = {
   churchResourceDeleted: "church.resource_deleted",
   resourceBookingDeleted: "church.booking_deleted",
   organizationUnitCreated: "organization.unit_created",
+  organizationImportRun: "organization.import_run",
+  organizationStarterDataApplied: "organization.starter_data_applied",
   organizationLeaderAssigned: "organization.leader_assigned",
   safeguardingCaseCreated: "safeguarding.case_created",
   safeguardingCaseUpdated: "safeguarding.case_updated",
@@ -157,5 +159,7 @@ export const activityActions = {
   accessHardwareDeviceCreated: "access.hardware_device_created",
   accessControlUpdated: "access.control_updated",
   accessControlDeleted: "access.control_deleted",
-  accessLogsCleared: "access.logs_cleared"
+  accessLogsCleared: "access.logs_cleared",
+  automaticBackupCreated: "system.automatic_backup_created",
+  monitorWarningRaised: "system.monitor_warning_raised"
 } as const;

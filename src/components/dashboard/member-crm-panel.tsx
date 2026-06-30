@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BriefcaseBusiness, Loader2, Save, Search, ShieldCheck, UserRound } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  Building2,
+  Download,
+  ImagePlus,
+  Loader2,
+  Save,
+  Search,
+  ShieldCheck,
+  UploadCloud,
+  UserRound
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +61,16 @@ type CrmMember = {
   stats: { files: number; tasks: number; activities: number };
 };
 
+type ImportSummary = {
+  units?: number;
+  departments?: number;
+  ministries?: number;
+  invitations?: number;
+  memberProfiles?: number;
+  userUpdates?: number;
+  skipped?: Array<{ row: number; reason: string }>;
+};
+
 const fieldClass = "space-y-1 text-xs font-medium text-ink/60";
 const blankProfile: MemberProfile = {
   phone: null,
@@ -89,7 +110,10 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState<MemberProfile>(initialMembers[0]?.profile ?? blankProfile);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const [importMessage, setImportMessage] = useState("");
   const selected = members.find((member) => member.id === selectedId);
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -151,9 +175,114 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
     setMessage("Member profile saved.");
   }
 
+  function summarizeImport(summary: ImportSummary) {
+    const parts = [
+      summary.units ? `${summary.units} units` : null,
+      summary.departments ? `${summary.departments} departments/categories` : null,
+      summary.ministries ? `${summary.ministries} ministries` : null,
+      summary.invitations ? `${summary.invitations} invitations` : null,
+      summary.memberProfiles ? `${summary.memberProfiles} member profiles` : null,
+      summary.userUpdates ? `${summary.userUpdates} user updates` : null
+    ].filter(Boolean);
+    const skipped = summary.skipped?.length ? ` ${summary.skipped.length} row(s) need attention.` : "";
+    return `${parts.length ? parts.join(", ") : "No changes were needed."}.${skipped}`;
+  }
+
+  async function applyStarterData() {
+    setImporting(true);
+    setImportMessage("");
+    const response = await fetch("/api/admin/organization-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "BOOTSTRAP" })
+    });
+    const data = (await response.json().catch(() => null)) as { summary?: ImportSummary; error?: string } | null;
+    setImporting(false);
+    if (!response.ok || !data?.summary) {
+      setImportMessage(data?.error ?? "Starter data could not be applied.");
+      return;
+    }
+    setImportMessage(`Starter data applied: ${summarizeImport(data.summary)}`);
+  }
+
+  async function importCsv(file: File | null) {
+    if (!file) return;
+    setImporting(true);
+    setImportMessage("");
+    const formData = new FormData();
+    formData.set("file", file);
+    const response = await fetch("/api/admin/organization-import", { method: "POST", body: formData });
+    const data = (await response.json().catch(() => null)) as { summary?: ImportSummary; error?: string } | null;
+    setImporting(false);
+    if (!response.ok || !data?.summary) {
+      setImportMessage(data?.error ?? "Organization import could not be completed.");
+      return;
+    }
+    setImportMessage(`Import complete: ${summarizeImport(data.summary)}`);
+    setTimeout(() => window.location.reload(), 900);
+  }
+
+  async function uploadSelectedPhoto(file: File | null) {
+    if (!file || !selected) return;
+    setPhotoUploading(true);
+    setMessage("");
+    const formData = new FormData();
+    formData.set("photo", file);
+    const response = await fetch(`/api/admin/members/${selected.id}/photo`, { method: "POST", body: formData });
+    const data = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+    setPhotoUploading(false);
+    if (!response.ok || !data?.imageUrl) {
+      setMessage(data?.error ?? "Member photo could not be uploaded.");
+      return;
+    }
+    setMembers((current) =>
+      current.map((member) => (member.id === selected.id ? { ...member, image: data.imageUrl ?? member.image } : member))
+    );
+    setMessage("Member photo uploaded.");
+  }
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
-      <section className="overflow-hidden rounded-lg border border-ink/10 bg-white">
+    <div className="space-y-5">
+      <section className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <Building2 className="h-4 w-4 text-moss" />
+              Organization data setup
+            </p>
+            <p className="mt-1 text-xs text-ink/55">
+              Load LETW branches, departments, ministries, invitations, positions, membership numbers, and profile links.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <a
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
+              href="/api/admin/organization-import"
+            >
+              <Download className="h-4 w-4" />
+              Template
+            </a>
+            <Button variant="secondary" onClick={applyStarterData} disabled={importing}>
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+              Apply LETW starter data
+            </Button>
+            <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-medium text-white hover:bg-ink/90">
+              <UploadCloud className="h-4 w-4" />
+              Import CSV
+              <input
+                className="sr-only"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => void importCsv(event.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+        </div>
+        {importMessage ? <p className="mt-3 rounded-md bg-paper px-3 py-2 text-sm text-ink/70">{importMessage}</p> : null}
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <section className="overflow-hidden rounded-lg border border-ink/10 bg-white">
         <div className="border-b border-ink/10 p-4">
           <div className="flex items-center gap-2">
             <UserRound className="h-4 w-4 text-moss" />
@@ -184,18 +313,40 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
             </button>
           ))}
         </div>
-      </section>
+        </section>
 
-      {selected ? (
-        <section className="rounded-lg border border-ink/10 bg-white">
+        {selected ? (
+          <section className="rounded-lg border border-ink/10 bg-white">
           <div className="flex flex-col gap-3 border-b border-ink/10 p-5 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-medium text-moss">
-                <ShieldCheck className="h-4 w-4" />
-                Admin-only Member 360
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold text-ink">{selected.name ?? selected.email}</h2>
-              <p className="text-sm text-ink/55">{selected.email}</p>
+            <div className="flex min-w-0 gap-4">
+              <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-ink/10 bg-paper">
+                {selected.image ? (
+                  /* eslint-disable-next-line @next/next/no-img-element -- Imported profile images can be approved external URLs. */
+                  <img alt={selected.name ?? "Member photo"} className="h-full w-full object-cover" src={selected.image} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-ink/35">
+                    <UserRound className="h-8 w-8" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 text-xs font-medium text-moss">
+                  <ShieldCheck className="h-4 w-4" />
+                  Admin-only Member 360
+                </p>
+                <h2 className="mt-1 truncate text-2xl font-semibold text-ink">{selected.name ?? selected.email}</h2>
+                <p className="truncate text-sm text-ink/55">{selected.email}</p>
+                <label className="mt-3 inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium hover:bg-mint/40">
+                  {photoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                  Upload photo
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => void uploadSelectedPhoto(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
             </div>
             <Button onClick={save} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -264,10 +415,11 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
               </div>
             </div>
           </div>
-        </section>
-      ) : (
-        <section className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No member selected.</section>
-      )}
+          </section>
+        ) : (
+          <section className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No member selected.</section>
+        )}
+      </div>
     </div>
   );
 }
