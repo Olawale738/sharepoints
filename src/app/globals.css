@@ -1880,13 +1880,13 @@ select {
   z-index: 0;
   display: block;
   background:
-    repeating-linear-gradient(132deg, transparent 0 0.78rem, rgb(30 78 140 / 5%) 0.82rem 0.86rem, transparent 0.9rem 1.68rem),
-    radial-gradient(ellipse at 50% 18%, rgb(212 175 55 / 17%), transparent 34%);
+    repeating-linear-gradient(132deg, transparent 0 0.78rem, rgb(212 175 55 / 6%) 0.82rem 0.86rem, transparent 0.9rem 1.68rem),
+    radial-gradient(ellipse at 50% 18%, rgb(212 175 55 / 14%), transparent 34%);
   pointer-events: none;
 }
 
 .plastic-id-front-body::after {
-  content: "LIGHT ENCOUNTER TABERNACLE WORLDWIDE • LETW.ORG";
+  content: "LIGHT ENCOUNTER TABERNACLE WORLDWIDE | LETW.ORG";
   position: absolute;
   left: 1.25rem;
   right: 1.25rem;
@@ -1926,11 +1926,27 @@ select {
 }
 
 .plastic-id-card-front .plastic-id-metric {
+  border-color: rgb(212 175 55 / 28%);
   background:
-    linear-gradient(135deg, rgb(255 255 255 / 96%), rgb(241 247 255 / 88%));
+    linear-gradient(135deg, rgb(255 255 255 / 98%) 0%, rgb(255 252 242 / 96%) 55%, rgb(248 242 226 / 94%) 100%);
   box-shadow:
-    0 9px 20px rgb(11 27 61 / 7%),
-    inset 0 0 0 1px rgb(255 255 255 / 72%);
+    0 9px 20px rgb(126 92 22 / 8%),
+    inset 0 0 0 1px rgb(255 255 255 / 80%);
+}
+
+.plastic-id-card-front .plastic-id-metric:nth-child(1),
+.plastic-id-card-front .plastic-id-metric:nth-child(2) {
+  background:
+    linear-gradient(90deg, rgb(212 175 55 / 16%) 0 0.28rem, transparent 0.28rem),
+    linear-gradient(135deg, #ffffff 0%, #fffaf0 56%, #f7efd9 100%);
+}
+
+.plastic-id-card-front .plastic-id-metric span {
+  color: #8a6416;
+}
+
+.plastic-id-card-front .plastic-id-metric strong {
+  color: #0b1b3d;
 }
 
 .plastic-id-card-front .plastic-id-portrait-footer {
