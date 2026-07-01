@@ -1,5 +1,20 @@
 /* eslint-disable @next/next/no-img-element */
-import { BadgeCheck, Building2, CalendarDays, Download, KeyRound, QrCode, ShieldCheck, WalletCards } from "lucide-react";
+import type { ReactNode } from "react";
+
+import {
+  BadgeCheck,
+  Building2,
+  CalendarDays,
+  Download,
+  Globe2,
+  IdCard,
+  KeyRound,
+  Mail,
+  ShieldCheck,
+  Smartphone,
+  UserRound,
+  WalletCards
+} from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
@@ -10,10 +25,21 @@ import { prisma } from "@/lib/prisma";
 import { cardStatusTone, ensureMemberNumber, refreshOfflinePayload } from "@/lib/qr-identity";
 import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
-function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function DetailRow({
+  icon,
+  label,
+  value,
+  mono = false
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
     <div className="plastic-id-detail-row">
-      <span>{label}</span>
+      <span className="plastic-id-detail-icon">{icon}</span>
+      <span className="plastic-id-detail-label">{label}</span>
       <strong className={mono ? "font-mono" : ""}>{value}</strong>
     </div>
   );
@@ -138,26 +164,36 @@ export default async function MembershipCardPage() {
         <>
           <div className="digital-id-print-sheet mx-auto">
             <section
-            className={`plastic-id-card plastic-id-card-front ${
-              !cardValid ? "plastic-id-card-invalid" : ""
-            }`}
+              className={`plastic-id-card plastic-id-card-front ${
+                !cardValid ? "plastic-id-card-invalid" : ""
+              }`}
             >
               <header className="plastic-id-portrait-header">
-                <Image
-                  alt="LETTW logo"
-                  className="h-14 w-14 rounded-md bg-white object-contain p-1"
-                  height={112}
-                  src="/letw-logo.png"
-                  width={112}
-                  priority
-                />
-                <div>
-                  <p>Light Encounter Tabernacle Worldwide</p>
-                  <span>Official Membership Identity</span>
+                <div className="plastic-id-brand-lockup">
+                  <Image
+                    alt="LETTW logo"
+                    className="plastic-id-brand-logo"
+                    height={112}
+                    src="/letw-logo.png"
+                    width={112}
+                    priority
+                  />
+                  <div className="plastic-id-brand-divider" />
+                  <div>
+                    <p>Light Encounter Tabernacle Worldwide</p>
+                    <span>Official Membership Identity</span>
+                  </div>
+                </div>
+                <div className="plastic-id-chip">
+                  <Globe2 className="h-5 w-5" />
                 </div>
               </header>
 
               <div className="plastic-id-front-body">
+                <div className="plastic-id-nfc">
+                  <span className="plastic-id-nfc-waves" />
+                  <span>NFC<br />Ready</span>
+                </div>
                 <div className="plastic-id-portrait-photo">
                   {account?.image ? (
                     <img
@@ -172,6 +208,7 @@ export default async function MembershipCardPage() {
 
                 <p className="plastic-id-member-name">{account?.name ?? "LETTW Member"}</p>
                 <p className="plastic-id-position">{position}</p>
+                <span className="plastic-id-name-rule" />
                 {badges.length ? (
                   <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-[#b78727]">
                     {badges.slice(0, 2).map((badge) => badge.title).join(" | ")}
@@ -179,28 +216,31 @@ export default async function MembershipCardPage() {
                 ) : null}
 
                 <div className="plastic-id-details">
-                  <DetailRow label="Organization ID" value={card.organizationId} mono />
-                  <DetailRow label="Member no." value={membershipNumber} mono />
-                  <DetailRow label="Member since" value={memberSince} />
-                  <DetailRow label="Location" value={location} />
+                  <DetailRow icon={<IdCard />} label="Organization ID" value={card.organizationId} mono />
+                  <DetailRow icon={<UserRound />} label="Member no." value={membershipNumber} mono />
+                  <DetailRow icon={<CalendarDays />} label="Member since" value={memberSince} />
+                  <DetailRow icon={<Globe2 />} label="Location" value={location} />
                 </div>
               </div>
 
               <footer className="plastic-id-portrait-footer">
-                <span>letw.org</span>
-                <Badge className={cardValid ? "bg-amber-300 text-[#0b1f33]" : "bg-red-100 text-red-800"}>
-                  {cardDisplayStatus}
-                </Badge>
+                <div className="plastic-id-status-lock">
+                  <ShieldCheck className="h-5 w-5" />
+                  <strong>{cardDisplayStatus}</strong>
+                </div>
+                <span>Issued {card.issuedAt.toLocaleDateString()}</span>
+                <span>{card.expiresAt ? `Expires ${card.expiresAt.toLocaleDateString()}` : "No Expiry"}</span>
               </footer>
             </section>
 
             <section className="plastic-id-card plastic-id-card-back">
               <header className="plastic-id-back-header">
+                <ShieldCheck className="plastic-id-back-shield" />
                 <div>
                   <p>Identity Verification</p>
                   <span>Scan to confirm current membership status</span>
                 </div>
-                <QrCode className="h-7 w-7 text-amber-300" />
+                <span className="plastic-id-dot-grid" />
               </header>
 
               <div className="plastic-id-back-body">
@@ -217,25 +257,33 @@ export default async function MembershipCardPage() {
                     <ShieldCheck className="h-14 w-14 text-red-700" />
                   )}
                 </div>
-                <p className="plastic-id-scan-label">SCAN TO AUTHENTICATE</p>
+                <p className="plastic-id-scan-label">
+                  <Smartphone className="h-4 w-4" />
+                  SCAN TO AUTHENTICATE
+                </p>
                 <p className="plastic-id-back-org-id">{card.organizationId}</p>
                 {card.offlinePayloadHash ? (
-                  <p className="mt-1 max-w-full truncate font-mono text-[9px] text-white/65">
+                  <p className="plastic-id-offline-hash">
                     Offline hash {card.offlinePayloadHash.slice(0, 18)}
                   </p>
                 ) : null}
 
-                <div className="plastic-id-validity">
-                  <span>
-                    <CalendarDays className="h-3 w-3" />
-                    Issued {card.issuedAt.toLocaleDateString()}
-                  </span>
-                  <span>{card.expiresAt ? `Expires ${card.expiresAt.toLocaleDateString()}` : "No expiry"}</span>
-                </div>
               </div>
 
               <footer className="plastic-id-back-footer">
-                LIGHT ENCOUNTER TABERNACLE WORLDWIDE | letw.org
+                <div className="plastic-id-back-contact">
+                  <span><Globe2 className="h-4 w-4" /> letw.org</span>
+                  <span><Mail className="h-4 w-4" /> info@letw.org</span>
+                </div>
+                <Image
+                  alt="LETTW seal"
+                  className="plastic-id-back-seal"
+                  height={112}
+                  src="/letw-logo.png"
+                  width={112}
+                />
+                <p>Light Encounter Tabernacle Worldwide</p>
+                <strong>letw.org</strong>
               </footer>
             </section>
           </div>
