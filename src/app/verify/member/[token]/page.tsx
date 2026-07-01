@@ -30,7 +30,12 @@ export const metadata: Metadata = {
 export default async function VerifyMemberPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const [existing, session, requestHeaders] = await Promise.all([
-    prisma.digitalMembershipCard.findFirst({ where: { qrToken: token, deletedAt: null } }),
+    prisma.digitalMembershipCard.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ qrToken: token }, { organizationId: token }]
+      }
+    }),
     auth(),
     headers()
   ]);

@@ -12,7 +12,10 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const { token } = await context.params;
     const existing = await prisma.digitalMembershipCard.findFirst({
-      where: { qrToken: token, deletedAt: null }
+      where: {
+        deletedAt: null,
+        OR: [{ qrToken: token }, { organizationId: token }]
+      }
     });
     if (!existing) throw new ApiError(404, "Membership card not found.");
     const { card, account } = await ensureMembershipCredential(existing.id);

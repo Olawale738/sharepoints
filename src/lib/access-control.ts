@@ -81,6 +81,8 @@ export type AccessScanInput = {
   accessPointId: string;
   qrToken?: string | null;
   organizationId?: string | null;
+  visitorToken?: string | null;
+  purpose?: string | null;
   method: AccessMethod;
   scannedById?: string | null;
   deviceId?: string | null;
@@ -94,6 +96,11 @@ export async function evaluateAccessScan(input: AccessScanInput) {
     where: { accessPointId: input.accessPointId },
     orderBy: [{ priority: "asc" }, { createdAt: "asc" }]
   });
+
+  const purpose = (input.purpose ?? "ACCESS").toUpperCase();
+  const visitorPass = input.visitorToken
+    ? await prisma.temporaryVisitorPass.findUnique({ where: { qrToken: input.visitorToken } })
+    : null;
 
   let card = input.qrToken
     ? await prisma.digitalMembershipCard.findFirst({ where: { qrToken: input.qrToken, deletedAt: null } })
@@ -135,11 +142,48 @@ export async function evaluateAccessScan(input: AccessScanInput) {
   let credentialValid = false;
   let signatureValid = false;
   let statusValid = false;
+  let riskScore = 0;
+  let suspicious = false;
+  let metadata: Record<string, unknown> = { purpose };
 
   if (!accessPoint) {
     reason = "Access point not found.";
   } else if (!accessPoint.active) {
     reason = "Access point is inactive.";
+  } else if (visitorPass) {
+    const now = new Date();
+    const validVisitor =
+      visitorPass.status === "ACTIVE" &&
+      !visitorPass.revokedAt &&
+      visitorPass.validFrom <= now &&
+      visitorPass.validUntil >= now &&
+      (!visitorPass.accessPointId || visitorPass.accessPointId === accessPoint.id);
+
+    if (validVisitor) {
+      decision = AccessDecision.GRANTED;
+      reason = "Temporary visitor pass granted entry.";
+      await prisma.temporaryVisitorPass.update({
+        where: { id: visitorPass.id },
+        data: { scanCount: { increment: 1 } }
+      });
+    } else {
+      decision = AccessDecision.DENIED;
+      reason =
+        visitorPass.revokedAt || visitorPass.status !== "ACTIVE"
+          ? "Temporary visitor pass is revoked."
+          : visitorPass.validUntil < now
+            ? "Temporary visitor pass has expired."
+            : visitorPass.validFrom > now
+              ? "Temporary visitor pass is not valid yet."
+              : "Temporary visitor pass is not valid for this access point.";
+      riskScore += 40;
+    }
+    metadata = {
+      ...metadata,
+      visitorName: visitorPass.displayName,
+      visitorPurpose: visitorPass.purpose,
+      validUntil: visitorPass.validUntil.toISOString()
+    };
   } else if (!card) {
     reason = "Digital ID was not found.";
   } else if (!account) {
@@ -158,7 +202,20 @@ export async function evaluateAccessScan(input: AccessScanInput) {
       reason = "Digital ID verification is temporarily unavailable.";
     }
 
-    if (accessPoint.requireLiveCard && !credentialValid) {
+    if (!signatureValid) riskScore += 40;
+    if (!statusValid) riskScore += 30;
+    if (accessPoint.highSecurity) riskScore += 10;
+
+    if (card.status === "LOST") {
+      reason = "Digital ID was reported lost and cannot be accepted.";
+      riskScore += 60;
+    } else if (card.status === "REVOKED") {
+      reason = "Digital ID has been revoked.";
+      riskScore += 60;
+    } else if (card.expiresAt && card.expiresAt <= new Date()) {
+      reason = "Digital ID has expired.";
+      riskScore += 35;
+    } else if (accessPoint.requireLiveCard && !credentialValid) {
       reason = signatureValid ? "Digital ID is not active." : "Digital ID signature could not be verified.";
     } else if (accessPoint.workspaceId && !account.workspaceMemberships.some((membership) => membership.workspaceId === accessPoint.workspaceId)) {
       const isGlobalAdmin = account.workspaceMemberships.some((membership) => membership.role === "ADMIN");
@@ -170,34 +227,86 @@ export async function evaluateAccessScan(input: AccessScanInput) {
       const denyRule = matches.find((rule) => !rule.canAccess);
       const allowRule = matches.find((rule) => rule.canAccess);
       const isGlobalAdmin = account.workspaceMemberships.some((membership) => membership.role === "ADMIN");
+      const highSecurityApproval = accessPoint.highSecurity || accessPoint.requireExplicitApproval
+        ? await prisma.digitalIdAccessApproval.findFirst({
+            where: {
+              accessPointId: accessPoint.id,
+              userId: account.id,
+              revokedAt: null,
+              validFrom: { lte: new Date() },
+              OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }]
+            }
+          })
+        : null;
 
       if (denyRule) {
         decision = AccessDecision.DENIED;
         reason = "A matching access rule denied this member.";
+      } else if ((accessPoint.highSecurity || accessPoint.requireExplicitApproval) && !highSecurityApproval) {
+        decision = AccessDecision.NEEDS_REVIEW;
+        reason = "High-security access requires explicit admin approval before entry.";
       } else if (allowRule || isGlobalAdmin) {
         decision = AccessDecision.GRANTED;
-        reason = allowRule ? "A matching access rule granted entry." : "Global administrator access granted.";
+        reason = accessPoint.requirePhotoMatch
+          ? "Access rule granted entry. Photo match must be checked by the scanner operator."
+          : allowRule
+            ? "A matching access rule granted entry."
+            : "Global administrator access granted.";
       } else {
         decision = AccessDecision.DENIED;
         reason = "No matching access rule granted entry.";
       }
+      metadata = {
+        ...metadata,
+        highSecurity: accessPoint.highSecurity,
+        explicitApproval: Boolean(highSecurityApproval),
+        photoMatchRequired: accessPoint.requirePhotoMatch,
+        allowRuleId: allowRule?.id ?? null,
+        denyRuleId: denyRule?.id ?? null
+      };
     }
   }
 
   if (accessPoint) {
+    const recentDenied = card
+      ? await prisma.accessScanLog.count({
+          where: {
+            OR: [{ cardId: card.id }, { organizationId: card.organizationId }],
+            decision: AccessDecision.DENIED,
+            createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }
+          }
+        })
+      : visitorPass
+        ? await prisma.accessScanLog.count({
+            where: {
+              visitorPassId: visitorPass.id,
+              decision: AccessDecision.DENIED,
+              createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }
+            }
+          })
+        : 0;
+    if (recentDenied >= 3) riskScore += 30;
+    suspicious = riskScore >= 50 || recentDenied >= 5;
+
     await prisma.accessScanLog.create({
       data: {
         accessPointId: accessPoint.id,
         cardId: card?.id ?? null,
+        visitorPassId: visitorPass?.id ?? null,
         organizationId: card?.organizationId ?? input.organizationId ?? null,
         scannedUserId: card?.userId ?? null,
         method: input.method,
+        purpose,
         decision,
         reason,
+        riskScore,
+        suspicious,
+        photoMatchRequired: Boolean(accessPoint.requirePhotoMatch),
         scannedById: input.scannedById ?? null,
         deviceId: input.deviceId ?? null,
         ipHash: input.ipHash ?? null,
-        userAgent: input.userAgent?.slice(0, 500) ?? null
+        userAgent: input.userAgent?.slice(0, 500) ?? null,
+        metadata: metadata as never
       }
     });
   }
@@ -219,10 +328,23 @@ export async function evaluateAccessScan(input: AccessScanInput) {
           location: account.memberProfile?.digitalIdLocation ?? "LETTW Worldwide"
         }
       : null,
+    visitor: visitorPass
+      ? {
+          id: visitorPass.id,
+          name: visitorPass.displayName,
+          purpose: visitorPass.purpose,
+          validUntil: visitorPass.validUntil
+        }
+      : null,
     verification: {
       credentialValid,
       signatureValid,
       statusValid
+    },
+    security: {
+      riskScore,
+      suspicious,
+      photoMatchRequired: Boolean(accessPoint?.requirePhotoMatch)
     }
   };
 }

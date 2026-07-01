@@ -269,6 +269,7 @@ enum MembershipCardStatus {
   ACTIVE
   SUSPENDED
   REVOKED
+  LOST
 }
 
 enum GovernanceHoldStatus {
@@ -3032,6 +3033,15 @@ model DigitalMembershipCard {
   expiresAt             DateTime?
   revokedAt             DateTime?
   revokedById           String?
+  lostAt                DateTime?
+  lostById              String?
+  renewedAt             DateTime?
+  renewedById           String?
+  qrRotatedAt           DateTime?
+  qrRotationCount       Int                  @default(0)
+  offlinePayload        Json?
+  offlinePayloadHash    String?
+  lastStatusReason      String?
   deletedAt             DateTime?
   deletedById           String?
   credentialId          String?              @unique
@@ -3044,7 +3054,112 @@ model DigitalMembershipCard {
 
   @@index([status, expiresAt])
   @@index([status, deletedAt])
+  @@index([qrRotatedAt])
   @@index([credentialKeyId])
+}
+
+model TemporaryVisitorPass {
+  id                 String    @id @default(cuid())
+  displayName        String
+  email              String?
+  phone              String?
+  purpose            String
+  qrToken            String    @unique
+  accessPointId      String?
+  organizationUnitId String?
+  validFrom          DateTime  @default(now())
+  validUntil         DateTime
+  status             String    @default("ACTIVE")
+  issuedById         String
+  revokedAt          DateTime?
+  revokedById        String?
+  scanCount          Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([accessPointId, status, validUntil])
+  @@index([organizationUnitId, status, validUntil])
+  @@index([status, validUntil])
+}
+
+model MembershipHouseholdLink {
+  id            String   @id @default(cuid())
+  primaryUserId String
+  relatedUserId String?
+  displayName   String
+  relationship  String
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([primaryUserId, createdAt])
+  @@index([relatedUserId])
+}
+
+model MemberOnboardingItem {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  status        String    @default("PENDING")
+  dueAt         DateTime?
+  completedAt   DateTime?
+  completedById String?
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, title])
+  @@index([userId, status, dueAt])
+}
+
+model MemberCertificationBadge {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  issuer            String    @default("Light Encounter Tabernacle Worldwide")
+  certificateNumber String?   @unique
+  verifyToken       String    @unique
+  status            String    @default("ACTIVE")
+  issuedAt          DateTime  @default(now())
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  createdById       String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId, status, issuedAt])
+  @@index([status, expiresAt])
+}
+
+model DigitalIdAccessApproval {
+  id            String    @id @default(cuid())
+  accessPointId String
+  userId        String
+  reason        String?
+  validFrom     DateTime  @default(now())
+  validUntil    DateTime?
+  approvedById  String
+  revokedAt     DateTime?
+  revokedById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([accessPointId, userId])
+  @@index([accessPointId, revokedAt, validUntil])
+  @@index([userId, revokedAt, validUntil])
+}
+
+model QrBulkActionLog {
+  id          String   @id @default(cuid())
+  action      String
+  count       Int      @default(0)
+  createdById String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([createdById, createdAt])
 }
 
 model DigitalIdentityVerification {
@@ -3126,19 +3241,22 @@ model ResourceCheckIn {
 }
 
 model AccessPoint {
-  id                 String          @id @default(cuid())
-  name               String
-  pointType          AccessPointType
-  location           String?
-  description        String?
-  workspaceId        String?
-  organizationUnitId String?
-  resourceId         String?
-  active             Boolean         @default(true)
-  requireLiveCard    Boolean         @default(true)
-  createdById        String
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                      String          @id @default(cuid())
+  name                    String
+  pointType               AccessPointType
+  location                String?
+  description             String?
+  workspaceId             String?
+  organizationUnitId      String?
+  resourceId              String?
+  active                  Boolean         @default(true)
+  requireLiveCard         Boolean         @default(true)
+  highSecurity            Boolean         @default(false)
+  requireExplicitApproval Boolean         @default(false)
+  requirePhotoMatch       Boolean         @default(false)
+  createdById             String
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 
   @@index([workspaceId, active])
   @@index([organizationUnitId, active])
@@ -3169,41 +3287,50 @@ model AccessRule {
 }
 
 model AccessHardwareDevice {
-  id              String    @id @default(cuid())
-  accessPointId   String
-  name            String
-  provider        String    @default("generic")
+  id               String    @id @default(cuid())
+  accessPointId    String
+  name             String
+  provider         String    @default("generic")
   deviceIdentifier String?
-  apiEndpoint     String?
+  apiEndpoint      String?
   sharedSecretHash String?
-  active          Boolean   @default(true)
-  lastSeenAt      DateTime?
-  createdById     String
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  active           Boolean   @default(true)
+  lastSeenAt       DateTime?
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([accessPointId, active])
   @@index([provider, deviceIdentifier])
 }
 
 model AccessScanLog {
-  id             String         @id @default(cuid())
-  accessPointId  String
-  cardId         String?
-  organizationId String?
-  scannedUserId  String?
-  method         AccessMethod
-  decision       AccessDecision
-  reason         String
-  scannedById    String?
-  deviceId       String?
-  ipHash         String?
-  userAgent      String?
-  createdAt      DateTime       @default(now())
+  id                 String         @id @default(cuid())
+  accessPointId      String
+  cardId             String?
+  visitorPassId      String?
+  organizationId     String?
+  scannedUserId      String?
+  method             AccessMethod
+  purpose            String         @default("ACCESS")
+  decision           AccessDecision
+  reason             String
+  riskScore          Int            @default(0)
+  suspicious         Boolean        @default(false)
+  photoMatchRequired Boolean        @default(false)
+  scannedById        String?
+  deviceId           String?
+  ipHash             String?
+  userAgent          String?
+  metadata           Json?
+  createdAt          DateTime       @default(now())
 
   @@index([accessPointId, createdAt])
+  @@index([visitorPassId, createdAt])
   @@index([scannedUserId, createdAt])
   @@index([organizationId, createdAt])
   @@index([decision, createdAt])
+  @@index([purpose, createdAt])
+  @@index([suspicious, createdAt])
   @@index([deviceId, createdAt])
 }

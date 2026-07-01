@@ -18,7 +18,10 @@ const createSchema = z.discriminatedUnion("entity", [
     workspaceId: optionalCuid,
     organizationUnitId: optionalCuid,
     resourceId: optionalCuid,
-    requireLiveCard: z.coerce.boolean().default(true)
+    requireLiveCard: z.coerce.boolean().default(true),
+    highSecurity: z.coerce.boolean().default(false),
+    requireExplicitApproval: z.coerce.boolean().default(false),
+    requirePhotoMatch: z.coerce.boolean().default(false)
   }),
   z.object({
     entity: z.literal("ACCESS_RULE"),
@@ -45,7 +48,15 @@ const createSchema = z.discriminatedUnion("entity", [
 ]);
 
 const updateSchema = z.discriminatedUnion("entity", [
-  z.object({ entity: z.literal("ACCESS_POINT"), id: z.string().cuid(), active: z.coerce.boolean().optional(), requireLiveCard: z.coerce.boolean().optional() }),
+  z.object({
+    entity: z.literal("ACCESS_POINT"),
+    id: z.string().cuid(),
+    active: z.coerce.boolean().optional(),
+    requireLiveCard: z.coerce.boolean().optional(),
+    highSecurity: z.coerce.boolean().optional(),
+    requireExplicitApproval: z.coerce.boolean().optional(),
+    requirePhotoMatch: z.coerce.boolean().optional()
+  }),
   z.object({ entity: z.literal("ACCESS_RULE"), id: z.string().cuid(), canAccess: z.coerce.boolean().optional(), priority: z.coerce.number().int().min(1).max(10000).optional() }),
   z.object({ entity: z.literal("HARDWARE_DEVICE"), id: z.string().cuid(), active: z.coerce.boolean().optional() })
 ]);
@@ -65,7 +76,7 @@ export async function GET() {
   try {
     const user = await requireUser();
     await requireAnyWorkspaceAdmin(user.id, "Only administrators can open access control.");
-    const [accessPoints, rules, devices, logs, users, workspaces, units, departments, resources] = await Promise.all([
+    const [accessPoints, rules, devices, logs, users, workspaces, units, departments, resources, attendanceSessions, events] = await Promise.all([
       prisma.accessPoint.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }], take: 300 }),
       prisma.accessRule.findMany({ orderBy: [{ accessPointId: "asc" }, { priority: "asc" }], take: 1000 }),
       prisma.accessHardwareDevice.findMany({ orderBy: [{ active: "desc" }, { createdAt: "desc" }], take: 300 }),
@@ -79,10 +90,12 @@ export async function GET() {
       prisma.workspace.findMany({ where: { deletedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       prisma.organizationUnit.findMany({ where: { active: true }, select: { id: true, name: true, type: true }, orderBy: [{ type: "asc" }, { name: "asc" }] }),
       prisma.department.findMany({ select: { id: true, name: true, kind: true }, orderBy: [{ kind: "asc" }, { name: "asc" }] }),
-      prisma.churchResource.findMany({ where: { active: true }, select: { id: true, name: true, category: true }, orderBy: { name: "asc" } })
+      prisma.churchResource.findMany({ where: { active: true }, select: { id: true, name: true, category: true }, orderBy: { name: "asc" } }),
+      prisma.smartAttendanceSession.findMany({ where: { active: true }, select: { id: true, title: true, targetType: true }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.churchEvent.findMany({ select: { id: true, title: true, startsAt: true }, orderBy: { startsAt: "desc" }, take: 100 })
     ]);
 
-    return ok({ accessPoints, rules, devices, logs, users, workspaces, units, departments, resources });
+    return ok({ accessPoints, rules, devices, logs, users, workspaces, units, departments, resources, attendanceSessions, events });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -109,6 +122,9 @@ export async function POST(request: Request) {
           organizationUnitId: data.organizationUnitId ?? null,
           resourceId: data.resourceId ?? null,
           requireLiveCard: data.requireLiveCard,
+          highSecurity: data.highSecurity,
+          requireExplicitApproval: data.requireExplicitApproval,
+          requirePhotoMatch: data.requirePhotoMatch,
           createdById: user.id
         }
       });
@@ -169,7 +185,13 @@ export async function PATCH(request: Request) {
     if (data.entity === "ACCESS_POINT") {
       result = await prisma.accessPoint.update({
         where: { id: data.id },
-        data: { active: data.active, requireLiveCard: data.requireLiveCard }
+        data: {
+          active: data.active,
+          requireLiveCard: data.requireLiveCard,
+          highSecurity: data.highSecurity,
+          requireExplicitApproval: data.requireExplicitApproval,
+          requirePhotoMatch: data.requirePhotoMatch
+        }
       });
     } else if (data.entity === "ACCESS_RULE") {
       result = await prisma.accessRule.update({

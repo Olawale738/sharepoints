@@ -23,15 +23,17 @@ import { Textarea } from "@/components/ui/textarea";
 
 type Option = { id: string; name: string };
 type AccessData = {
-  accessPoints: Array<{ id: string; name: string; pointType: string; location?: string | null; active: boolean; requireLiveCard: boolean }>;
+  accessPoints: Array<{ id: string; name: string; pointType: string; location?: string | null; active: boolean; requireLiveCard: boolean; highSecurity: boolean; requireExplicitApproval: boolean; requirePhotoMatch: boolean }>;
   rules: Array<{ id: string; accessPointId: string; subjectType: string; subjectId?: string | null; role?: string | null; canAccess: boolean; priority: number; timeStart?: string | null; timeEnd?: string | null }>;
   devices: Array<{ id: string; accessPointId: string; name: string; provider: string; deviceIdentifier?: string | null; active: boolean; lastSeenAt?: string | null }>;
-  logs: Array<{ id: string; accessPointId: string; organizationId?: string | null; scannedUserId?: string | null; method: string; decision: string; reason: string; createdAt: string }>;
+  logs: Array<{ id: string; accessPointId: string; organizationId?: string | null; scannedUserId?: string | null; method: string; purpose: string; decision: string; reason: string; riskScore: number; suspicious: boolean; createdAt: string }>;
   users: Array<{ id: string; name?: string | null; email?: string | null; category?: string | null; departmentId?: string | null }>;
   workspaces: Option[];
   units: Array<{ id: string; name: string; type: string }>;
   departments: Array<{ id: string; name: string; kind: string }>;
   resources: Array<{ id: string; name: string; category: string }>;
+  attendanceSessions: Array<{ id: string; title: string; targetType: string }>;
+  events: Array<{ id: string; title: string; startsAt: string }>;
 };
 
 type Mode = "ACCESS_POINT" | "ACCESS_RULE" | "HARDWARE_DEVICE";
@@ -45,7 +47,9 @@ const emptyData: AccessData = {
   workspaces: [],
   units: [],
   departments: [],
-  resources: []
+  resources: [],
+  attendanceSessions: [],
+  events: []
 };
 
 function titleCase(value: string) {
@@ -65,6 +69,9 @@ export function AccessControlPanel() {
     reason: string;
     accessPoint?: { name: string; pointType: string; location?: string | null } | null;
     member?: { name?: string | null; organizationId: string; membershipNumber: string; position: string; location: string } | null;
+    visitor?: { name: string; purpose: string; validUntil: string } | null;
+    security?: { riskScore: number; suspicious: boolean; photoMatchRequired: boolean };
+    sideEffects?: Record<string, unknown>;
   }>(null);
 
   const pointName = useMemo(() => new Map(data.accessPoints.map((point) => [point.id, point.name])), [data.accessPoints]);
@@ -179,7 +186,13 @@ export function AccessControlPanel() {
       accessPointId: values.accessPointId,
       qrToken: values.qrToken || null,
       organizationId: values.organizationId || null,
-      method: values.method || "QR"
+      method: values.method || "QR",
+      visitorToken: values.visitorToken || null,
+      purpose: values.purpose || "ACCESS",
+      attendanceSessionId: values.attendanceSessionId || null,
+      eventId: values.eventId || null,
+      resourceId: values.resourceId || null,
+      note: values.note || null
     };
     const response = await fetch("/api/access-control/scan", {
       method: "POST",
@@ -247,6 +260,18 @@ export function AccessControlPanel() {
                 <label className="flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm">
                   <input name="requireLiveCard" type="checkbox" value="true" defaultChecked />
                   Require live valid Digital ID
+                </label>
+                <label className="flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm">
+                  <input name="highSecurity" type="checkbox" value="true" />
+                  High-security point
+                </label>
+                <label className="flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm">
+                  <input name="requireExplicitApproval" type="checkbox" value="true" />
+                  Require explicit approval
+                </label>
+                <label className="flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm">
+                  <input name="requirePhotoMatch" type="checkbox" value="true" />
+                  Require photo match
                 </label>
                 <Textarea className="md:col-span-2" name="description" placeholder="Access instructions, door notes, controller notes, or guard instructions" />
               </>
@@ -316,15 +341,36 @@ export function AccessControlPanel() {
                   <p className="text-xs">{scanResult.member.position} - {scanResult.member.location}</p>
                 </div>
               ) : null}
+              {scanResult.visitor ? (
+                <div className="mt-3 rounded-md bg-white/70 p-3 text-ink">
+                  <p className="font-semibold">{scanResult.visitor.name}</p>
+                  <p className="text-xs">{scanResult.visitor.purpose}</p>
+                  <p className="text-xs">Valid until {new Date(scanResult.visitor.validUntil).toLocaleString()}</p>
+                </div>
+              ) : null}
+              {scanResult.security?.photoMatchRequired ? (
+                <p className="mt-3 rounded-md bg-white/70 px-3 py-2 text-xs text-ink">Photo match required: compare the member photo on the verification screen before opening.</p>
+              ) : null}
+              {scanResult.security?.suspicious ? (
+                <p className="mt-3 rounded-md bg-white/70 px-3 py-2 text-xs text-clay">Suspicious scan warning: risk score {scanResult.security.riskScore}.</p>
+              ) : null}
             </div>
           ) : null}
           <form className="mt-4 space-y-3" onSubmit={scan}>
             <Select name="accessPointId" label="Choose access point" options={data.accessPoints.map((item) => [item.id, item.name])} required />
+            <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" name="purpose" defaultValue="ACCESS">
+              {["ACCESS", "ATTENDANCE", "EVENT", "RESOURCE", "EMERGENCY_ROLL_CALL", "VISITOR"].map((item) => <option key={item}>{item}</option>)}
+            </select>
             <Input name="qrToken" placeholder="QR token from member card" />
             <Input name="organizationId" placeholder="Or Organization ID, e.g. LETW.ORG-..." />
+            <Input name="visitorToken" placeholder="Or temporary visitor pass token" />
+            <Select name="attendanceSessionId" label="Optional attendance / emergency roll-call session" options={data.attendanceSessions.map((item) => [item.id, `${item.targetType.toLowerCase()}: ${item.title}`])} />
+            <Select name="eventId" label="Optional event check-in" options={data.events.map((item) => [item.id, `${item.title} (${new Date(item.startsAt).toLocaleDateString()})`])} />
+            <Select name="resourceId" label="Optional resource check-in/out" options={data.resources.map((item) => [item.id, `${item.name} (${item.category})`])} />
             <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" name="method" defaultValue="QR">
               {["QR", "NFC_RFID", "MANUAL", "HARDWARE_API"].map((item) => <option key={item}>{item}</option>)}
             </select>
+            <Textarea name="note" placeholder="Optional attendance/resource/guard note" />
             <Button className="w-full" disabled={busy === "SCAN"} type="submit">
               {busy === "SCAN" ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
               Check access
@@ -340,6 +386,9 @@ export function AccessControlPanel() {
               <div className="mt-2 flex flex-wrap gap-2">
                 <SmallButton onClick={() => void update("ACCESS_POINT", point.id, { active: !point.active })}>{point.active ? "Disable" : "Enable"}</SmallButton>
                 <SmallButton onClick={() => void update("ACCESS_POINT", point.id, { requireLiveCard: !point.requireLiveCard })}>{point.requireLiveCard ? "Relax live check" : "Require live check"}</SmallButton>
+                <SmallButton onClick={() => void update("ACCESS_POINT", point.id, { highSecurity: !point.highSecurity })}>{point.highSecurity ? "Normal security" : "High security"}</SmallButton>
+                <SmallButton onClick={() => void update("ACCESS_POINT", point.id, { requireExplicitApproval: !point.requireExplicitApproval })}>{point.requireExplicitApproval ? "No explicit approval" : "Require approval"}</SmallButton>
+                <SmallButton onClick={() => void update("ACCESS_POINT", point.id, { requirePhotoMatch: !point.requirePhotoMatch })}>{point.requirePhotoMatch ? "No photo match" : "Photo match"}</SmallButton>
                 <IconDelete onClick={() => void deleteRecord("ACCESS_POINT", point.id)} />
               </div>
             </Item>
@@ -375,9 +424,10 @@ export function AccessControlPanel() {
             <Item key={log.id} title={log.decision === "GRANTED" ? "Access granted" : "Access denied"} subtitle={`${pointName.get(log.accessPointId) ?? "Access point"} - ${titleCase(log.method)} - ${new Date(log.createdAt).toLocaleString()}`}>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge className={log.decision === "GRANTED" ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>{titleCase(log.decision)}</Badge>
+                <Badge className={log.suspicious ? "bg-clay/10 text-clay" : "bg-paper"}>{log.purpose.toLowerCase()}</Badge>
                 <span className="text-xs text-ink/50">{log.organizationId ?? userName.get(log.scannedUserId ?? "") ?? "Unknown member"}</span>
               </div>
-              <p className="mt-1 text-xs text-ink/55">{log.reason}</p>
+              <p className="mt-1 text-xs text-ink/55">{log.reason} {log.riskScore ? `Risk ${log.riskScore}` : ""}</p>
             </Item>
           ))}
         </Panel>
