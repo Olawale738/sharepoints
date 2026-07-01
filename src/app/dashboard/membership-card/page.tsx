@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { PrintIdButton } from "@/components/dashboard/print-id-button";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
-import { cardStatusTone, refreshOfflinePayload } from "@/lib/qr-identity";
+import { cardStatusTone, ensureMemberNumber, refreshOfflinePayload } from "@/lib/qr-identity";
 import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
 function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
@@ -83,12 +83,17 @@ export default async function MembershipCardPage() {
     }
   }
 
+  const ensuredMembershipNumber =
+    account?.memberProfile?.membershipNumber ||
+    (await ensureMemberNumber(session.user.id).catch(() => null)) ||
+    card?.cardNumber ||
+    "";
   const location =
     account?.memberProfile?.digitalIdLocation ||
     [account?.memberProfile?.city, account?.memberProfile?.country].filter(Boolean).join(", ") ||
     "LETTW Worldwide";
   const position = account?.memberProfile?.organizationPosition ?? "Member";
-  const membershipNumber = account?.memberProfile?.membershipNumber || card?.cardNumber || "";
+  const membershipNumber = ensuredMembershipNumber;
   const memberSince = String(
     account?.memberProfile?.membershipStartedAt?.getFullYear() ?? card?.issuedAt.getFullYear() ?? new Date().getFullYear()
   );
@@ -201,7 +206,7 @@ export default async function MembershipCardPage() {
               <div className="plastic-id-back-body">
                 <div className="plastic-id-terms">
                   <p>This card remains the property of Light Encounter Tabernacle Worldwide.</p>
-                  <p>It is valid only while the QR confirmation page displays “confirmed”.</p>
+                  <p>It is valid only when the QR confirmation page displays confirmed status.</p>
                   <p>Revoked, expired, deleted, or replaced credentials must not be accepted.</p>
                 </div>
 
