@@ -1,20 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import type { ReactNode } from "react";
-
-import {
-  BadgeCheck,
-  Building2,
-  CalendarDays,
-  Download,
-  Globe2,
-  IdCard,
-  KeyRound,
-  Mail,
-  ShieldCheck,
-  Smartphone,
-  UserRound,
-  WalletCards
-} from "lucide-react";
+import { BadgeCheck, Building2, Download, KeyRound, ShieldCheck, WalletCards } from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
@@ -25,21 +10,10 @@ import { prisma } from "@/lib/prisma";
 import { cardStatusTone, ensureMemberNumber, refreshOfflinePayload } from "@/lib/qr-identity";
 import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
-function DetailRow({
-  icon,
-  label,
-  value,
-  mono = false
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
+function IdentityMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="plastic-id-detail-row">
-      <span className="plastic-id-detail-icon">{icon}</span>
-      <span className="plastic-id-detail-label">{label}</span>
+    <div className="plastic-id-metric">
+      <span>{label}</span>
       <strong className={mono ? "font-mono" : ""}>{value}</strong>
     </div>
   );
@@ -133,6 +107,10 @@ export default async function MembershipCardPage() {
       : card.status === "ACTIVE"
         ? "expired"
         : card.status.toLowerCase();
+  const cardDisplayStatusLabel = cardDisplayStatus
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
   const statusTone = card ? cardStatusTone(card) : "MISSING";
 
   return (
@@ -169,31 +147,23 @@ export default async function MembershipCardPage() {
               }`}
             >
               <header className="plastic-id-portrait-header">
-                <div className="plastic-id-brand-lockup">
+                <div className="plastic-id-brand-mark">
                   <Image
                     alt="LETTW logo"
                     className="plastic-id-brand-logo"
                     height={112}
-                    src="/letw-logo.png"
+                    src="/letw-logo-transparent.png"
                     width={112}
                     priority
                   />
-                  <div className="plastic-id-brand-divider" />
-                  <div>
-                    <p>Light Encounter Tabernacle Worldwide</p>
-                    <span>Official Membership Identity</span>
-                  </div>
                 </div>
-                <div className="plastic-id-chip">
-                  <Globe2 className="h-5 w-5" />
+                <div className="plastic-id-brand-copy">
+                  <p>Light Encounter Tabernacle Worldwide</p>
+                  <span>Official Membership Identity</span>
                 </div>
               </header>
 
               <div className="plastic-id-front-body">
-                <div className="plastic-id-nfc">
-                  <span className="plastic-id-nfc-waves" />
-                  <span>NFC<br />Ready</span>
-                </div>
                 <div className="plastic-id-portrait-photo">
                   {account?.image ? (
                     <img
@@ -208,46 +178,50 @@ export default async function MembershipCardPage() {
 
                 <p className="plastic-id-member-name">{account?.name ?? "LETTW Member"}</p>
                 <p className="plastic-id-position">{position}</p>
-                <span className="plastic-id-name-rule" />
                 {badges.length ? (
                   <p className="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-[#b78727]">
                     {badges.slice(0, 2).map((badge) => badge.title).join(" | ")}
                   </p>
                 ) : null}
 
-                <div className="plastic-id-details">
-                  <DetailRow icon={<IdCard />} label="Organization ID" value={card.organizationId} mono />
-                  <DetailRow icon={<UserRound />} label="Member no." value={membershipNumber} mono />
-                  <DetailRow icon={<CalendarDays />} label="Member since" value={memberSince} />
-                  <DetailRow icon={<Globe2 />} label="Location" value={location} />
+                <div className="plastic-id-info-grid">
+                  <IdentityMetric label="Organization ID" value={card.organizationId} mono />
+                  <IdentityMetric label="Member no." value={membershipNumber} mono />
+                  <IdentityMetric label="Member since" value={memberSince} />
+                  <IdentityMetric label="Location" value={location} />
                 </div>
               </div>
 
               <footer className="plastic-id-portrait-footer">
+                <span>letw.org</span>
                 <div className="plastic-id-status-lock">
-                  <ShieldCheck className="h-5 w-5" />
-                  <strong>{cardDisplayStatus}</strong>
+                  <span className="plastic-id-status-dot" />
+                  <strong>Status: {cardDisplayStatusLabel}</strong>
                 </div>
-                <span>Issued {card.issuedAt.toLocaleDateString()}</span>
-                <span>{card.expiresAt ? `Expires ${card.expiresAt.toLocaleDateString()}` : "No Expiry"}</span>
               </footer>
             </section>
 
             <section className="plastic-id-card plastic-id-card-back">
               <header className="plastic-id-back-header">
-                <ShieldCheck className="plastic-id-back-shield" />
                 <div>
                   <p>Identity Verification</p>
                   <span>Scan to confirm current membership status</span>
                 </div>
-                <span className="plastic-id-dot-grid" />
               </header>
 
               <div className="plastic-id-back-body">
+                <Image
+                  alt=""
+                  aria-hidden="true"
+                  className="plastic-id-watermark"
+                  height={420}
+                  src="/letw-logo-transparent.png"
+                  width={420}
+                />
                 <div className="plastic-id-terms">
                   <p>This card remains the property of Light Encounter Tabernacle Worldwide.</p>
-                  <p>It is valid only when the QR confirmation page displays confirmed status.</p>
-                  <p>Revoked, expired, deleted, or replaced credentials must not be accepted.</p>
+                  <p>It is valid only when the QR confirmation page displays an Active status.</p>
+                  <p>Revoked, expired, or replaced credentials are void and will not be accepted.</p>
                 </div>
 
                 <div className="plastic-id-large-qr">
@@ -257,10 +231,7 @@ export default async function MembershipCardPage() {
                     <ShieldCheck className="h-14 w-14 text-red-700" />
                   )}
                 </div>
-                <p className="plastic-id-scan-label">
-                  <Smartphone className="h-4 w-4" />
-                  SCAN TO AUTHENTICATE
-                </p>
+                <p className="plastic-id-scan-label">Scan to Authenticate</p>
                 <p className="plastic-id-back-org-id">{card.organizationId}</p>
                 {card.offlinePayloadHash ? (
                   <p className="plastic-id-offline-hash">
@@ -271,17 +242,6 @@ export default async function MembershipCardPage() {
               </div>
 
               <footer className="plastic-id-back-footer">
-                <div className="plastic-id-back-contact">
-                  <span><Globe2 className="h-4 w-4" /> letw.org</span>
-                  <span><Mail className="h-4 w-4" /> info@letw.org</span>
-                </div>
-                <Image
-                  alt="LETTW seal"
-                  className="plastic-id-back-seal"
-                  height={112}
-                  src="/letw-logo.png"
-                  width={112}
-                />
                 <p>Light Encounter Tabernacle Worldwide</p>
                 <strong>letw.org</strong>
               </footer>
