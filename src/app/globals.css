@@ -3148,3 +3148,337 @@ select {
     background: #ffffff !important;
   }
 }
+
+/* Final print clarity pass: larger proof cards, stronger text, no clipping. */
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 0;
+  }
+
+  .digital-id-print-sheet {
+    position: fixed !important;
+    inset: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 70mm) !important;
+    align-content: start !important;
+    justify-content: center !important;
+    gap: 10mm !important;
+    width: 215.9mm !important;
+    height: 279.4mm !important;
+    max-width: 215.9mm !important;
+    margin: 0 !important;
+    padding: 12mm 0 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .plastic-id-card {
+    display: flex !important;
+    width: 70mm !important;
+    height: 111mm !important;
+    min-width: 70mm !important;
+    min-height: 111mm !important;
+    max-width: 70mm !important;
+    max-height: 111mm !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border: 0.35mm solid rgb(11 27 61 / 14%) !important;
+    border-radius: 4mm !important;
+    box-shadow: none !important;
+  }
+
+  .plastic-id-card-front,
+  .plastic-id-card-back {
+    color: #0b1b3d !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-card-front::before {
+    height: 0.8mm !important;
+    background: linear-gradient(90deg, #0b1b3d, #d4af37, #0b1b3d) !important;
+  }
+
+  .plastic-id-card-front::after,
+  .plastic-id-front-body::after {
+    display: none !important;
+  }
+
+  .plastic-id-portrait-header {
+    flex: 0 0 18mm !important;
+    min-height: 18mm !important;
+    gap: 2.2mm !important;
+    padding: 2.2mm 3mm !important;
+    border-bottom: 0.45mm solid rgb(212 175 55 / 70%) !important;
+    color: #0b1b3d !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-brand-mark,
+  .plastic-id-brand-logo,
+  .plastic-id-portrait-header img {
+    width: 13.5mm !important;
+    height: 13.5mm !important;
+  }
+
+  .plastic-id-brand-copy p,
+  .plastic-id-portrait-header p {
+    color: #0b1b3d !important;
+    font-size: 2.15mm !important;
+    font-weight: 950 !important;
+    line-height: 1.18 !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .plastic-id-front-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 3mm 4mm 2.2mm !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-front-body::before,
+  .plastic-id-map-watermark {
+    display: block !important;
+    background: url("/letw-logo-transparent.png") center 24mm / 48mm no-repeat !important;
+    opacity: 0.055 !important;
+  }
+
+  .plastic-id-portrait-photo {
+    width: 25mm !important;
+    height: 25mm !important;
+    min-width: 25mm !important;
+    min-height: 25mm !important;
+    border-width: 1mm !important;
+    box-shadow: 0 0 0 0.75mm rgb(212 175 55 / 30%) !important;
+  }
+
+  .plastic-id-member-name {
+    min-height: 4.4mm !important;
+    margin-top: 1.8mm !important;
+    color: #08245c !important;
+    font-size: 3.7mm !important;
+    font-weight: 950 !important;
+    line-height: 1.12 !important;
+  }
+
+  .plastic-id-position {
+    min-height: 3.4mm !important;
+    margin-top: 1mm !important;
+    padding: 0.8mm 4mm !important;
+    color: #ffffff !important;
+    background: #0b1b3d !important;
+    font-size: 1.75mm !important;
+    line-height: 1.1 !important;
+    text-shadow: none !important;
+  }
+
+  .plastic-id-info-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.4mm !important;
+    margin-top: 2mm !important;
+  }
+
+  .plastic-id-card-front .plastic-id-metric {
+    min-height: 10mm !important;
+    border: 0.25mm solid rgb(10 61 131 / 16%) !important;
+    border-radius: 2mm !important;
+    padding: 1.6mm 1.8mm !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .plastic-id-card-front .plastic-id-metric span:not(.plastic-id-metric-icon) {
+    color: #0a3d83 !important;
+    font-size: 1.35mm !important;
+    font-weight: 950 !important;
+    line-height: 1.1 !important;
+  }
+
+  .plastic-id-card-front .plastic-id-metric strong {
+    margin-top: 0.7mm !important;
+    color: #08245c !important;
+    font-size: 1.75mm !important;
+    font-weight: 950 !important;
+    line-height: 1.15 !important;
+  }
+
+  .plastic-id-portrait-footer {
+    flex: 0 0 14mm !important;
+    min-height: 14mm !important;
+    border-top: 0.45mm solid rgb(212 175 55 / 70%) !important;
+    color: #0b1b3d !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-security-strip {
+    height: 1mm !important;
+    background: linear-gradient(90deg, #0b1b3d, #d4af37, #0b1b3d) !important;
+  }
+
+  .plastic-id-footer-main {
+    grid-template-columns: 1.1fr 1fr 1fr !important;
+    gap: 1.2mm !important;
+    padding: 1.6mm 2.2mm 0 !important;
+  }
+
+  .plastic-id-active-badge {
+    min-height: 4.5mm !important;
+    padding: 1mm 1.5mm !important;
+    color: #ffffff !important;
+    background: #0b1b3d !important;
+    font-size: 1.55mm !important;
+  }
+
+  .plastic-id-date-pair span,
+  .plastic-id-signature small {
+    color: rgb(11 27 61 / 60%) !important;
+    font-size: 1.15mm !important;
+  }
+
+  .plastic-id-date-pair strong {
+    color: #0b1b3d !important;
+    font-size: 1.35mm !important;
+  }
+
+  .plastic-id-signature {
+    display: none !important;
+  }
+
+  .plastic-id-back-header {
+    flex: 0 0 18mm !important;
+    min-height: 18mm !important;
+    gap: 2.5mm !important;
+    padding: 2.4mm 3.5mm !important;
+    border-bottom: 0.45mm solid rgb(212 175 55 / 70%) !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-back-logo {
+    width: 13mm !important;
+    height: 13mm !important;
+  }
+
+  .plastic-id-back-header p {
+    color: #0b1b3d !important;
+    font-size: 3.1mm !important;
+    line-height: 1.05 !important;
+  }
+
+  .plastic-id-back-header span {
+    color: #0a3d83 !important;
+    font-size: 1.55mm !important;
+    line-height: 1.15 !important;
+  }
+
+  .plastic-id-back-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 3mm 4mm 1.8mm !important;
+    color: #0b1b3d !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-watermark {
+    opacity: 0.055 !important;
+  }
+
+  .plastic-id-large-qr {
+    width: 42mm !important;
+    height: 42mm !important;
+    min-width: 42mm !important;
+    min-height: 42mm !important;
+    margin-top: 1mm !important;
+    padding: 2.4mm !important;
+    border: 0.5mm solid #7dd3fc !important;
+    border-radius: 3mm !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  .plastic-id-large-qr img {
+    border: 1.5mm solid #ffffff !important;
+    border-radius: 1.6mm !important;
+  }
+
+  .plastic-id-scan-label {
+    margin-top: 1.5mm !important;
+    color: #0b1b3d !important;
+    font-size: 2mm !important;
+  }
+
+  .plastic-id-back-org-id {
+    color: #0a3d83 !important;
+    font-size: 1.65mm !important;
+  }
+
+  .plastic-id-security-icons {
+    gap: 1.4mm !important;
+    margin-top: 1.8mm !important;
+  }
+
+  .plastic-id-security-icons span {
+    min-height: 4.8mm !important;
+    color: #0b1b3d !important;
+    background: #eff6ff !important;
+    font-size: 1.35mm !important;
+  }
+
+  .plastic-id-terms {
+    margin-top: 1.6mm !important;
+    color: rgb(11 27 61 / 82%) !important;
+    font-size: 1.35mm !important;
+    line-height: 1.22 !important;
+  }
+
+  .plastic-id-terms h3 {
+    color: #0b1b3d !important;
+    font-size: 1.55mm !important;
+  }
+
+  .plastic-id-terms p {
+    margin-bottom: 0.65mm !important;
+    padding-left: 2.4mm !important;
+  }
+
+  .plastic-id-contact-grid {
+    gap: 0.75mm !important;
+    margin-top: 1.2mm !important;
+    color: #0a3d83 !important;
+    font-size: 1.35mm !important;
+  }
+
+  .plastic-id-hologram-seal {
+    right: 3mm !important;
+    bottom: 2.6mm !important;
+    width: 10mm !important;
+    height: 10mm !important;
+  }
+
+  .plastic-id-hologram-seal img {
+    width: 8mm !important;
+    height: 8mm !important;
+  }
+
+  .plastic-id-back-footer {
+    flex: 0 0 10mm !important;
+    min-height: 10mm !important;
+    padding: 1.7mm 3mm !important;
+    border-top: 0.45mm solid rgb(212 175 55 / 70%) !important;
+    color: #0b1b3d !important;
+    background: #ffffff !important;
+  }
+
+  .plastic-id-back-footer p {
+    color: #0b1b3d !important;
+    font-size: 1.35mm !important;
+  }
+
+  .plastic-id-back-footer strong {
+    color: #0a3d83 !important;
+    font-size: 1.35mm !important;
+  }
+}
