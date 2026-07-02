@@ -3285,32 +3285,32 @@ select {
 
   .plastic-id-info-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 1.4mm !important;
-    margin-top: 2mm !important;
+    gap: 1.8mm !important;
+    margin-top: 2.4mm !important;
   }
 
   .plastic-id-card-front .plastic-id-metric {
-    min-height: 10mm !important;
+    min-height: 13mm !important;
     border: 0.25mm solid rgb(10 61 131 / 16%) !important;
     border-radius: 2mm !important;
-    padding: 1.6mm 1.8mm !important;
+    padding: 2mm 2.2mm !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }
 
   .plastic-id-card-front .plastic-id-metric span:not(.plastic-id-metric-icon) {
     color: #0a3d83 !important;
-    font-size: 1.35mm !important;
+    font-size: 1.85mm !important;
     font-weight: 950 !important;
-    line-height: 1.1 !important;
+    line-height: 1.12 !important;
   }
 
   .plastic-id-card-front .plastic-id-metric strong {
-    margin-top: 0.7mm !important;
+    margin-top: 1mm !important;
     color: #08245c !important;
-    font-size: 1.75mm !important;
+    font-size: 2.35mm !important;
     font-weight: 950 !important;
-    line-height: 1.15 !important;
+    line-height: 1.12 !important;
   }
 
   .plastic-id-portrait-footer {
