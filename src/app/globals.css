@@ -3149,7 +3149,7 @@ select {
   }
 }
 
-/* Final print clarity pass: larger proof cards, stronger text, no clipping. */
+/* Final print clarity pass: larger proof cards, navy headers, stronger text, no clipping. */
 @media print {
   @page {
     size: letter portrait;
@@ -3211,8 +3211,8 @@ select {
     gap: 2.2mm !important;
     padding: 2.2mm 3mm !important;
     border-bottom: 0.45mm solid rgb(212 175 55 / 70%) !important;
-    color: #0b1b3d !important;
-    background: #ffffff !important;
+    color: #ffffff !important;
+    background: #0b1b3d !important;
   }
 
   .plastic-id-brand-mark,
@@ -3222,9 +3222,17 @@ select {
     height: 13.5mm !important;
   }
 
+  .plastic-id-brand-mark {
+    display: grid !important;
+    place-items: center !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 0.45mm rgb(212 175 55 / 42%) !important;
+  }
+
   .plastic-id-brand-copy p,
   .plastic-id-portrait-header p {
-    color: #0b1b3d !important;
+    color: #ffffff !important;
     font-size: 2.15mm !important;
     font-weight: 950 !important;
     line-height: 1.18 !important;
@@ -3353,22 +3361,27 @@ select {
     gap: 2.5mm !important;
     padding: 2.4mm 3.5mm !important;
     border-bottom: 0.45mm solid rgb(212 175 55 / 70%) !important;
-    background: #ffffff !important;
+    color: #ffffff !important;
+    background: #0b1b3d !important;
   }
 
   .plastic-id-back-logo {
     width: 13mm !important;
     height: 13mm !important;
+    border-radius: 999px !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 0.45mm rgb(212 175 55 / 42%) !important;
+    object-fit: contain !important;
   }
 
   .plastic-id-back-header p {
-    color: #0b1b3d !important;
+    color: #ffffff !important;
     font-size: 3.1mm !important;
     line-height: 1.05 !important;
   }
 
   .plastic-id-back-header span {
-    color: #0a3d83 !important;
+    color: #d4af37 !important;
     font-size: 1.55mm !important;
     line-height: 1.15 !important;
   }
