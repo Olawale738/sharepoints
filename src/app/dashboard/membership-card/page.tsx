@@ -246,6 +246,13 @@ export default async function MembershipCardPage() {
 
             <section className="plastic-id-card plastic-id-card-back">
               <header className="plastic-id-back-header">
+                <Image
+                  alt="LETTW logo"
+                  className="plastic-id-back-logo"
+                  height={112}
+                  src="/letw-logo-transparent.png"
+                  width={112}
+                />
                 <div>
                   <p>Identity Verification</p>
                   <span>Scan to verify official membership credentials.</span>
