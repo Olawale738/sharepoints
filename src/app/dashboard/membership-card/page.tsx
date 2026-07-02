@@ -6,7 +6,6 @@ import {
   Building2,
   CalendarDays,
   CheckCircle2,
-  Crown,
   Download,
   Fingerprint,
   Globe2,
@@ -199,11 +198,6 @@ export default async function MembershipCardPage() {
                 </div>
                 <div className="plastic-id-brand-copy">
                   <p>Light Encounter Tabernacle Worldwide</p>
-                  <span>Official Membership Identity</span>
-                </div>
-                <div className="plastic-id-official-ribbon">
-                  <Crown className="h-4 w-4" />
-                  <span>Official Member</span>
                 </div>
               </header>
 
