@@ -1,23 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
-import type { ReactNode } from "react";
 
 import {
   BadgeCheck,
   Building2,
-  CalendarDays,
   CheckCircle2,
   Download,
   Fingerprint,
   Globe2,
-  IdCard,
   KeyRound,
   Mail,
-  MapPin,
   Phone,
-  Radio,
   ShieldCheck,
-  Sparkles,
-  UserRound,
   WalletCards
 } from "lucide-react";
 import Image from "next/image";
@@ -31,19 +24,16 @@ import { cardStatusTone, ensureMemberNumber, refreshOfflinePayload } from "@/lib
 import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
 function IdentityMetric({
-  icon,
   label,
   value,
   mono = false
 }: {
-  icon: ReactNode;
   label: string;
   value: string;
   mono?: boolean;
 }) {
   return (
     <div className="plastic-id-metric">
-      <span className="plastic-id-metric-icon">{icon}</span>
       <span>{label}</span>
       <strong className={mono ? "font-mono" : ""}>{value}</strong>
     </div>
@@ -224,15 +214,10 @@ export default async function MembershipCardPage() {
                 ) : null}
 
                 <div className="plastic-id-info-grid">
-                  <IdentityMetric icon={<IdCard />} label="Organization ID" value={card.organizationId} mono />
-                  <IdentityMetric icon={<UserRound />} label="Member Number" value={membershipNumber} mono />
-                  <IdentityMetric icon={<CalendarDays />} label="Member Since" value={memberSince} />
-                  <IdentityMetric icon={<MapPin />} label="Location" value={location} />
-                </div>
-
-                <div className="plastic-id-nfc-enabled">
-                  <Radio className="h-4 w-4" />
-                  <span>NFC Enabled</span>
+                  <IdentityMetric label="Organization ID" value={card.organizationId} mono />
+                  <IdentityMetric label="Member Number" value={membershipNumber} mono />
+                  <IdentityMetric label="Member Since" value={memberSince} />
+                  <IdentityMetric label="Location" value={location} />
                 </div>
               </div>
 
@@ -289,8 +274,6 @@ export default async function MembershipCardPage() {
                 <div className="plastic-id-security-icons">
                   <span><CheckCircle2 className="h-3.5 w-3.5" /> Secure</span>
                   <span><ShieldCheck className="h-3.5 w-3.5" /> Verified</span>
-                  <span><Globe2 className="h-3.5 w-3.5" /> Global</span>
-                  <span><Sparkles className="h-3.5 w-3.5" /> Kingdom Impact</span>
                 </div>
 
                 <div className="plastic-id-terms">
