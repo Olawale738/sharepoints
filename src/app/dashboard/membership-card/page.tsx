@@ -58,6 +58,8 @@ export default async function MembershipCardPage() {
           select: {
             membershipNumber: true,
             membershipStatus: true,
+            phone: true,
+            alternatePhone: true,
             city: true,
             country: true,
             membershipStartedAt: true,
@@ -114,6 +116,7 @@ export default async function MembershipCardPage() {
     [account?.memberProfile?.city, account?.memberProfile?.country].filter(Boolean).join(", ") ||
     "LETTW Worldwide";
   const position = account?.memberProfile?.organizationPosition ?? "Member";
+  const memberPhone = account?.memberProfile?.phone || account?.memberProfile?.alternatePhone || null;
   const membershipNumber = ensuredMembershipNumber;
   const memberSince = String(
     account?.memberProfile?.membershipStartedAt?.getFullYear() ?? card?.issuedAt.getFullYear() ?? new Date().getFullYear()
@@ -294,7 +297,7 @@ export default async function MembershipCardPage() {
                 <div className="plastic-id-contact-grid">
                   <span><Globe2 className="h-3.5 w-3.5" /> www.letw.org</span>
                   <span><Mail className="h-3.5 w-3.5" /> info@letw.org</span>
-                  <span><Phone className="h-3.5 w-3.5" /> +234 XXX XXX XXXX</span>
+                  {memberPhone ? <span><Phone className="h-3.5 w-3.5" /> {memberPhone}</span> : null}
                 </div>
 
                 <div className="plastic-id-hologram-seal" aria-hidden="true">
