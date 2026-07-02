@@ -1,5 +1,26 @@
 /* eslint-disable @next/next/no-img-element */
-import { BadgeCheck, Building2, Download, KeyRound, ShieldCheck, WalletCards } from "lucide-react";
+import type { ReactNode } from "react";
+
+import {
+  BadgeCheck,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Crown,
+  Download,
+  Fingerprint,
+  Globe2,
+  IdCard,
+  KeyRound,
+  Mail,
+  MapPin,
+  Phone,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  WalletCards
+} from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
@@ -10,9 +31,20 @@ import { prisma } from "@/lib/prisma";
 import { cardStatusTone, ensureMemberNumber, refreshOfflinePayload } from "@/lib/qr-identity";
 import { ensureMembershipCredential, verifyMembershipCredential } from "@/lib/verifiable-credentials";
 
-function IdentityMetric({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function IdentityMetric({
+  icon,
+  label,
+  value,
+  mono = false
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
     <div className="plastic-id-metric">
+      <span className="plastic-id-metric-icon">{icon}</span>
       <span>{label}</span>
       <strong className={mono ? "font-mono" : ""}>{value}</strong>
     </div>
@@ -97,6 +129,14 @@ export default async function MembershipCardPage() {
   const memberSince = String(
     account?.memberProfile?.membershipStartedAt?.getFullYear() ?? card?.issuedAt.getFullYear() ?? new Date().getFullYear()
   );
+  const issuedLabel = card?.issuedAt.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+  const validityLabel = card?.expiresAt
+    ? card.expiresAt.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })
+    : "No Expiry";
   const cardValid = Boolean(
     card && card.status === "ACTIVE" && (!card.expiresAt || card.expiresAt > new Date())
   );
@@ -161,9 +201,14 @@ export default async function MembershipCardPage() {
                   <p>Light Encounter Tabernacle Worldwide</p>
                   <span>Official Membership Identity</span>
                 </div>
+                <div className="plastic-id-official-ribbon">
+                  <Crown className="h-4 w-4" />
+                  <span>Official Member</span>
+                </div>
               </header>
 
               <div className="plastic-id-front-body">
+                <span className="plastic-id-map-watermark" aria-hidden="true" />
                 <div className="plastic-id-portrait-photo">
                   {account?.image ? (
                     <img
@@ -185,18 +230,37 @@ export default async function MembershipCardPage() {
                 ) : null}
 
                 <div className="plastic-id-info-grid">
-                  <IdentityMetric label="Organization ID" value={card.organizationId} mono />
-                  <IdentityMetric label="Member no." value={membershipNumber} mono />
-                  <IdentityMetric label="Member since" value={memberSince} />
-                  <IdentityMetric label="Location" value={location} />
+                  <IdentityMetric icon={<IdCard />} label="Organization ID" value={card.organizationId} mono />
+                  <IdentityMetric icon={<UserRound />} label="Member Number" value={membershipNumber} mono />
+                  <IdentityMetric icon={<CalendarDays />} label="Member Since" value={memberSince} />
+                  <IdentityMetric icon={<MapPin />} label="Location" value={location} />
+                </div>
+
+                <div className="plastic-id-nfc-enabled">
+                  <Radio className="h-4 w-4" />
+                  <span>NFC Enabled</span>
                 </div>
               </div>
 
               <footer className="plastic-id-portrait-footer">
-                <span>letw.org</span>
-                <div className="plastic-id-status-lock">
-                  <span className="plastic-id-status-dot" />
-                  <strong>Status: {cardDisplayStatusLabel}</strong>
+                <div className="plastic-id-security-strip" />
+                <div className="plastic-id-footer-main">
+                  <div className="plastic-id-active-badge">
+                    <ShieldCheck className="h-4 w-4" />
+                    <strong>{cardDisplayStatusLabel}</strong>
+                  </div>
+                  <div className="plastic-id-date-pair">
+                    <span>Issued:</span>
+                    <strong>{issuedLabel}</strong>
+                  </div>
+                  <div className="plastic-id-date-pair">
+                    <span>Validity:</span>
+                    <strong>{validityLabel}</strong>
+                  </div>
+                </div>
+                <div className="plastic-id-signature">
+                  <span />
+                  <small>Authorized Signature</small>
                 </div>
               </footer>
             </section>
@@ -205,7 +269,7 @@ export default async function MembershipCardPage() {
               <header className="plastic-id-back-header">
                 <div>
                   <p>Identity Verification</p>
-                  <span>Scan to confirm current membership status</span>
+                  <span>Scan to verify official membership credentials.</span>
                 </div>
               </header>
 
@@ -218,12 +282,6 @@ export default async function MembershipCardPage() {
                   src="/letw-logo-transparent.png"
                   width={420}
                 />
-                <div className="plastic-id-terms">
-                  <p>This card remains the property of Light Encounter Tabernacle Worldwide.</p>
-                  <p>It is valid only when the QR confirmation page displays an Active status.</p>
-                  <p>Revoked, expired, or replaced credentials are void and will not be accepted.</p>
-                </div>
-
                 <div className="plastic-id-large-qr">
                   {cardValid ? (
                     <img alt="Scan to verify LETTW membership" src="/api/membership-card/qr" />
@@ -233,17 +291,43 @@ export default async function MembershipCardPage() {
                 </div>
                 <p className="plastic-id-scan-label">Scan to Authenticate</p>
                 <p className="plastic-id-back-org-id">{card.organizationId}</p>
-                {card.offlinePayloadHash ? (
-                  <p className="plastic-id-offline-hash">
-                    Offline hash {card.offlinePayloadHash.slice(0, 18)}
-                  </p>
-                ) : null}
+
+                <div className="plastic-id-security-icons">
+                  <span><CheckCircle2 className="h-3.5 w-3.5" /> Secure</span>
+                  <span><ShieldCheck className="h-3.5 w-3.5" /> Verified</span>
+                  <span><Globe2 className="h-3.5 w-3.5" /> Global</span>
+                  <span><Sparkles className="h-3.5 w-3.5" /> Kingdom Impact</span>
+                </div>
+
+                <div className="plastic-id-terms">
+                  <h3>Verification Notice</h3>
+                  <p>This credential remains the property of Light Encounter Tabernacle Worldwide.</p>
+                  <p>Authentication is valid only when the QR verification portal displays VERIFIED status.</p>
+                  <p>Revoked, expired, suspended, replaced, altered, or deleted credentials are invalid.</p>
+                  <p>This credential is non-transferable.</p>
+                </div>
+
+                <div className="plastic-id-contact-grid">
+                  <span><Globe2 className="h-3.5 w-3.5" /> www.letw.org</span>
+                  <span><Mail className="h-3.5 w-3.5" /> info@letw.org</span>
+                  <span><Phone className="h-3.5 w-3.5" /> +234 XXX XXX XXXX</span>
+                </div>
+
+                <div className="plastic-id-hologram-seal" aria-hidden="true">
+                  <Image
+                    alt=""
+                    height={112}
+                    src="/letw-logo-transparent.png"
+                    width={112}
+                  />
+                  <Fingerprint className="h-5 w-5" />
+                </div>
 
               </div>
 
               <footer className="plastic-id-back-footer">
                 <p>Light Encounter Tabernacle Worldwide</p>
-                <strong>letw.org</strong>
+                <strong>Empowering Lives | Transforming Nations | Advancing God&apos;s Kingdom</strong>
               </footer>
             </section>
           </div>
