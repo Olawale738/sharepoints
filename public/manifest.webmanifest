@@ -4,14 +4,41 @@
   "description": "Private collaboration, documents, chat, meetings, tasks, forms, and knowledge for LETW.",
   "start_url": "/dashboard",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#F8F6F0",
   "theme_color": "#1F6F5B",
+  "orientation": "portrait",
+  "scope": "/",
+  "categories": ["business", "productivity", "utilities"],
   "icons": [
     {
       "src": "/letw-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Member ID",
+      "short_name": "ID",
+      "description": "Open your LETW digital membership card.",
+      "url": "/dashboard/membership-card",
+      "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Meetings",
+      "short_name": "Meetings",
+      "description": "Open LETW meetings and calls.",
+      "url": "/dashboard/calendar",
+      "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Knowledge Base",
+      "short_name": "Knowledge",
+      "description": "Open LETW doctrines, policies, guides, and FAQs.",
+      "url": "/dashboard/knowledge",
+      "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
     }
   ]
 }

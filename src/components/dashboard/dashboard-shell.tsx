@@ -1,7 +1,25 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
-import { BadgeCheck, BarChart3, CalendarDays, ClipboardCheck, DoorOpen, FileLock2, HeartHandshake, Newspaper, RadioTower, ShieldCheck, SlidersHorizontal, Sparkles, Sprout, UserRound } from "lucide-react";
+import {
+  Award,
+  BadgeCheck,
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  ClipboardCheck,
+  DoorOpen,
+  FileLock2,
+  HeartHandshake,
+  Newspaper,
+  RadioTower,
+  ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
+  Sparkles,
+  Sprout,
+  UserRound
+} from "lucide-react";
 
 import { DashboardWorkspaceSwitcher } from "@/components/dashboard/dashboard-workspace-switcher";
 import { GlobalSearch } from "@/components/dashboard/global-search";
@@ -86,6 +104,30 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               <GlobalSearch />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-1 sm:justify-end">
+              <Link
+                aria-label="Knowledge base"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/knowledge"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Knowledge</span>
+              </Link>
+              <Link
+                aria-label="Certificate generator"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/certificates"
+              >
+                <Award className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Certificates</span>
+              </Link>
+              <Link
+                aria-label="Mobile app"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/mobile-app"
+              >
+                <Smartphone className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Mobile</span>
+              </Link>
               <Link
                 aria-label="Emergency command center"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"

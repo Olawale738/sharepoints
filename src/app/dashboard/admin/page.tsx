@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Activity,
+  Award,
+  BookOpen,
   CalendarClock,
   ClipboardCheck,
   ContactRound,
@@ -9,6 +11,7 @@ import {
   Files,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   UsersRound,
   Workflow,
@@ -360,6 +363,41 @@ export default async function AdminControlCenterPage() {
           >
             <ClipboardCheck className="h-4 w-4" />
             Required forms
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/admin/access-review"
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Access review
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/admin/public-site"
+          >
+            <Globe2 className="h-4 w-4" />
+            letw.org sync
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/knowledge"
+          >
+            <BookOpen className="h-4 w-4" />
+            Knowledge
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/certificates"
+          >
+            <Award className="h-4 w-4" />
+            Certificates
+          </Link>
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
+            href="/dashboard/mobile-app"
+          >
+            <Smartphone className="h-4 w-4" />
+            Mobile app
           </Link>
         </div>
       </section>

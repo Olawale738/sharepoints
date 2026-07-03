@@ -1,5 +1,17 @@
-const CACHE_NAME = "letw-shell-v1";
-const SHELL = ["/", "/login", "/offline", "/manifest.webmanifest", "/letw-logo.png"];
+const CACHE_NAME = "letw-shell-v2";
+const SHELL = [
+  "/",
+  "/login",
+  "/offline",
+  "/manifest.webmanifest",
+  "/letw-logo.png",
+  "/letw-logo-transparent.png",
+  "/dashboard",
+  "/dashboard/mobile-app",
+  "/dashboard/membership-card",
+  "/dashboard/knowledge",
+  "/dashboard/certificates"
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
@@ -24,7 +36,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        if (response.ok && !url.pathname.startsWith("/dashboard")) {
+        if (response.ok && (SHELL.includes(url.pathname) || !url.pathname.startsWith("/dashboard"))) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
