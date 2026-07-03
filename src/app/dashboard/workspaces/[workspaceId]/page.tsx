@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { ChevronRight, KeyRound, UsersRound } from "lucide-react";
+import { BookOpen, CalendarDays, ChevronRight, ClipboardCheck, FileText, KeyRound, MessageSquareText, UsersRound } from "lucide-react";
 import { WorkspaceRole } from "@prisma/client";
 
 import { auth } from "@/auth";
@@ -507,9 +507,62 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
         </div>
       </section>
 
+      <section className="rounded-lg border border-ink/10 bg-white p-4">
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-ink">Workspace tools</p>
+          <p className="mt-1 text-xs text-ink/55">Jump straight to the workspace area you want to use.</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            {
+              href: "#documents",
+              label: "Documents",
+              detail: "Files, folders, uploads, previews",
+              icon: FileText
+            },
+            {
+              href: "#knowledge",
+              label: "Knowledge",
+              detail: "Doctrines, policies, manuals, FAQs",
+              icon: BookOpen
+            },
+            {
+              href: "#forms",
+              label: "Forms",
+              detail: "Workspace forms and responses",
+              icon: ClipboardCheck
+            },
+            {
+              href: "#meetings",
+              label: "Meetings",
+              detail: "Video, audio, notes, schedules",
+              icon: CalendarDays
+            },
+            {
+              href: "#chat",
+              label: "Chat",
+              detail: "Channels and direct messages",
+              icon: MessageSquareText
+            }
+          ].map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <a className="rounded-md border border-ink/10 bg-paper p-3 transition hover:bg-mint/40" href={item.href} key={item.href}>
+                <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                  <Icon className="h-4 w-4 text-moss" />
+                  {item.label}
+                </span>
+                <span className="mt-1 block text-xs text-ink/55">{item.detail}</span>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
-          <div className="rounded-lg border border-ink/10 bg-white p-4">
+          <div id="documents" className="scroll-mt-24 rounded-lg border border-ink/10 bg-white p-4">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink/60">
               <Link className="font-medium text-moss hover:underline" href={`/dashboard/workspaces/${workspaceId}`}>
                 Files
@@ -569,10 +622,12 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
             canManage={permissions.canCreateAnnouncements}
           />
 
-          <FormsPanel
-            workspaceId={workspaceId}
-            canManage={permissions.canCreateAnnouncements}
-          />
+          <div id="forms" className="scroll-mt-24">
+            <FormsPanel
+              workspaceId={workspaceId}
+              canManage={permissions.canCreateAnnouncements}
+            />
+          </div>
 
           <TasksPanel
             workspaceId={workspaceId}
@@ -607,42 +662,46 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
             canManage={permissions.canManageTasks}
           />
 
-          <MeetingsPanel
-            workspaceId={workspaceId}
-            meetings={meetings.map((meeting) => serializeMeeting(meeting, session.user.id, origin))}
-            canSchedule={permissions.canScheduleMeetings}
-            canCancel={hasAdminAccess}
-          />
+          <div id="meetings" className="scroll-mt-24">
+            <MeetingsPanel
+              workspaceId={workspaceId}
+              meetings={meetings.map((meeting) => serializeMeeting(meeting, session.user.id, origin))}
+              canSchedule={permissions.canScheduleMeetings}
+              canCancel={hasAdminAccess}
+            />
+          </div>
 
-          <ChatPanel
-            workspaceId={workspaceId}
-            currentUserId={session.user.id}
-            channels={channels.map((channel) => ({
-              id: channel.id,
-              name: channel.name,
-              description: channel.description,
-              _count: channel._count
-            }))}
-            initialMessages={initialMessages.reverse().map((message) => ({
-              id: message.id,
-              body: message.body,
-              externalAuthor: message.externalAuthor,
-              createdAt: message.createdAt.toISOString(),
-              editedAt: message.editedAt?.toISOString() ?? null,
-              deletedAt: message.deletedAt?.toISOString() ?? null,
-              voiceStorageKey: message.voiceStorageKey,
-              voiceMimeType: message.voiceMimeType,
-              voiceSize: message.voiceSize,
-              voiceDurationMs: message.voiceDurationMs,
-              replyToId: message.replyToId,
-              forwardedFromId: message.forwardedFromId,
-              author: message.author,
-              attachmentFile: message.attachmentFile
-            }))}
-            canCreateChannels={permissions.canCreateChannels}
-            canDeleteChannels={hasAdminAccess}
-            canSendMessages={permissions.canSendMessages}
-          />
+          <div id="chat" className="scroll-mt-24">
+            <ChatPanel
+              workspaceId={workspaceId}
+              currentUserId={session.user.id}
+              channels={channels.map((channel) => ({
+                id: channel.id,
+                name: channel.name,
+                description: channel.description,
+                _count: channel._count
+              }))}
+              initialMessages={initialMessages.reverse().map((message) => ({
+                id: message.id,
+                body: message.body,
+                externalAuthor: message.externalAuthor,
+                createdAt: message.createdAt.toISOString(),
+                editedAt: message.editedAt?.toISOString() ?? null,
+                deletedAt: message.deletedAt?.toISOString() ?? null,
+                voiceStorageKey: message.voiceStorageKey,
+                voiceMimeType: message.voiceMimeType,
+                voiceSize: message.voiceSize,
+                voiceDurationMs: message.voiceDurationMs,
+                replyToId: message.replyToId,
+                forwardedFromId: message.forwardedFromId,
+                author: message.author,
+                attachmentFile: message.attachmentFile
+              }))}
+              canCreateChannels={permissions.canCreateChannels}
+              canDeleteChannels={hasAdminAccess}
+              canSendMessages={permissions.canSendMessages}
+            />
+          </div>
 
           <DirectMessagesPanel
             workspaceId={workspaceId}
