@@ -308,6 +308,92 @@ export default async function AdminControlCenterPage() {
       icon: Sparkles
     }
   ];
+  const adminNavigationGroups = [
+    {
+      title: "Core Administration",
+      description: "Organization structure and enterprise-wide controls.",
+      links: [
+        {
+          href: "/dashboard/admin/global",
+          label: "Global church network",
+          detail: "Countries, regions, branches, churches, ministries, and leaders.",
+          icon: Globe2
+        },
+        {
+          href: "/dashboard/admin/enterprise",
+          label: "Enterprise controls",
+          detail: "Security, governance, backup, DLP, AI agents, and platform controls.",
+          icon: ShieldAlert
+        }
+      ]
+    },
+    {
+      title: "People & Identity",
+      description: "Members, profiles, digital IDs, QR access, and certificates.",
+      links: [
+        {
+          href: "/dashboard/admin/members",
+          label: "Member CRM",
+          detail: "Member profiles, positions, photos, care details, and workspace roles.",
+          icon: ContactRound
+        },
+        {
+          href: "/dashboard/admin/qr-identity",
+          label: "QR Identity",
+          detail: "Digital ID cards, QR verification, access approvals, and scan logs.",
+          icon: IdCard
+        },
+        {
+          href: "/dashboard/certificates",
+          label: "Certificates",
+          detail: "Generate baptism, membership, training, ordination, and service certificates.",
+          icon: Award
+        }
+      ]
+    },
+    {
+      title: "Governance & Compliance",
+      description: "Required forms, access reviews, and permission hygiene.",
+      links: [
+        {
+          href: "/dashboard/compliance",
+          label: "Required forms",
+          detail: "Push forms to members, review submissions, and manage sanctions.",
+          icon: ClipboardCheck
+        },
+        {
+          href: "/dashboard/admin/access-review",
+          label: "Access review",
+          detail: "Review workspace roles, share links, AI agents, old devices, and sensitive access.",
+          icon: ShieldAlert
+        }
+      ]
+    },
+    {
+      title: "Publishing & Knowledge",
+      description: "Internal knowledge and selected public content for letw.org.",
+      links: [
+        {
+          href: "/dashboard/admin/public-site",
+          label: "letw.org sync",
+          detail: "Publish approved announcements, events, sermons, branches, and forms.",
+          icon: Globe2
+        },
+        {
+          href: "/dashboard/knowledge",
+          label: "Knowledge",
+          detail: "Doctrines, policies, procedures, branch manuals, forms, guides, and FAQs.",
+          icon: BookOpen
+        },
+        {
+          href: "/dashboard/mobile-app",
+          label: "Mobile app",
+          detail: "Installable PWA, offline shell, notifications, ID card, chat, and scanner access.",
+          icon: Smartphone
+        }
+      ]
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -324,81 +410,48 @@ export default async function AdminControlCenterPage() {
             </p>
           </div>
           <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/global"
-          >
-            <Globe2 className="h-4 w-4" />
-            Global church network
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-4 text-sm font-medium text-ink transition hover:bg-mint/50"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-4 text-sm font-medium text-ink transition hover:bg-mint/50"
             href="/dashboard"
           >
             Back to dashboard
           </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-mint/40 px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/enterprise"
-          >
-            <ShieldAlert className="h-4 w-4" />
-            Enterprise controls
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/members"
-          >
-            <ContactRound className="h-4 w-4" />
-            Member CRM
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/qr-identity"
-          >
-            <IdCard className="h-4 w-4" />
-            QR Identity
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/compliance"
-          >
-            <ClipboardCheck className="h-4 w-4" />
-            Required forms
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/access-review"
-          >
-            <ShieldAlert className="h-4 w-4" />
-            Access review
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/admin/public-site"
-          >
-            <Globe2 className="h-4 w-4" />
-            letw.org sync
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/knowledge"
-          >
-            <BookOpen className="h-4 w-4" />
-            Knowledge
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/certificates"
-          >
-            <Award className="h-4 w-4" />
-            Certificates
-          </Link>
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-ink/10 bg-white px-4 text-sm font-medium text-ink transition hover:bg-mint"
-            href="/dashboard/mobile-app"
-          >
-            <Smartphone className="h-4 w-4" />
-            Mobile app
-          </Link>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-ink">Admin navigation</p>
+            <p className="text-xs text-ink/55">Organized shortcuts for the most important LETW control areas.</p>
+          </div>
+          <Badge>{adminNavigationGroups.reduce((total, group) => total + group.links.length, 0)} tools</Badge>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-4">
+          {adminNavigationGroups.map((group) => (
+            <div className="rounded-lg border border-ink/10 bg-paper p-3" key={group.title}>
+              <h2 className="text-sm font-semibold text-ink">{group.title}</h2>
+              <p className="mt-1 min-h-10 text-xs leading-5 text-ink/55">{group.description}</p>
+              <div className="mt-3 space-y-2">
+                {group.links.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      className="block rounded-md border border-ink/10 bg-white p-3 transition hover:bg-mint/40"
+                      href={item.href}
+                      key={item.href}
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                        <Icon className="h-4 w-4 text-moss" />
+                        {item.label}
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-ink/55">{item.detail}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 

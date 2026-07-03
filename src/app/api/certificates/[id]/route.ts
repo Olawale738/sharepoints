@@ -44,3 +44,37 @@ export async function PATCH(request: Request, context: RouteContext) {
     return handleRouteError(error);
   }
 }
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const actor = await requireUser();
+    await requireAnyWorkspaceAdmin(actor.id, "Only administrators can delete certificates.");
+    const { id } = await context.params;
+    const certificate = await prisma.memberCertificationBadge.findUnique({
+      where: { id }
+    });
+
+    if (!certificate) {
+      throw new ApiError(404, "Certificate not found.");
+    }
+
+    await prisma.memberCertificationBadge.delete({
+      where: { id }
+    });
+
+    await logActivity({
+      userId: actor.id,
+      action: "certificate.deleted",
+      targetId: id,
+      metadata: {
+        userId: certificate.userId,
+        title: certificate.title,
+        certificateNumber: certificate.certificateNumber
+      }
+    });
+
+    return ok({ deleted: true });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}

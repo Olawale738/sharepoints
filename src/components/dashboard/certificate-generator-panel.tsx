@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, ExternalLink, Loader2, Printer, RotateCcw, ShieldOff } from "lucide-react";
+import { Award, Cpu, ExternalLink, Loader2, Printer, QrCode, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -139,6 +139,26 @@ export function CertificateGeneratorPanel({
     router.refresh();
   }
 
+  async function deleteCertificate(id: string, title: string) {
+    if (!window.confirm(`Delete "${title}" permanently? This cannot be undone.`)) return;
+    setBusy(`DELETE-${id}`);
+    setNotice("");
+    setError("");
+    const response = await fetch(`/api/certificates/${id}`, {
+      method: "DELETE"
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+
+    if (!response.ok) {
+      setError(body?.error ?? "Certificate could not be deleted.");
+      return;
+    }
+
+    setNotice("Certificate deleted.");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
@@ -200,7 +220,8 @@ export function CertificateGeneratorPanel({
           ) : null}
           {filteredCertificates.map((certificate) => {
             const valid = certificate.status === "ACTIVE" && !certificate.revokedAt && (!certificate.expiresAt || new Date(certificate.expiresAt) > new Date());
-            const verifyHref = `/api/certificates/verify/${certificate.verifyToken}`;
+            const verifyHref = `/verify/certificate/${certificate.verifyToken}`;
+            const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
 
             return (
               <article className="overflow-hidden rounded-lg border border-ink/10 bg-white certificate-print-card" key={certificate.id}>
@@ -227,7 +248,7 @@ export function CertificateGeneratorPanel({
                   <div className="grid gap-3 text-sm sm:grid-cols-3">
                     <div className="rounded-md bg-paper p-3">
                       <p className="text-xs text-ink/45">Certificate no.</p>
-                      <p className="mt-1 font-semibold text-ink">{certificate.certificateNumber ?? "Pending"}</p>
+                      <p className="mt-1 font-semibold text-ink">{certificateCode}</p>
                     </div>
                     <div className="rounded-md bg-paper p-3">
                       <p className="text-xs text-ink/45">Issued</p>
@@ -238,8 +259,52 @@ export function CertificateGeneratorPanel({
                       <p className="mt-1 font-semibold text-ink">{formatDate(certificate.expiresAt)}</p>
                     </div>
                   </div>
+                  <div className="grid gap-4 rounded-lg border border-[#d4af37]/35 bg-[#fbfdff] p-4 md:grid-cols-[10rem_minmax(0,1fr)]">
+                    <div className="rounded-lg border border-[#0b1b3d]/10 bg-white p-3 text-center shadow-sm">
+                      <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-md border border-sky-200 bg-sky-50 p-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={`QR verification code for ${certificateCode}`}
+                          className="h-full w-full object-contain"
+                          src={`/api/certificates/${certificate.id}/qr`}
+                        />
+                      </div>
+                      <p className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-[#0a3d83]">
+                        <QrCode className="h-3.5 w-3.5" />
+                        Scan to verify
+                      </p>
+                    </div>
+                    <div className="flex flex-col justify-between gap-3">
+                      <div className="relative overflow-hidden rounded-lg border border-[#d4af37]/40 bg-[#0b1b3d] p-4 text-white">
+                        <div className="absolute right-3 top-3 grid grid-cols-4 gap-1 opacity-40" aria-hidden="true">
+                          {Array.from({ length: 16 }).map((_, index) => (
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" key={index} />
+                          ))}
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-md border border-[#d4af37]/60 bg-gradient-to-br from-[#ffe8a3] via-[#d4af37] to-[#8a5b12] text-[#0b1b3d] shadow-inner">
+                            <Cpu className="h-7 w-7" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">Seal chip</p>
+                            <p className="mt-1 text-lg font-semibold">LETW Verified Credential</p>
+                            <p className="mt-1 break-all text-xs text-white/75">{certificateCode}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-md bg-paper p-3 text-sm leading-6 text-ink/65">
+                        <p className="flex items-center gap-2 font-semibold text-ink">
+                          <ShieldCheck className="h-4 w-4 text-moss" />
+                          Verification instruction
+                        </p>
+                        <p className="mt-1">
+                          Scan the QR code. Accept this certificate only when the verification page displays an active LETW status.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <a className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm font-medium text-ink hover:bg-mint/40" href={verifyHref} target="_blank">
+                    <a className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm font-medium text-ink hover:bg-mint/40" href={verifyHref} rel="noreferrer" target="_blank">
                       <ExternalLink className="h-4 w-4" />
                       Verify
                     </a>
@@ -265,6 +330,17 @@ export function CertificateGeneratorPanel({
                           Restore
                         </Button>
                       )
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        className="h-9"
+                        disabled={busy === `DELETE-${certificate.id}`}
+                        variant="danger"
+                        onClick={() => deleteCertificate(certificate.id, certificate.title)}
+                      >
+                        {busy === `DELETE-${certificate.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Delete
+                      </Button>
                     ) : null}
                   </div>
                 </div>
