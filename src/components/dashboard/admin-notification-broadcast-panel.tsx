@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { BellRing, Loader2, Mail, MessageCircle, Send, UsersRound } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,26 @@ type Result = {
   sent: number;
   notificationCount: number;
   emailDelivery: { delivered: number; scanned: number };
-  whatsApp: { configured: boolean; sent: number; failed: number; skipped: number };
+  whatsApp: {
+    configured: boolean;
+    mode: string;
+    attempted: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+    errors: string[];
+    note?: string | null;
+  };
+};
+
+type WhatsAppConfig = {
+  configured: boolean;
+  graphVersion: string;
+  defaultCountryCodeConfigured: boolean;
+  templateConfigured: boolean;
+  fallbackTemplateLanguage: string;
+  templateHasBodyParams: boolean;
+  setupRequired: string[];
 };
 
 const roles = ["ADMIN", "LEADER", "MODERATOR", "USER", "EDITOR", "VIEWER"];
@@ -44,6 +63,10 @@ export function AdminNotificationBroadcastPanel({
   const [priority, setPriority] = useState("NORMAL");
   const [email, setEmail] = useState(true);
   const [whatsapp, setWhatsapp] = useState(false);
+  const [whatsappMode, setWhatsappMode] = useState("TEXT");
+  const [whatsappTemplateName, setWhatsappTemplateName] = useState("");
+  const [whatsappTemplateLanguage, setWhatsappTemplateLanguage] = useState("en");
+  const [whatsappConfig, setWhatsappConfig] = useState<WhatsAppConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<Result | null>(null);
@@ -55,6 +78,26 @@ export function AdminNotificationBroadcastPanel({
     if (audienceType === "ROLE") return "Members with the selected role. Select a workspace to limit the role search.";
     return "One selected LETW member.";
   }, [audienceType]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/notification-broadcasts")
+      .then((response) => response.json())
+      .then((payload: { whatsApp?: WhatsAppConfig }) => {
+        if (!active) return;
+        setWhatsappConfig(payload.whatsApp ?? null);
+        if (payload.whatsApp?.fallbackTemplateLanguage) {
+          setWhatsappTemplateLanguage(payload.whatsApp.fallbackTemplateLanguage);
+        }
+      })
+      .catch(() => {
+        if (active) setWhatsappConfig(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +118,9 @@ export function AdminNotificationBroadcastPanel({
         body,
         href,
         priority,
+        whatsappMode,
+        whatsappTemplateName: whatsappTemplateName || null,
+        whatsappTemplateLanguage: whatsappTemplateLanguage || null,
         channels: { inApp: true, email, whatsapp }
       })
     });
@@ -218,11 +264,72 @@ export function AdminNotificationBroadcastPanel({
             </label>
           </div>
 
+          {whatsapp ? (
+            <div className="rounded-lg border border-ink/10 bg-paper p-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="space-y-2 text-sm font-medium text-ink">
+                  WhatsApp mode
+                  <select
+                    className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm"
+                    value={whatsappMode}
+                    onChange={(event) => setWhatsappMode(event.target.value)}
+                  >
+                    <option value="TEXT">Free-form text</option>
+                    <option value="TEMPLATE">Approved template</option>
+                  </select>
+                </label>
+                <label className="space-y-2 text-sm font-medium text-ink">
+                  Template name
+                  <Input
+                    disabled={whatsappMode !== "TEMPLATE"}
+                    value={whatsappTemplateName}
+                    onChange={(event) => setWhatsappTemplateName(event.target.value)}
+                    placeholder="Use env default"
+                  />
+                </label>
+                <label className="space-y-2 text-sm font-medium text-ink">
+                  Language code
+                  <Input
+                    disabled={whatsappMode !== "TEMPLATE"}
+                    value={whatsappTemplateLanguage}
+                    onChange={(event) => setWhatsappTemplateLanguage(event.target.value)}
+                    placeholder="en"
+                  />
+                </label>
+              </div>
+              <div className="mt-3 rounded-md border border-ink/10 bg-white px-3 py-2 text-xs leading-5 text-ink/60">
+                {whatsappConfig?.configured ? (
+                  <p>
+                    WhatsApp Cloud API is configured. Graph {whatsappConfig.graphVersion}.{" "}
+                    {whatsappConfig.templateConfigured ? "Default template is configured." : "No default template is configured."}
+                  </p>
+                ) : (
+                  <p>
+                    WhatsApp is not fully configured yet. Required Vercel variables:{" "}
+                    {(whatsappConfig?.setupRequired.length ? whatsappConfig.setupRequired : ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]).join(", ")}.
+                  </p>
+                )}
+                <p className="mt-1">
+                  Use approved template mode for first-time or organization-initiated WhatsApp broadcasts. Free-form text usually works only
+                  inside the active WhatsApp service window.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           {error ? <p className="rounded-md bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p> : null}
           {result ? (
             <div className="rounded-md border border-moss/20 bg-mint/45 px-3 py-2 text-sm text-ink">
-              Sent to {result.sent} member(s). Email scan: {result.emailDelivery.scanned}. WhatsApp sent: {result.whatsApp.sent}
+              Sent to {result.sent} member(s). Email scan: {result.emailDelivery.scanned}. WhatsApp attempted:{" "}
+              {result.whatsApp.attempted}. WhatsApp sent: {result.whatsApp.sent}. Failed: {result.whatsApp.failed}. Skipped:{" "}
+              {result.whatsApp.skipped}.
               {result.whatsApp.configured ? "" : " (WhatsApp provider not configured)."}
+              {result.whatsApp.note ? <span className="mt-1 block">{result.whatsApp.note}</span> : null}
+              {result.whatsApp.errors.length ? (
+                <span className="mt-2 block rounded-md bg-white/75 p-2 text-xs text-clay">
+                  {result.whatsApp.errors.join(" | ")}
+                </span>
+              ) : null}
             </div>
           ) : null}
 
@@ -244,6 +351,7 @@ export function AdminNotificationBroadcastPanel({
             <p>Workspace broadcasts only reach members already invited into that workspace.</p>
             <p>Email uses the existing Resend notification delivery configuration.</p>
             <p>WhatsApp requires `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID`.</p>
+            <p>Approved templates are best for first-time WhatsApp announcements.</p>
           </div>
         </div>
         <div className="rounded-lg border border-ink/10 bg-paper p-4">

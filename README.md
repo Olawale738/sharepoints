@@ -100,6 +100,13 @@ SEED_ADMIN_EMAIL="president@letw.org"
 SEED_ADMIN_PASSWORD="replace-with-a-private-admin-password"
 RESEND_API_KEY=""
 EMAIL_FROM="LETW <no-reply@letw.org>"
+WHATSAPP_ACCESS_TOKEN=""
+WHATSAPP_PHONE_NUMBER_ID=""
+WHATSAPP_GRAPH_VERSION="v20.0"
+WHATSAPP_DEFAULT_COUNTRY_CODE="234"
+WHATSAPP_TEMPLATE_NAME=""
+WHATSAPP_TEMPLATE_LANGUAGE="en"
+WHATSAPP_TEMPLATE_HAS_BODY_PARAMS="true"
 AWS_REGION="auto"
 AWS_ACCESS_KEY_ID=""
 AWS_SECRET_ACCESS_KEY=""
@@ -172,6 +179,22 @@ inviting users or relying on password reset emails. In local development, the
 invitation form copies the registration link if email delivery is not configured,
 and the reset form shows a development reset link after a valid invited account
 requests one.
+
+## WhatsApp Broadcast Delivery
+
+Admin notification broadcasts can send in-app, email, and WhatsApp messages.
+For WhatsApp, configure Meta WhatsApp Cloud API variables in Vercel:
+
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_GRAPH_VERSION`, for example `v20.0`
+- `WHATSAPP_DEFAULT_COUNTRY_CODE`, for local phone numbers such as `234`
+- Optional `WHATSAPP_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE`
+
+Use free-form WhatsApp text only when the member is inside the active WhatsApp
+service window. For first-time or organization-initiated broadcasts, use an
+approved WhatsApp template. The default template mode expects two body variables:
+`{{1}}` for the title and `{{2}}` for the message body.
 
 ## Enterprise Collaboration Suite
 

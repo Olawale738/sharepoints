@@ -3385,6 +3385,276 @@ select {
   }
 }
 
+/* Certificate print correction: one complete landscape certificate per sheet. */
+@media print {
+  body.letw-certificate-page {
+    width: 279.4mm !important;
+    min-width: 279.4mm !important;
+    height: 215.9mm !important;
+    min-height: 215.9mm !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  body.letw-certificate-page .certificate-print-zone,
+  body.letw-certificate-page .certificate-print-zone * {
+    visibility: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body.letw-certificate-page .certificate-print-zone {
+    position: fixed !important;
+    inset: 0 !important;
+    display: block !important;
+    width: 279.4mm !important;
+    min-width: 279.4mm !important;
+    height: auto !important;
+    min-height: 215.9mm !important;
+    margin: 0 !important;
+    padding: 7mm !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  body.letw-certificate-page .certificate-nonprint,
+  body.letw-certificate-page .certificate-nonprint * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.letw-certificate-page .official-certificate {
+    display: block !important;
+    width: 265.4mm !important;
+    height: 201.9mm !important;
+    max-width: none !important;
+    max-height: 201.9mm !important;
+    margin: 0 auto !important;
+    overflow: hidden !important;
+    border-radius: 3mm !important;
+    break-after: page;
+    page-break-after: always;
+    box-shadow: none !important;
+  }
+
+  body.letw-certificate-page .official-certificate:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  body.letw-certificate-page .official-certificate-inner {
+    display: grid !important;
+    grid-template-rows: 27mm minmax(0, 1fr) 19mm 33mm 8.5mm !important;
+    height: 100% !important;
+    border-width: 1.8mm !important;
+    background:
+      linear-gradient(135deg, rgb(212 175 55 / 14%) 0 1mm, transparent 1mm),
+      #ffffff !important;
+  }
+
+  body.letw-certificate-page .official-certificate-inner::before {
+    inset: 4mm !important;
+    border-radius: 2mm !important;
+  }
+
+  body.letw-certificate-page .official-certificate-inner::after {
+    inset: 6mm !important;
+    border-radius: 1.4mm !important;
+  }
+
+  body.letw-certificate-page .certificate-watermark {
+    inset: 24mm 76mm 30mm !important;
+    opacity: 0.038 !important;
+  }
+
+  body.letw-certificate-page .certificate-header {
+    min-height: 27mm !important;
+    padding: 4.8mm 8mm 4mm !important;
+    border-bottom-width: 1.25mm !important;
+  }
+
+  body.letw-certificate-page .certificate-brand {
+    gap: 4mm !important;
+  }
+
+  body.letw-certificate-page .certificate-brand img {
+    width: 18mm !important;
+    height: 18mm !important;
+    padding: 0.7mm !important;
+    box-shadow: 0 0 0 0.7mm rgb(212 175 55 / 56%) !important;
+  }
+
+  body.letw-certificate-page .certificate-brand p {
+    max-width: 170mm !important;
+    font-size: 5mm !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  body.letw-certificate-page .certificate-brand span {
+    margin-top: 1.4mm !important;
+    font-size: 2.3mm !important;
+  }
+
+  body.letw-certificate-page .certificate-status-active,
+  body.letw-certificate-page .certificate-status-inactive {
+    padding: 1.8mm 5mm !important;
+    border-radius: 999px !important;
+    font-size: 3.1mm !important;
+  }
+
+  body.letw-certificate-page .certificate-body {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 45mm !important;
+    gap: 7mm !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 5mm 10mm 3mm !important;
+  }
+
+  body.letw-certificate-page .certificate-main-copy {
+    display: grid !important;
+    align-content: center !important;
+    min-height: 0 !important;
+  }
+
+  body.letw-certificate-page .certificate-eyebrow {
+    font-size: 2.6mm !important;
+    letter-spacing: 0.18em !important;
+  }
+
+  body.letw-certificate-page .certificate-main-copy h3 {
+    margin-top: 1.4mm !important;
+    font-size: 12.4mm !important;
+    line-height: 0.98 !important;
+  }
+
+  body.letw-certificate-page .certificate-intro {
+    margin-top: 3mm !important;
+    font-size: 2.9mm !important;
+  }
+
+  body.letw-certificate-page .certificate-main-copy h4 {
+    max-width: 170mm !important;
+    margin-top: 1.6mm !important;
+    font-size: 8.8mm !important;
+    line-height: 1.04 !important;
+  }
+
+  body.letw-certificate-page .certificate-position {
+    justify-self: center !important;
+    margin-top: 2mm !important;
+    padding: 1.15mm 5.5mm !important;
+    font-size: 2.1mm !important;
+  }
+
+  body.letw-certificate-page .certificate-statement {
+    max-width: 162mm !important;
+    margin-top: 3mm !important;
+    font-size: 2.8mm !important;
+    line-height: 1.35 !important;
+  }
+
+  body.letw-certificate-page .certificate-identity {
+    align-content: center !important;
+    gap: 4mm !important;
+  }
+
+  body.letw-certificate-page .certificate-photo {
+    width: 38mm !important;
+    height: 38mm !important;
+    border-width: 1.35mm !important;
+    border-radius: 4mm !important;
+    font-size: 8mm !important;
+    box-shadow: 0 4mm 8mm rgb(11 27 61 / 14%) !important;
+  }
+
+  body.letw-certificate-page .certificate-seal {
+    width: 38mm !important;
+    min-height: 28mm !important;
+    padding: 2.2mm !important;
+    border-radius: 4mm !important;
+  }
+
+  body.letw-certificate-page .certificate-seal img {
+    width: 17mm !important;
+    height: 17mm !important;
+  }
+
+  body.letw-certificate-page .certificate-seal span {
+    margin-top: 1.2mm !important;
+    font-size: 1.9mm !important;
+  }
+
+  body.letw-certificate-page .certificate-details {
+    gap: 3mm !important;
+    min-height: 0 !important;
+    padding: 0 10mm 3mm !important;
+  }
+
+  body.letw-certificate-page .certificate-details div {
+    min-height: 14mm !important;
+    border-left-width: 1.3mm !important;
+    border-radius: 2.4mm !important;
+    padding: 2.4mm 2.8mm !important;
+  }
+
+  body.letw-certificate-page .certificate-details span {
+    font-size: 1.85mm !important;
+  }
+
+  body.letw-certificate-page .certificate-details strong {
+    margin-top: 1mm !important;
+    font-size: 2.6mm !important;
+    line-height: 1.12 !important;
+  }
+
+  body.letw-certificate-page .certificate-footer {
+    min-height: 0 !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 31mm !important;
+    gap: 5mm !important;
+    align-items: center !important;
+    overflow: hidden !important;
+    padding: 3mm 10mm !important;
+    border-top-width: 1.25mm !important;
+  }
+
+  body.letw-certificate-page .certificate-signature p {
+    width: 58mm !important;
+    font-size: 4.8mm !important;
+  }
+
+  body.letw-certificate-page .certificate-signature span,
+  body.letw-certificate-page .certificate-chip span,
+  body.letw-certificate-page .certificate-chip p,
+  body.letw-certificate-page .certificate-qr p {
+    font-size: 1.85mm !important;
+  }
+
+  body.letw-certificate-page .certificate-chip {
+    min-height: 15mm !important;
+    border-radius: 2.4mm !important;
+    padding: 2.4mm !important;
+  }
+
+  body.letw-certificate-page .certificate-qr {
+    gap: 1.1mm !important;
+  }
+
+  body.letw-certificate-page .certificate-qr div {
+    width: 22.5mm !important;
+    border-width: 0.55mm !important;
+    border-radius: 2.2mm !important;
+    padding: 1mm !important;
+  }
+
+  body.letw-certificate-page .certificate-verification-note {
+    min-height: 8.5mm !important;
+    padding: 2mm 10mm !important;
+    font-size: 2.25mm !important;
+  }
+}
+
 @media print {
   .certificate-print-zone,
   .certificate-print-zone * {

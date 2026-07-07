@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Award, BadgeCheck, Download, ExternalLink, Loader2, PenLine, Printer, QrCode, RotateCcw, ShieldCheck, ShieldOff, Stamp, Trash2 } from "lucide-react";
 
@@ -97,6 +97,61 @@ export function CertificateGeneratorPanel({
         .includes(value)
     );
   }, [certificates, query]);
+
+  useEffect(() => {
+    document.body.classList.add("letw-certificate-page");
+
+    function ensureCertificatePrintPage() {
+      if (document.getElementById("letw-certificate-print-page-style")) return;
+      const style = document.createElement("style");
+      style.id = "letw-certificate-print-page-style";
+      style.textContent = `
+        @media print {
+          @page { size: letter landscape; margin: 0; }
+          html, body.letw-certificate-page {
+            width: 279.4mm !important;
+            min-width: 279.4mm !important;
+            height: 215.9mm !important;
+            min-height: 215.9mm !important;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    function removeCertificatePrintPage() {
+      document.getElementById("letw-certificate-print-page-style")?.remove();
+    }
+
+    window.addEventListener("beforeprint", ensureCertificatePrintPage);
+    window.addEventListener("afterprint", removeCertificatePrintPage);
+
+    return () => {
+      document.body.classList.remove("letw-certificate-page");
+      window.removeEventListener("beforeprint", ensureCertificatePrintPage);
+      window.removeEventListener("afterprint", removeCertificatePrintPage);
+      removeCertificatePrintPage();
+    };
+  }, []);
+
+  function printCertificates() {
+    const style = document.createElement("style");
+    style.id = "letw-certificate-print-page-style";
+    style.textContent = `
+      @media print {
+        @page { size: letter landscape; margin: 0; }
+        html, body.letw-certificate-page {
+          width: 279.4mm !important;
+          min-width: 279.4mm !important;
+          height: 215.9mm !important;
+          min-height: 215.9mm !important;
+        }
+      }
+    `;
+    document.getElementById("letw-certificate-print-page-style")?.remove();
+    document.head.appendChild(style);
+    window.print();
+  }
 
   async function createCertificate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -218,9 +273,9 @@ export function CertificateGeneratorPanel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Input className="w-64" value={query} placeholder="Search certificates" onChange={(event) => setQuery(event.target.value)} />
-            <Button variant="secondary" onClick={() => window.print()}>
+            <Button variant="secondary" onClick={printCertificates}>
               <Printer className="h-4 w-4" />
-              Print
+              Print certificates
             </Button>
           </div>
         </div>
