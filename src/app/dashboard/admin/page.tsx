@@ -12,6 +12,7 @@ import {
   Database,
   FileClock,
   Files,
+  Gauge,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
@@ -21,7 +22,8 @@ import {
   Workflow,
   ShieldAlert,
   Globe2,
-  IdCard
+  IdCard,
+  MessageCircle
 } from "lucide-react";
 
 import { auth } from "@/auth";
@@ -330,6 +332,12 @@ export default async function AdminControlCenterPage() {
           icon: Building2
         },
         {
+          href: "/dashboard/admin/branch-health",
+          label: "Branch health score",
+          detail: "Score every country, branch, church, and ministry by members, attendance, projects, care, and governance.",
+          icon: Gauge
+        },
+        {
           href: "/dashboard/admin/enterprise",
           label: "Enterprise controls",
           detail: "Security, governance, backup, DLP, AI agents, and platform controls.",
@@ -394,6 +402,12 @@ export default async function AdminControlCenterPage() {
           label: "Notification center",
           detail: "Broadcast in-app, email, and configured WhatsApp messages to controlled audiences.",
           icon: BellRing
+        },
+        {
+          href: "/dashboard/admin/whatsapp-inbox",
+          label: "WhatsApp inbox",
+          detail: "Receive member replies, match phone numbers to profiles, and answer from LETW.",
+          icon: MessageCircle
         }
       ]
     },

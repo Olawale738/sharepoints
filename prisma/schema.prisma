@@ -46,6 +46,19 @@ enum MeetingType {
   VIDEO
 }
 
+enum WhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WhatsAppMessageStatus {
+  RECEIVED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 enum ApprovalStatus {
   PENDING
   APPROVED
@@ -1440,6 +1453,48 @@ model DirectMessage {
   @@index([authorId, createdAt])
   @@index([replyToId])
   @@index([deletedAt])
+}
+
+model WhatsAppConversation {
+  id            String   @id @default(cuid())
+  userId        String?
+  workspaceId   String?
+  phone         String   @unique
+  displayName   String?
+  lastMessageAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, lastMessageAt])
+  @@index([workspaceId, lastMessageAt])
+  @@index([lastMessageAt])
+}
+
+model WhatsAppMessage {
+  id             String                    @id @default(cuid())
+  conversationId String
+  userId         String?
+  workspaceId    String?
+  direction      WhatsAppMessageDirection
+  status         WhatsAppMessageStatus     @default(RECEIVED)
+  providerId     String?                   @unique
+  fromPhone      String?
+  toPhone        String?
+  messageType    String
+  body           String?                   @db.Text
+  mediaId        String?
+  mediaMimeType  String?
+  mediaSha256    String?
+  rawPayload     Json?
+  sentById       String?
+  receivedAt     DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([direction, status, createdAt])
 }
 
 model OrgChatRoom {

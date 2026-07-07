@@ -104,6 +104,8 @@ WHATSAPP_ACCESS_TOKEN=""
 WHATSAPP_PHONE_NUMBER_ID=""
 WHATSAPP_GRAPH_VERSION="v20.0"
 WHATSAPP_DEFAULT_COUNTRY_CODE="234"
+WHATSAPP_WEBHOOK_VERIFY_TOKEN="replace-with-a-private-webhook-token"
+WHATSAPP_APP_SECRET=""
 WHATSAPP_TEMPLATE_NAME=""
 WHATSAPP_TEMPLATE_LANGUAGE="en"
 WHATSAPP_TEMPLATE_HAS_BODY_PARAMS="true"
@@ -189,12 +191,21 @@ For WhatsApp, configure Meta WhatsApp Cloud API variables in Vercel:
 - `WHATSAPP_PHONE_NUMBER_ID`
 - `WHATSAPP_GRAPH_VERSION`, for example `v20.0`
 - `WHATSAPP_DEFAULT_COUNTRY_CODE`, for local phone numbers such as `234`
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, any private random value used when Meta verifies the webhook
+- Optional `WHATSAPP_APP_SECRET`, from the Meta app, to verify webhook signatures
 - Optional `WHATSAPP_TEMPLATE_NAME` and `WHATSAPP_TEMPLATE_LANGUAGE`
 
 Use free-form WhatsApp text only when the member is inside the active WhatsApp
 service window. For first-time or organization-initiated broadcasts, use an
 approved WhatsApp template. The default template mode expects two body variables:
 `{{1}}` for the title and `{{2}}` for the message body.
+
+Two-way WhatsApp inbox setup:
+
+- In Meta for Developers, set the callback URL to `https://sharepoints.letw.org/api/integrations/whatsapp/webhook`.
+- Use the same `WHATSAPP_WEBHOOK_VERIFY_TOKEN` value from Vercel as the Meta verify token.
+- Subscribe the webhook to WhatsApp `messages`.
+- In LETW, admins open `/dashboard/admin/whatsapp-inbox` to see inbound member replies and send WhatsApp responses.
 
 ## Enterprise Collaboration Suite
 
@@ -206,6 +217,8 @@ approved WhatsApp template. The default template mode expects two body variables
 - Complete JSON backups plus restorable files, folders, workspaces, and messages
 - DLP scanning and download/share restrictions
 - Searchable meeting transcripts, summaries, attendance, and action items
+- AI Meeting Secretary for summaries, decisions, risks, attendance insights, and follow-up drafts
+- Branch Health Score for countries, regions, branches, churches, and ministries
 - Ministry, event, attendance, volunteer, follow-up, and resource-booking tools
 - Safe admin role preview, workspace templates, health checks, and Playwright E2E tests
 - Expo Android/iOS application shell in `mobile/`

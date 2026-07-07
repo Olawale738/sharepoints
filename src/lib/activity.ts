@@ -54,6 +54,7 @@ export const activityActions = {
   meetingScheduled: "meeting.scheduled",
   meetingCancelled: "meeting.cancelled",
   meetingCleared: "meeting.cleared",
+  meetingSecretaryGenerated: "meeting.secretary_generated",
   meetingResponseUpdated: "meeting.response_updated",
   fileShareLinkCreated: "file.share_link_created",
   companyInvitationResent: "company_invitation.resent",
@@ -176,5 +177,7 @@ export const activityActions = {
   accessControlDeleted: "access.control_deleted",
   accessLogsCleared: "access.logs_cleared",
   automaticBackupCreated: "system.automatic_backup_created",
-  monitorWarningRaised: "system.monitor_warning_raised"
+  monitorWarningRaised: "system.monitor_warning_raised",
+  whatsAppMessageReceived: "whatsapp.message_received",
+  whatsAppMessageSent: "whatsapp.message_sent"
 } as const;
