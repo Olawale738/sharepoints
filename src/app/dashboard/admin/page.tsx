@@ -3,17 +3,21 @@ import { redirect } from "next/navigation";
 import {
   Activity,
   Award,
+  BellRing,
   BookOpen,
+  Building2,
   CalendarClock,
   ClipboardCheck,
   ContactRound,
   Database,
+  FileClock,
   Files,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
   Sparkles,
   UsersRound,
+  UserRoundSearch,
   Workflow,
   ShieldAlert,
   Globe2,
@@ -320,6 +324,12 @@ export default async function AdminControlCenterPage() {
           icon: Globe2
         },
         {
+          href: "/dashboard/admin/branches",
+          label: "Branch dashboards",
+          detail: "Network intelligence, unit health, leaders, members, projects, and transfers.",
+          icon: Building2
+        },
+        {
           href: "/dashboard/admin/enterprise",
           label: "Enterprise controls",
           detail: "Security, governance, backup, DLP, AI agents, and platform controls.",
@@ -334,7 +344,7 @@ export default async function AdminControlCenterPage() {
         {
           href: "/dashboard/admin/members",
           label: "Member CRM",
-          detail: "Member profiles, positions, photos, care details, and workspace roles.",
+          detail: "Profiles, photos, care details, CSV import, member numbers, positions, and roles.",
           icon: ContactRound
         },
         {
@@ -366,6 +376,24 @@ export default async function AdminControlCenterPage() {
           label: "Access review",
           detail: "Review workspace roles, share links, AI agents, old devices, and sensitive access.",
           icon: ShieldAlert
+        },
+        {
+          href: "/dashboard/admin/permission-simulator",
+          label: "Permission simulator",
+          detail: "Preview exactly what any member can see, use, download, or search.",
+          icon: UserRoundSearch
+        },
+        {
+          href: "/dashboard/admin/document-renewals",
+          label: "Document renewals",
+          detail: "Track expiry dates, send reminders, renew records, and archive old documents.",
+          icon: FileClock
+        },
+        {
+          href: "/dashboard/admin/notifications",
+          label: "Notification center",
+          detail: "Broadcast in-app, email, and configured WhatsApp messages to controlled audiences.",
+          icon: BellRing
         }
       ]
     },

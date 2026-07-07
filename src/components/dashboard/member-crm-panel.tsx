@@ -111,6 +111,7 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
   const [draft, setDraft] = useState<MemberProfile>(initialMembers[0]?.profile ?? blankProfile);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [numbering, setNumbering] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [message, setMessage] = useState("");
   const [importMessage, setImportMessage] = useState("");
@@ -222,6 +223,26 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
     setTimeout(() => window.location.reload(), 900);
   }
 
+  async function generateMemberNumbers() {
+    setNumbering(true);
+    setImportMessage("");
+    const response = await fetch("/api/admin/member-numbers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ includeUnitCode: true })
+    });
+    const data = (await response.json().catch(() => null)) as { assigned?: number; pending?: number; error?: string } | null;
+    setNumbering(false);
+
+    if (!response.ok) {
+      setImportMessage(data?.error ?? "Member numbers could not be generated.");
+      return;
+    }
+
+    setImportMessage(`${data?.assigned ?? 0} member number(s) generated. Reloading member CRM...`);
+    setTimeout(() => window.location.reload(), 900);
+  }
+
   async function uploadSelectedPhoto(file: File | null) {
     if (!file || !selected) return;
     setPhotoUploading(true);
@@ -265,6 +286,10 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
             <Button variant="secondary" onClick={applyStarterData} disabled={importing}>
               {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
               Apply LETW starter data
+            </Button>
+            <Button variant="secondary" onClick={generateMemberNumbers} disabled={numbering}>
+              {numbering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              Generate member numbers
             </Button>
             <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md bg-ink px-3 text-sm font-medium text-white hover:bg-ink/90">
               <UploadCloud className="h-4 w-4" />
