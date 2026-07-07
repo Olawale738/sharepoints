@@ -19,8 +19,10 @@ export default async function CertificateVerificationPage(context: PageContext) 
     ? await prisma.user.findUnique({
         where: { id: certificate.userId },
         select: {
+          id: true,
           name: true,
           email: true,
+          image: true,
           memberProfile: {
             select: {
               membershipNumber: true,
@@ -101,7 +103,19 @@ export default async function CertificateVerificationPage(context: PageContext) 
               </div>
 
               <div className="rounded-lg border border-[#d4af37]/40 bg-[#fffaf0] p-4 text-center">
-                <Award className="mx-auto h-10 w-10 text-[#b78727]" />
+                {valid && user ? (
+                  <div className="mx-auto mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#d4af37] bg-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={`${user.name ?? "LETW member"} profile`}
+                      className="h-full w-full object-cover"
+                      src={`/api/profile/photo/${user.id}?certificateToken=${encodeURIComponent(certificate.verifyToken)}`}
+                    />
+                  </div>
+                ) : null}
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-[#d4af37]/60 bg-white p-2">
+                  <Image alt="LETW official seal" className="h-full w-full object-contain" height={96} src="/letw-logo.png" width={96} />
+                </div>
                 <p className="mt-3 text-sm font-semibold text-[#0b1b3d]">LETW official seal</p>
                 <p className="mt-2 text-xs leading-5 text-ink/55">
                   Confirm the status on this page before accepting a printed or digital certificate.

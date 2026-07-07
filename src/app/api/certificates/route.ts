@@ -44,7 +44,8 @@ export async function GET() {
         memberProfile: {
           select: {
             membershipNumber: true,
-            organizationPosition: true
+            organizationPosition: true,
+            phone: true
           }
         }
       }

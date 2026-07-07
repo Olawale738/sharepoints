@@ -79,7 +79,7 @@ export default async function PublicSiteIntegrationPage() {
               active branches/ministries, and open forms.
             </p>
           </div>
-          <PublicSiteIntegrationPanel feedUrl={feedUrl} />
+          <PublicSiteIntegrationPanel configured={Boolean(feedToken)} feedUrl={feedUrl} />
         </div>
       </section>
 

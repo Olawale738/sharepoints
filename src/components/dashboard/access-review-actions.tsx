@@ -7,6 +7,7 @@ import { Loader2, RotateCw, ShieldOff, Trash2, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type AccessReviewAction =
+  | { action: "CONFIRM_WORKSPACE_MEMBER"; memberId: string }
   | { action: "REMOVE_WORKSPACE_MEMBER"; memberId: string }
   | { action: "DELETE_SHARE_LINK"; shareLinkId: string }
   | { action: "DISABLE_AI_AGENT"; agentId: string }
@@ -14,6 +15,7 @@ type AccessReviewAction =
   | { action: "CLEAR_ACCESS_REVIEW_LOGS" };
 
 const icons = {
+  CONFIRM_WORKSPACE_MEMBER: RotateCw,
   REMOVE_WORKSPACE_MEMBER: UserMinus,
   DELETE_SHARE_LINK: Trash2,
   DISABLE_AI_AGENT: ShieldOff,

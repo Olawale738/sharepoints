@@ -8,6 +8,10 @@ import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
+    action: z.literal("CONFIRM_WORKSPACE_MEMBER"),
+    memberId: z.string().cuid()
+  }),
+  z.object({
     action: z.literal("REMOVE_WORKSPACE_MEMBER"),
     memberId: z.string().cuid()
   }),
@@ -64,6 +68,36 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
+
+    if (data.action === "CONFIRM_WORKSPACE_MEMBER") {
+      const member = await prisma.workspaceMember.findUnique({
+        where: { id: data.memberId },
+        include: {
+          workspace: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, email: true } }
+        }
+      });
+
+      if (!member) {
+        throw new ApiError(404, "Workspace member not found.");
+      }
+
+      await logActivity({
+        userId: actor.id,
+        workspaceId: member.workspaceId,
+        action: "access_review.workspace_access_confirmed",
+        targetId: member.id,
+        metadata: {
+          reviewedUserId: member.userId,
+          reviewedUserName: member.user.name,
+          reviewedUserEmail: member.user.email,
+          role: member.role,
+          workspaceName: member.workspace.name
+        }
+      });
+
+      return ok({ confirmed: true });
+    }
 
     if (data.action === "REMOVE_WORKSPACE_MEMBER") {
       const member = await ensureNotLastWorkspaceAdmin(data.memberId);
@@ -156,7 +190,7 @@ export async function POST(request: Request) {
     });
     await logActivity({
       userId: actor.id,
-      action: "access_review.logs_cleared",
+      action: "governance.access_review_logs_cleared",
       metadata: { deleted: result.count }
     });
 

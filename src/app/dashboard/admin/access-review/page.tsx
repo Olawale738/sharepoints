@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Bot, CalendarClock, FileKey2, MonitorSmartphone, ShieldAlert, UserRoundCheck, UsersRound } from "lucide-react";
+import { WorkspaceRole } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { AccessReviewActionButton } from "@/components/dashboard/access-review-actions";
@@ -12,6 +13,8 @@ import { formatDate } from "@/lib/utils";
 function nameOf(user?: { name?: string | null; email?: string | null } | null) {
   return user?.name ?? user?.email ?? "LETW member";
 }
+
+const privilegedWorkspaceRoles: WorkspaceRole[] = [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR];
 
 export default async function AdvancedAccessReviewPage() {
   const session = await auth();
@@ -28,19 +31,24 @@ export default async function AdvancedAccessReviewPage() {
   const oldAccessDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   const oldDeviceDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
   const [
-    memberships,
+    reviewMemberships,
     shareLinks,
     aiAgents,
     oldDevices,
     safeguardingCount,
     counsellingCount,
     accessReviewLogs,
+    recentAccessConfirmations,
     workspaceMapRows
   ] = await Promise.all([
     prisma.workspaceMember.findMany({
       where: {
-        joinedAt: { lt: oldAccessDate },
-        workspace: { deletedAt: null }
+        workspace: { deletedAt: null },
+        OR: [
+          { joinedAt: { lt: oldAccessDate } },
+          { role: { in: privilegedWorkspaceRoles } },
+          { user: { OR: [{ suspendedAt: { not: null } }, { accessRevokedAt: { not: null } }, { deletedAt: { not: null } }] } }
+        ]
       },
       include: {
         workspace: { select: { id: true, name: true } },
@@ -56,7 +64,7 @@ export default async function AdvancedAccessReviewPage() {
         }
       },
       orderBy: { joinedAt: "asc" },
-      take: 120
+      take: 200
     }),
     prisma.fileShareLink.findMany({
       where: {
@@ -102,6 +110,13 @@ export default async function AdvancedAccessReviewPage() {
       orderBy: { createdAt: "desc" },
       take: 25
     }),
+    prisma.activityLog.findMany({
+      where: {
+        action: "access_review.workspace_access_confirmed",
+        createdAt: { gte: oldAccessDate }
+      },
+      select: { targetId: true }
+    }),
     prisma.workspace.findMany({
       where: { deletedAt: null },
       select: { id: true, name: true }
@@ -109,11 +124,20 @@ export default async function AdvancedAccessReviewPage() {
   ]);
 
   const workspaceNames = new Map(workspaceMapRows.map((workspace) => [workspace.id, workspace.name]));
+  const confirmedMemberIds = new Set(
+    recentAccessConfirmations.map((log) => log.targetId).filter((targetId): targetId is string => Boolean(targetId))
+  );
+  const memberships = reviewMemberships.filter((membership) => !confirmedMemberIds.has(membership.id));
   const riskyMemberships = memberships.filter((membership) => {
-    return membership.user.suspendedAt || membership.user.accessRevokedAt || membership.user.deletedAt || membership.role !== "USER";
+    return (
+      membership.user.suspendedAt ||
+      membership.user.accessRevokedAt ||
+      membership.user.deletedAt ||
+      privilegedWorkspaceRoles.includes(membership.role)
+    );
   });
   const metrics = [
-    ["Review candidates", memberships.length, UsersRound, "Memberships older than 90 days"],
+    ["Review candidates", memberships.length, UsersRound, "Old, privileged, or restricted memberships"],
     ["Privileged/risky", riskyMemberships.length, ShieldAlert, "Leaders, moderators, admins, or restricted users"],
     ["Live share links", shareLinks.length, FileKey2, "Active download links requiring review"],
     ["AI agents", aiAgents.length, Bot, "Enabled custom AI agents"],
@@ -164,10 +188,10 @@ export default async function AdvancedAccessReviewPage() {
         <div className="rounded-lg border border-ink/10 bg-white">
           <div className="border-b border-ink/10 px-4 py-3">
             <h2 className="text-sm font-semibold text-ink">Workspace access to review</h2>
-            <p className="mt-1 text-xs text-ink/55">Older memberships and privileged access should be confirmed monthly or quarterly.</p>
+            <p className="mt-1 text-xs text-ink/55">Older memberships, leaders, moderators, admins, and restricted users should be confirmed monthly or quarterly.</p>
           </div>
           <div className="divide-y divide-ink/10">
-            {memberships.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No old workspace memberships found.</p> : null}
+            {memberships.length === 0 ? <p className="px-4 py-8 text-sm text-ink/55">No workspace access currently needs review.</p> : null}
             {memberships.map((membership) => (
               <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" key={membership.id}>
                 <div className="min-w-0">
@@ -183,7 +207,12 @@ export default async function AdvancedAccessReviewPage() {
                   </p>
                 </div>
                 <AccessReviewActionButton
-                  label="Remove access"
+                  label="Confirm access"
+                  payload={{ action: "CONFIRM_WORKSPACE_MEMBER", memberId: membership.id }}
+                  confirmText={`Confirm ${nameOf(membership.user)} should keep access to ${membership.workspace.name}?`}
+                />
+                <AccessReviewActionButton
+                  label="Remove"
                   payload={{ action: "REMOVE_WORKSPACE_MEMBER", memberId: membership.id }}
                   confirmText={`Remove ${nameOf(membership.user)} from ${membership.workspace.name}?`}
                   variant="danger"

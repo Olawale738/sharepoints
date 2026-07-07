@@ -31,7 +31,8 @@ export default async function CertificatesPage() {
             memberProfile: {
               select: {
                 membershipNumber: true,
-                organizationPosition: true
+                organizationPosition: true,
+                phone: true
               }
             }
           },
@@ -56,13 +57,14 @@ export default async function CertificatesPage() {
       name: true,
       email: true,
       image: true,
-      memberProfile: {
-        select: {
-          membershipNumber: true,
-          organizationPosition: true
+        memberProfile: {
+          select: {
+            membershipNumber: true,
+            organizationPosition: true,
+            phone: true
+          }
         }
       }
-    }
   });
   const usersById = new Map(certificateUsers.map((user) => [user.id, user]));
   const certificates = certificateRows.map((certificate) => ({

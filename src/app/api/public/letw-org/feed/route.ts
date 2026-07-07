@@ -1,12 +1,28 @@
 import { ok } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 function publicOrigin() {
   return (process.env.AUTH_URL ?? "https://sharepoints.letw.org").replace(/\/$/, "");
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://letw.org",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400"
+};
+
 function unauthorized() {
-  return Response.json({ error: "Invalid public feed token." }, { status: 401 });
+  return Response.json({ error: "Invalid public feed token." }, { status: 401, headers: corsHeaders });
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders
+  });
 }
 
 export async function GET(request: Request) {
@@ -69,8 +85,16 @@ export async function GET(request: Request) {
   return ok(
     {
       organization: "Light Encounter Tabernacle Worldwide",
+      website: "https://letw.org",
       source: `${publicOrigin()}/api/public/letw-org/feed`,
       generatedAt: new Date().toISOString(),
+      rules: {
+        announcements: "approved and pinned",
+        events: "upcoming only",
+        sermons: "PUBLIC visibility only",
+        branches: "active public organization units",
+        forms: "open forms from active workspaces"
+      },
       announcements: announcements.map((announcement) => ({
         id: announcement.id,
         title: announcement.title,
@@ -119,7 +143,7 @@ export async function GET(request: Request) {
     {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=600",
-        "Access-Control-Allow-Origin": "https://letw.org"
+        ...corsHeaders
       }
     }
   );

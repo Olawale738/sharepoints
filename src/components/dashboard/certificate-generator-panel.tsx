@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Award, Cpu, ExternalLink, Loader2, Printer, QrCode, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { Award, BadgeCheck, ExternalLink, Loader2, PenLine, Printer, QrCode, RotateCcw, ShieldCheck, ShieldOff, Stamp, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ type CertificateUser = {
   memberProfile?: {
     membershipNumber?: string | null;
     organizationPosition?: string | null;
+    phone?: string | null;
   } | null;
 };
 
@@ -44,6 +45,16 @@ const certificateTypes = [
 
 function displayName(user: CertificateUser) {
   return user.name ?? user.email ?? "LETW Member";
+}
+
+function initials(user: CertificateUser) {
+  const source = displayName(user);
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "L";
 }
 
 function formatDate(value: string | Date | null | undefined) {
@@ -214,7 +225,7 @@ export function CertificateGeneratorPanel({
           </div>
         </div>
 
-        <div className="grid gap-4 p-4 xl:grid-cols-2">
+        <div className="certificate-print-zone grid gap-5 p-4">
           {filteredCertificates.length === 0 ? (
             <p className="rounded-md bg-paper px-4 py-8 text-sm text-ink/55">No certificates found.</p>
           ) : null}
@@ -222,89 +233,115 @@ export function CertificateGeneratorPanel({
             const valid = certificate.status === "ACTIVE" && !certificate.revokedAt && (!certificate.expiresAt || new Date(certificate.expiresAt) > new Date());
             const verifyHref = `/verify/certificate/${certificate.verifyToken}`;
             const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
+            const position = certificate.user.memberProfile?.organizationPosition ?? "LETW Member";
+            const membershipNumber = certificate.user.memberProfile?.membershipNumber ?? "Member number pending";
+            const photoSrc = certificate.user.image || `/api/profile/photo/${certificate.user.id}`;
 
             return (
-              <article className="overflow-hidden rounded-lg border border-ink/10 bg-white certificate-print-card" key={certificate.id}>
-                <div className="bg-[#0b1b3d] px-5 py-4 text-white">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">Light Encounter Tabernacle Worldwide</p>
-                      <h3 className="mt-2 text-xl font-semibold">{certificate.title}</h3>
+              <article className="official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft" key={certificate.id}>
+                <div className="official-certificate-inner">
+                  <div className="certificate-watermark" aria-hidden="true" />
+                  <header className="certificate-header">
+                    <div className="certificate-brand">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt="LETW logo" src="/letw-logo.png" />
+                      <div>
+                        <p>Light Encounter Tabernacle Worldwide</p>
+                        <span>letw.org official credential</span>
+                      </div>
                     </div>
-                    <Badge className={valid ? "border-white/20 bg-white/10 text-white" : "bg-clay text-white"}>
-                      {valid ? "valid" : certificate.revokedAt ? "revoked" : "inactive"}
+                    <Badge className={valid ? "certificate-status-active" : "certificate-status-inactive"}>
+                      {valid ? "verified active" : certificate.revokedAt ? "revoked" : "inactive"}
                     </Badge>
+                  </header>
+
+                  <div className="certificate-body">
+                    <section className="certificate-main-copy">
+                      <p className="certificate-eyebrow">Certificate of LETW Recognition</p>
+                      <h3>{certificate.title}</h3>
+                      <p className="certificate-intro">This certifies that</p>
+                      <h4>{displayName(certificate.user)}</h4>
+                      <p className="certificate-position">{position}</p>
+                      <p className="certificate-statement">
+                        has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only
+                        when the QR verification page confirms an active status.
+                      </p>
+                    </section>
+
+                    <aside className="certificate-identity">
+                      <div className="certificate-photo">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={`${displayName(certificate.user)} profile`}
+                          src={photoSrc}
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                        <span>{initials(certificate.user)}</span>
+                      </div>
+                      <div className="certificate-seal">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img alt="LETW official seal" src="/letw-logo-transparent.png" />
+                        <span>Official Seal</span>
+                      </div>
+                    </aside>
                   </div>
-                </div>
-                <div className="space-y-4 p-5">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-ink/45">Awarded to</p>
-                    <p className="mt-1 text-2xl font-semibold text-ink">{displayName(certificate.user)}</p>
-                    <p className="text-sm text-ink/55">
-                      {certificate.user.memberProfile?.organizationPosition ?? "LETW Member"} -{" "}
-                      {certificate.user.memberProfile?.membershipNumber ?? "Member number pending"}
-                    </p>
-                  </div>
-                  <div className="grid gap-3 text-sm sm:grid-cols-3">
-                    <div className="rounded-md bg-paper p-3">
-                      <p className="text-xs text-ink/45">Certificate no.</p>
-                      <p className="mt-1 font-semibold text-ink">{certificateCode}</p>
+
+                  <section className="certificate-details">
+                    <div>
+                      <span>Certificate number</span>
+                      <strong>{certificateCode}</strong>
                     </div>
-                    <div className="rounded-md bg-paper p-3">
-                      <p className="text-xs text-ink/45">Issued</p>
-                      <p className="mt-1 font-semibold text-ink">{formatDate(certificate.issuedAt)}</p>
+                    <div>
+                      <span>Member number</span>
+                      <strong>{membershipNumber}</strong>
                     </div>
-                    <div className="rounded-md bg-paper p-3">
-                      <p className="text-xs text-ink/45">Expires</p>
-                      <p className="mt-1 font-semibold text-ink">{formatDate(certificate.expiresAt)}</p>
+                    <div>
+                      <span>Issued</span>
+                      <strong>{formatDate(certificate.issuedAt)}</strong>
                     </div>
-                  </div>
-                  <div className="grid gap-4 rounded-lg border border-[#d4af37]/35 bg-[#fbfdff] p-4 md:grid-cols-[10rem_minmax(0,1fr)]">
-                    <div className="rounded-lg border border-[#0b1b3d]/10 bg-white p-3 text-center shadow-sm">
-                      <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-md border border-sky-200 bg-sky-50 p-2">
+                    <div>
+                      <span>Expires</span>
+                      <strong>{formatDate(certificate.expiresAt)}</strong>
+                    </div>
+                  </section>
+
+                  <footer className="certificate-footer">
+                    <div className="certificate-signature">
+                      <PenLine className="h-4 w-4" />
+                      <p>Olawale N Sanni</p>
+                      <span>President / Authorized Signature</span>
+                    </div>
+                    <div className="certificate-chip">
+                      <Stamp className="h-5 w-5" />
+                      <div>
+                        <p>Seal chip</p>
+                        <span>{certificateCode}</span>
+                      </div>
+                    </div>
+                    <div className="certificate-qr">
+                      <div>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           alt={`QR verification code for ${certificateCode}`}
-                          className="h-full w-full object-contain"
                           src={`/api/certificates/${certificate.id}/qr`}
                         />
                       </div>
-                      <p className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-[#0a3d83]">
+                      <p>
                         <QrCode className="h-3.5 w-3.5" />
                         Scan to verify
                       </p>
                     </div>
-                    <div className="flex flex-col justify-between gap-3">
-                      <div className="relative overflow-hidden rounded-lg border border-[#d4af37]/40 bg-[#0b1b3d] p-4 text-white">
-                        <div className="absolute right-3 top-3 grid grid-cols-4 gap-1 opacity-40" aria-hidden="true">
-                          {Array.from({ length: 16 }).map((_, index) => (
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" key={index} />
-                          ))}
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-md border border-[#d4af37]/60 bg-gradient-to-br from-[#ffe8a3] via-[#d4af37] to-[#8a5b12] text-[#0b1b3d] shadow-inner">
-                            <Cpu className="h-7 w-7" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">Seal chip</p>
-                            <p className="mt-1 text-lg font-semibold">LETW Verified Credential</p>
-                            <p className="mt-1 break-all text-xs text-white/75">{certificateCode}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="rounded-md bg-paper p-3 text-sm leading-6 text-ink/65">
-                        <p className="flex items-center gap-2 font-semibold text-ink">
-                          <ShieldCheck className="h-4 w-4 text-moss" />
-                          Verification instruction
-                        </p>
-                        <p className="mt-1">
-                          Scan the QR code. Accept this certificate only when the verification page displays an active LETW status.
-                        </p>
-                      </div>
-                    </div>
+                  </footer>
+
+                  <div className="certificate-verification-note">
+                    <BadgeCheck className="h-4 w-4" />
+                    Accept this certificate only after scanning the QR code or opening the verification page.
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm font-medium text-ink hover:bg-mint/40" href={verifyHref} rel="noreferrer" target="_blank">
+
+                  <div className="certificate-actions certificate-nonprint flex flex-wrap items-center gap-2 border-t border-ink/10 bg-paper p-4">
+                    <a className="inline-flex h-9 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium text-ink hover:bg-mint/40" href={verifyHref} rel="noreferrer" target="_blank">
                       <ExternalLink className="h-4 w-4" />
                       Verify
                     </a>
@@ -342,7 +379,16 @@ export function CertificateGeneratorPanel({
                         Delete
                       </Button>
                     ) : null}
+                    <span className="ml-auto flex items-center gap-2 text-xs text-ink/55">
+                      <ShieldCheck className="h-4 w-4 text-moss" />
+                      QR verified public certificate
+                    </span>
                   </div>
+                  {!valid ? (
+                    <div className="certificate-invalid-stamp" aria-hidden="true">
+                      Not valid
+                    </div>
+                  ) : null}
                 </div>
               </article>
             );

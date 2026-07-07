@@ -15,27 +15,42 @@ function detectedImageType(body: Buffer) {
 export async function GET(request: Request, context: RouteContext) {
   try {
     const { userId } = await context.params;
+    const url = new URL(request.url);
     const session = await auth();
     if (!session?.user?.id) {
-      const token = new URL(request.url).searchParams.get("token");
-      const [card, account] = token
+      const token = url.searchParams.get("token");
+      const certificateToken = url.searchParams.get("certificateToken");
+      const [card, certificate, account] = token || certificateToken
         ? await Promise.all([
-            prisma.digitalMembershipCard.findFirst({
-              where: {
-                userId,
-                qrToken: token,
-                status: "ACTIVE",
-                deletedAt: null,
-                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
-              }
-            }),
+            token
+              ? prisma.digitalMembershipCard.findFirst({
+                  where: {
+                    userId,
+                    qrToken: token,
+                    status: "ACTIVE",
+                    deletedAt: null,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+                  }
+                })
+              : null,
+            certificateToken
+              ? prisma.memberCertificationBadge.findFirst({
+                  where: {
+                    userId,
+                    verifyToken: certificateToken,
+                    status: "ACTIVE",
+                    revokedAt: null,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+                  }
+                })
+              : null,
             prisma.user.findUnique({
               where: { id: userId },
               select: { suspendedAt: true, accessRevokedAt: true, deletedAt: true }
             })
           ])
-        : [null, null];
-      if (!card || !account || account.suspendedAt || account.accessRevokedAt || account.deletedAt) {
+        : [null, null, null];
+      if ((!card && !certificate) || !account || account.suspendedAt || account.accessRevokedAt || account.deletedAt) {
         throw new ApiError(401, "Authentication required.");
       }
     }
