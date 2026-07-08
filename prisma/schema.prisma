@@ -630,6 +630,66 @@ enum BoardRecordStatus {
   ARCHIVED
 }
 
+enum LeadershipDecisionStatus {
+  PENDING
+  APPROVED
+  IMPLEMENTED
+  DELAYED
+  CANCELLED
+}
+
+enum LeadershipDecisionSource {
+  PRESIDENT
+  PASTORS
+  LEADERS
+  BOARD
+  COMMITTEE
+}
+
+enum MonthlyReportStatus {
+  DRAFT
+  GENERATED
+  FINAL
+  ARCHIVED
+}
+
+enum ConfidentialVaultRecordType {
+  PRAYER
+  COUNSELLING
+  SAFEGUARDING
+}
+
+enum ConfidentialVaultStatus {
+  OPEN
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum LeadershipHandoverStatus {
+  DRAFT
+  PENDING_ACCEPTANCE
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+enum OfficialLetterType {
+  APPOINTMENT
+  TRANSFER
+  ORDINATION
+  RECOMMENDATION
+  INVITATION
+  MEMBERSHIP_CONFIRMATION
+}
+
+enum OfficialLetterStatus {
+  DRAFT
+  ISSUED
+  REVOKED
+  ARCHIVED
+}
+
 enum TrainingProgramStatus {
   ACTIVE
   ARCHIVED
@@ -2643,6 +2703,143 @@ model BoardDecision {
 
   @@index([recordId, createdAt])
   @@index([ownerId, dueAt])
+}
+
+model LeadershipDecision {
+  id                 String                   @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  source             LeadershipDecisionSource
+  title              String
+  description        String                   @db.Text
+  meetingNotes       String?                  @db.Text
+  attachments        Json?
+  status             LeadershipDecisionStatus @default(PENDING)
+  responsibleUserId  String?
+  decidedById        String?
+  dueAt              DateTime?
+  implementedAt      DateTime?
+  createdById        String
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([workspaceId, status, dueAt])
+  @@index([organizationUnitId, status, dueAt])
+  @@index([responsibleUserId, status, dueAt])
+  @@index([source, status])
+}
+
+model MonthlyMinistryReport {
+  id                 String              @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  reportType         String              @default("MONTHLY_BRANCH")
+  month              Int
+  year               Int
+  title              String
+  summary            String              @db.Text
+  metrics            Json
+  risks              Json?
+  sourceSnapshot     Json?
+  status             MonthlyReportStatus @default(GENERATED)
+  generatedById      String
+  finalizedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([organizationUnitId, year, month])
+  @@index([workspaceId, year, month])
+  @@index([status, createdAt])
+}
+
+model ConfidentialVaultRecord {
+  id                 String                      @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  recordType         ConfidentialVaultRecordType
+  title              String
+  subjectName        String
+  subjectUserId      String?
+  sensitivity        String                      @default("TOP_PASTORS_ONLY")
+  body               String                      @db.Text
+  prayerPoints       String?                     @db.Text
+  assignedToId       String?
+  status             ConfidentialVaultStatus     @default(OPEN)
+  createdById        String
+  closedAt           DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([recordType, status, createdAt])
+  @@index([organizationUnitId, status])
+  @@index([workspaceId, status])
+  @@index([subjectUserId, status])
+  @@index([assignedToId, status])
+}
+
+model ConfidentialVaultAccessLog {
+  id        String   @id @default(cuid())
+  recordId  String
+  userId    String
+  action    String
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([recordId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+model LeadershipHandover {
+  id                 String                   @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  fromLeaderId       String
+  toLeaderId         String?
+  title              String
+  reason             String?                  @db.Text
+  duties             Json?
+  documents          Json?
+  passwordAssets     Json?
+  pendingTasks       Json?
+  branchRecords      Json?
+  status             LeadershipHandoverStatus @default(DRAFT)
+  createdById        String
+  acceptedAt         DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@index([fromLeaderId, status])
+  @@index([toLeaderId, status])
+  @@index([organizationUnitId, status])
+  @@index([workspaceId, status])
+}
+
+model OfficialLetter {
+  id                 String               @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  letterType         OfficialLetterType
+  letterNumber       String               @unique
+  title              String
+  recipientUserId    String?
+  recipientName      String
+  recipientEmail     String?
+  body               String               @db.Text
+  signatureName      String               @default("Olawale N Sanni")
+  status             OfficialLetterStatus @default(DRAFT)
+  issuedById         String
+  issuedAt           DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([letterType, status, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@index([organizationUnitId, status])
+  @@index([workspaceId, status])
 }
 
 model TrainingProgram {

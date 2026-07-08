@@ -189,5 +189,16 @@ export const activityActions = {
   followUpAutomationRun: "leadership.follow_up_automation_run",
   leadershipAiReportGenerated: "leadership.ai_report_generated",
   voiceCommandDrafted: "leadership.voice_command_drafted",
-  documentIntelligenceRun: "leadership.document_intelligence_run"
+  documentIntelligenceRun: "leadership.document_intelligence_run",
+  leadershipDecisionCreated: "leadership.decision_created",
+  leadershipDecisionUpdated: "leadership.decision_updated",
+  monthlyReportGenerated: "leadership.monthly_report_generated",
+  monthlyReportUpdated: "leadership.monthly_report_updated",
+  confidentialVaultRecordCreated: "vault.record_created",
+  confidentialVaultRecordOpened: "vault.record_opened",
+  confidentialVaultRecordUpdated: "vault.record_updated",
+  leadershipHandoverCreated: "leadership.handover_created",
+  leadershipHandoverUpdated: "leadership.handover_updated",
+  officialLetterCreated: "letter.created",
+  officialLetterUpdated: "letter.updated"
 } as const;

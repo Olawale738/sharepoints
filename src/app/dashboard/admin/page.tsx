@@ -333,6 +333,12 @@ export default async function AdminControlCenterPage() {
           icon: Crown
         },
         {
+          href: "/dashboard/leadership-governance",
+          label: "Leadership governance",
+          detail: "Decision tracker, monthly report packs, confidential vault, leadership handovers, and official letters.",
+          icon: FileClock
+        },
+        {
           href: "/dashboard/admin/branches",
           label: "Branch dashboards",
           detail: "Network intelligence, unit health, leaders, members, projects, and transfers.",

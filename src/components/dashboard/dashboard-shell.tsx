@@ -53,6 +53,7 @@ type DashboardShellProps = {
 
 export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, children }: DashboardShellProps) {
   const canOpenAdminCenter = workspaces.some((workspace) => workspace.role === "ADMIN");
+  const canOpenLeadershipGovernance = workspaces.some((workspace) => ["ADMIN", "LEADER", "MODERATOR"].includes(workspace.role));
   const normalizedLocale = normalizeLocale(locale);
   const messages = appMessages(normalizedLocale);
 
@@ -113,6 +114,16 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                 <Crown className="h-4 w-4" />
                 <span className="hidden 2xl:inline">Leadership</span>
               </Link>
+              {canOpenLeadershipGovernance ? (
+                <Link
+                  aria-label="Leadership governance"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                  href="/dashboard/leadership-governance"
+                >
+                  <FileLock2 className="h-4 w-4" />
+                  <span className="hidden 2xl:inline">Governance</span>
+                </Link>
+              ) : null}
               <Link
                 aria-label="Member portal"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
