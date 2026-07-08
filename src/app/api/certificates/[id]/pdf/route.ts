@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import QRCode from "qrcode";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
 import { getObjectBuffer } from "@/lib/storage";
@@ -51,6 +51,75 @@ function wrapText(text: string, maxLength: number) {
 
   if (line) lines.push(line);
   return lines;
+}
+
+function fittedFontSize(font: PDFFont, text: string, maxWidth: number, preferred: number, minimum: number) {
+  let size = preferred;
+  while (size > minimum && font.widthOfTextAtSize(text, size) > maxWidth) {
+    size -= 1;
+  }
+  return size;
+}
+
+function drawCenteredText(page: PDFPage, text: string, centerX: number, y: number, font: PDFFont, size: number, color: ReturnType<typeof rgb>) {
+  page.drawText(text, {
+    x: centerX - font.widthOfTextAtSize(text, size) / 2,
+    y,
+    size,
+    font,
+    color
+  });
+}
+
+function drawVerificationSealChip(input: {
+  page: PDFPage;
+  logo: PDFImage;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sans: PDFFont;
+  sansBold: PDFFont;
+  navy: ReturnType<typeof rgb>;
+  blue: ReturnType<typeof rgb>;
+  gold: ReturnType<typeof rgb>;
+  lightBlue: ReturnType<typeof rgb>;
+  white: ReturnType<typeof rgb>;
+  certificateNumber: string;
+}) {
+  const { page, logo, x, y, width, height, sans, sansBold, navy, blue, gold, lightBlue, white, certificateNumber } = input;
+  page.drawRectangle({ x, y, width, height, color: lightBlue, borderColor: gold, borderWidth: 1.3 });
+  page.drawRectangle({ x: x + 4, y: y + 4, width: width - 8, height: height - 8, borderColor: rgb(0.65, 0.78, 0.93), borderWidth: 0.6 });
+  for (let i = 0; i < 5; i += 1) {
+    page.drawLine({
+      start: { x: x + 11 + i * 10, y: y + 10 },
+      end: { x: x + 11 + i * 10, y: y + height - 10 },
+      thickness: 0.28,
+      color: rgb(0.54, 0.72, 0.91),
+      opacity: 0.42
+    });
+    page.drawLine({
+      start: { x: x + 10, y: y + 12 + i * 9 },
+      end: { x: x + width - 10, y: y + 12 + i * 9 },
+      thickness: 0.28,
+      color: rgb(0.54, 0.72, 0.91),
+      opacity: 0.36
+    });
+  }
+
+  const sealCenterX = x + 44;
+  const sealCenterY = y + height / 2 + 4;
+  page.drawEllipse({ x: sealCenterX, y: sealCenterY, xScale: 36, yScale: 36, color: white, borderColor: gold, borderWidth: 3 });
+  page.drawEllipse({ x: sealCenterX, y: sealCenterY, xScale: 29, yScale: 29, color: rgb(0.985, 0.965, 0.88), borderColor: navy, borderWidth: 1.1 });
+  page.drawImage(logo, { x: sealCenterX - 21, y: sealCenterY - 21, width: 42, height: 42, opacity: 0.96 });
+  drawCenteredText(page, "LETW", sealCenterX, sealCenterY - 38, sansBold, 7.4, navy);
+
+  page.drawText("VERIFIABLE", { x: x + 88, y: y + height - 27, size: 9.2, font: sansBold, color: navy });
+  page.drawText("SEAL CHIP", { x: x + 88, y: y + height - 41, size: 10.8, font: sansBold, color: blue });
+  page.drawLine({ start: { x: x + 88, y: y + height - 48 }, end: { x: x + width - 12, y: y + height - 48 }, thickness: 0.8, color: gold });
+  page.drawText("Official stamp mark", { x: x + 88, y: y + height - 62, size: 6.8, font: sansBold, color: navy });
+  page.drawText("QR remains the live verifier", { x: x + 88, y: y + height - 73, size: 6.4, font: sans, color: blue });
+  page.drawText(certificateNumber.slice(0, 28), { x: x + 88, y: y + 12, size: 5.8, font: sansBold, color: navy });
 }
 
 async function embedImage(pdf: PDFDocument, body: Buffer) {
@@ -173,17 +242,29 @@ export async function GET(request: Request, context: RouteContext) {
     });
 
     page.drawImage(logo, { x: width / 2 - 118, y: 183, width: 236, height: 236, opacity: 0.045 });
-    page.drawText("CERTIFICATE OF LETW RECOGNITION", { x: 118, y: 430, size: 11, font: sansBold, color: gold });
-    page.drawText(certificate.title, { x: 118, y: 384, size: 34, font: serif, color: navy });
-    page.drawText("This certifies that", { x: 118, y: 345, size: 13, font: sansBold, color: muted });
-    page.drawText(holderName, { x: 118, y: 303, size: Math.min(32, Math.max(22, 420 / Math.max(holderName.length, 12))), font: sansBold, color: blue });
-    page.drawRectangle({ x: 118, y: 282, width: 210, height: 22, color: navy });
-    page.drawText(position.toUpperCase().slice(0, 44), { x: 130, y: 288, size: 9, font: sansBold, color: white });
+    const mainX = 84;
+    const mainWidth = 500;
+    const mainCenter = mainX + mainWidth / 2;
+    drawCenteredText(page, "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
+    const titleSize = fittedFontSize(serif, certificate.title, mainWidth, 34, 24);
+    drawCenteredText(page, certificate.title, mainCenter, 384, serif, titleSize, navy);
+    drawCenteredText(page, "This certifies that the certificate holder is", mainCenter, 346, sansBold, 12.5, muted);
+
+    page.drawRectangle({ x: mainX + 18, y: 289, width: mainWidth - 36, height: 46, color: rgb(0.955, 0.979, 1), borderColor: gold, borderWidth: 1.1 });
+    page.drawRectangle({ x: mainX + 23, y: 294, width: mainWidth - 46, height: 36, borderColor: rgb(0.72, 0.82, 0.94), borderWidth: 0.45 });
+    drawCenteredText(page, "OWNER / HOLDER NAME", mainCenter, 317, sansBold, 6.8, muted);
+    const holderSize = fittedFontSize(sansBold, holderName, mainWidth - 76, 25, 16);
+    drawCenteredText(page, holderName, mainCenter, 298, sansBold, holderSize, blue);
+
+    const positionText = position.toUpperCase().slice(0, 52);
+    const positionWidth = Math.min(330, sansBold.widthOfTextAtSize(positionText, 8.6) + 30);
+    page.drawRectangle({ x: mainCenter - positionWidth / 2, y: 260, width: positionWidth, height: 20, color: navy });
+    drawCenteredText(page, positionText, mainCenter, 266, sansBold, 8.6, white);
 
     const statement =
       "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.";
-    wrapText(statement, 78).forEach((line, index) => {
-      page.drawText(line, { x: 118, y: 252 - index * 16, size: 11, font: sans, color: ink });
+    wrapText(statement, 74).forEach((line, index) => {
+      drawCenteredText(page, line, mainCenter, 231 - index * 16, sans, 10.8, ink);
     });
 
     const photoX = width - 232;
@@ -195,8 +276,22 @@ export async function GET(request: Request, context: RouteContext) {
     } else {
       page.drawText(initials(holderName), { x: photoX + 41, y: photoY + 52, size: 27, font: sansBold, color: navy });
     }
-    page.drawImage(logo, { x: width - 207, y: 176, width: 82, height: 82, opacity: 0.86 });
-    page.drawText("OFFICIAL SEAL", { x: width - 202, y: 160, size: 8, font: sansBold, color: navy });
+    drawVerificationSealChip({
+      page,
+      logo,
+      x: width - 254,
+      y: 154,
+      width: 164,
+      height: 92,
+      sans,
+      sansBold,
+      navy,
+      blue,
+      gold,
+      lightBlue,
+      white,
+      certificateNumber
+    });
 
     const detailY = 137;
     const details = [

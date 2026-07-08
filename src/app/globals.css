@@ -3132,9 +3132,13 @@ select {
   margin: 0.4rem auto 0;
   max-width: 42rem;
   color: #0a3d83;
-  font-size: clamp(1.9rem, 4vw, 3.2rem);
+  border: 1px solid rgb(212 175 55 / 48%);
+  background: linear-gradient(180deg, #ffffff, #f1f7ff);
+  padding: 0.35rem 1rem 0.45rem;
+  font-size: clamp(2.15rem, 4vw, 3.35rem);
   font-weight: 950;
   line-height: 1.05;
+  box-shadow: inset 0 0 0 1px rgb(10 61 131 / 8%);
 }
 
 .certificate-position {
@@ -3189,30 +3193,74 @@ select {
 }
 
 .certificate-seal {
+  position: relative;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border: 1px solid rgb(212 175 55 / 45%);
   border-radius: 1rem;
   background:
-    radial-gradient(circle, rgb(255 255 255 / 82%) 0 44%, transparent 45%),
-    conic-gradient(from 30deg, #fff8dc, #d4af37, #b78727, #f8dda0, #d4af37, #fff8dc);
+    repeating-linear-gradient(90deg, rgb(10 61 131 / 10%) 0 1px, transparent 1px 0.72rem),
+    repeating-linear-gradient(0deg, rgb(10 61 131 / 8%) 0 1px, transparent 1px 0.68rem),
+    radial-gradient(circle at 34% 42%, rgb(255 255 255 / 94%) 0 2.9rem, transparent 3rem),
+    linear-gradient(135deg, #f8fbff, #e8f5ff 46%, #fff5ce);
   padding: 1rem;
   text-align: center;
+  box-shadow: inset 0 0 0 3px rgb(255 255 255 / 72%), 0 14px 30px rgb(11 27 61 / 14%);
+}
+
+.certificate-seal::before {
+  content: "";
+  position: absolute;
+  width: 6.4rem;
+  height: 6.4rem;
+  border: 0.28rem solid #d4af37;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 84%) 0 47%, rgb(212 175 55 / 12%) 48% 58%, transparent 59%),
+    conic-gradient(from 15deg, #fff8dc, #d4af37, #0b1b3d, #d4af37, #fff8dc);
+}
+
+.certificate-seal::after {
+  content: "LETW";
+  position: absolute;
+  top: 0.82rem;
+  right: 0.86rem;
+  border: 1px solid rgb(212 175 55 / 55%);
+  background: rgb(255 255 255 / 76%);
+  padding: 0.12rem 0.32rem;
+  color: #0b1b3d;
+  font-size: 0.58rem;
+  font-weight: 950;
+  letter-spacing: 0.1em;
 }
 
 .certificate-seal img {
+  position: relative;
+  z-index: 1;
   width: 5.4rem;
   height: 5.4rem;
   object-fit: contain;
 }
 
 .certificate-seal span {
+  position: relative;
+  z-index: 1;
   margin-top: 0.35rem;
   color: #0b1b3d;
   font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.certificate-seal small {
+  position: relative;
+  z-index: 1;
+  margin-top: 0.18rem;
+  color: #0a3d83;
+  font-size: 0.6rem;
+  font-weight: 800;
 }
 
 .certificate-details {
@@ -3537,6 +3585,7 @@ select {
   body.letw-certificate-page .certificate-main-copy h4 {
     max-width: 170mm !important;
     margin-top: 1.6mm !important;
+    padding: 1.1mm 4mm 1.3mm !important;
     font-size: 8.8mm !important;
     line-height: 1.04 !important;
   }
@@ -3576,6 +3625,18 @@ select {
     border-radius: 4mm !important;
   }
 
+  body.letw-certificate-page .certificate-seal::before {
+    width: 25mm !important;
+    height: 25mm !important;
+    border-width: 0.9mm !important;
+  }
+
+  body.letw-certificate-page .certificate-seal::after {
+    top: 2.2mm !important;
+    right: 2.4mm !important;
+    font-size: 1.35mm !important;
+  }
+
   body.letw-certificate-page .certificate-seal img {
     width: 17mm !important;
     height: 17mm !important;
@@ -3584,6 +3645,10 @@ select {
   body.letw-certificate-page .certificate-seal span {
     margin-top: 1.2mm !important;
     font-size: 1.9mm !important;
+  }
+
+  body.letw-certificate-page .certificate-seal small {
+    font-size: 1.55mm !important;
   }
 
   body.letw-certificate-page .certificate-details {
@@ -3733,6 +3798,7 @@ select {
   }
 
   .certificate-main-copy h4 {
+    padding: 1.1mm 4mm 1.3mm !important;
     font-size: 10mm !important;
   }
 
@@ -3755,6 +3821,18 @@ select {
     padding: 3mm !important;
   }
 
+  .certificate-seal::before {
+    width: 25mm !important;
+    height: 25mm !important;
+    border-width: 0.9mm !important;
+  }
+
+  .certificate-seal::after {
+    top: 2.2mm !important;
+    right: 2.4mm !important;
+    font-size: 1.35mm !important;
+  }
+
   .certificate-seal img {
     width: 22mm !important;
     height: 22mm !important;
@@ -3762,6 +3840,10 @@ select {
 
   .certificate-seal span {
     font-size: 1.8mm !important;
+  }
+
+  .certificate-seal small {
+    font-size: 1.55mm !important;
   }
 
   .certificate-details {

@@ -338,7 +338,8 @@ export function CertificateGeneratorPanel({
                       <div className="certificate-seal">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img alt="LETW official seal" src="/letw-logo-transparent.png" />
-                        <span>Official Seal</span>
+                        <span>Verifiable seal chip</span>
+                        <small>QR confirms live status</small>
                       </div>
                     </aside>
                   </div>
@@ -371,7 +372,7 @@ export function CertificateGeneratorPanel({
                     <div className="certificate-chip">
                       <Stamp className="h-5 w-5" />
                       <div>
-                        <p>Seal chip</p>
+                        <p>Credential code</p>
                         <span>{certificateCode}</span>
                       </div>
                     </div>
