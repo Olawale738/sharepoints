@@ -7,21 +7,29 @@ function publicOrigin() {
   return (process.env.AUTH_URL ?? "https://sharepoints.letw.org").replace(/\/$/, "");
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://letw.org",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Max-Age": "86400"
-};
+const allowedOrigins = new Set(["https://letw.org", "https://www.letw.org"]);
 
-function unauthorized() {
-  return Response.json({ error: "Invalid public feed token." }, { status: 401, headers: corsHeaders });
+function corsHeaders(request?: Request) {
+  const origin = request?.headers.get("origin") ?? "https://www.letw.org";
+  const allowedOrigin = allowedOrigins.has(origin) ? origin : "https://www.letw.org";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400"
+  };
 }
 
-export async function OPTIONS() {
+function unauthorized(request: Request) {
+  return Response.json({ error: "Invalid public feed token." }, { status: 401, headers: corsHeaders(request) });
+}
+
+export async function OPTIONS(request: Request) {
   return new Response(null, {
     status: 204,
-    headers: corsHeaders
+    headers: corsHeaders(request)
   });
 }
 
@@ -30,7 +38,7 @@ export async function GET(request: Request) {
   const requiredToken = process.env.PUBLIC_SITE_FEED_TOKEN;
 
   if (requiredToken && token !== requiredToken) {
-    return unauthorized();
+    return unauthorized(request);
   }
 
   const now = new Date();
@@ -143,7 +151,7 @@ export async function GET(request: Request) {
     {
       headers: {
         "Cache-Control": "public, max-age=60, stale-while-revalidate=600",
-        ...corsHeaders
+        ...corsHeaders(request)
       }
     }
   );
