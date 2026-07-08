@@ -8,6 +8,7 @@ import {
   BookOpen,
   CalendarDays,
   ClipboardCheck,
+  Crown,
   DoorOpen,
   FileLock2,
   HeartHandshake,
@@ -104,6 +105,22 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               <GlobalSearch />
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-1 sm:justify-end">
+              <Link
+                aria-label="Leadership suite"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/leadership"
+              >
+                <Crown className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Leadership</span>
+              </Link>
+              <Link
+                aria-label="Member portal"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/member-portal"
+              >
+                <UserRound className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Portal</span>
+              </Link>
               <Link
                 aria-label="Knowledge base"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"

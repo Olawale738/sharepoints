@@ -38,6 +38,7 @@ type MemberProfile = {
   salvationAt: string | null;
   baptismAt: string | null;
   membershipStartedAt: string | null;
+  weddingAnniversaryAt: string | null;
   organizationPosition: string | null;
   digitalIdLocation: string;
   communicationPreference: string | null;
@@ -91,6 +92,7 @@ const blankProfile: MemberProfile = {
   salvationAt: null,
   baptismAt: null,
   membershipStartedAt: null,
+  weddingAnniversaryAt: null,
   organizationPosition: null,
   digitalIdLocation: "LETTW Worldwide",
   communicationPreference: null,
@@ -169,7 +171,8 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
       firstVisitAt: dateInput(data.profile.firstVisitAt),
       salvationAt: dateInput(data.profile.salvationAt),
       baptismAt: dateInput(data.profile.baptismAt),
-      membershipStartedAt: dateInput(data.profile.membershipStartedAt)
+      membershipStartedAt: dateInput(data.profile.membershipStartedAt),
+      weddingAnniversaryAt: dateInput(data.profile.weddingAnniversaryAt)
     };
     setDraft(profile);
     setMembers((current) => current.map((member) => (member.id === selected.id ? { ...member, profile } : member)));
@@ -418,6 +421,7 @@ export function MemberCrmPanel({ members: initialMembers }: { members: CrmMember
                 <label className={fieldClass}>Salvation date<Input type="date" value={dateInput(draft.salvationAt)} onChange={(e) => setField("salvationAt", e.target.value || null)} /></label>
                 <label className={fieldClass}>Baptism date<Input type="date" value={dateInput(draft.baptismAt)} onChange={(e) => setField("baptismAt", e.target.value || null)} /></label>
                 <label className={fieldClass}>Membership start<Input type="date" value={dateInput(draft.membershipStartedAt)} onChange={(e) => setField("membershipStartedAt", e.target.value || null)} /></label>
+                <label className={fieldClass}>Wedding anniversary<Input type="date" value={dateInput(draft.weddingAnniversaryAt)} onChange={(e) => setField("weddingAnniversaryAt", e.target.value || null)} /></label>
                 <label className={`${fieldClass} md:col-span-2`}>Ministry interests<Input value={draft.ministryInterests.join(", ")} onChange={(e) => setField("ministryInterests", e.target.value.split(",").map((v) => v.trim()).filter(Boolean))} /></label>
                 <label className={`${fieldClass} md:col-span-2`}>Skills<Input value={draft.skills.join(", ")} onChange={(e) => setField("skills", e.target.value.split(",").map((v) => v.trim()).filter(Boolean))} /></label>
               </div>

@@ -179,5 +179,15 @@ export const activityActions = {
   automaticBackupCreated: "system.automatic_backup_created",
   monitorWarningRaised: "system.monitor_warning_raised",
   whatsAppMessageReceived: "whatsapp.message_received",
-  whatsAppMessageSent: "whatsapp.message_sent"
+  whatsAppMessageSent: "whatsapp.message_sent",
+  workspaceAudienceModeUpdated: "workspace.audience_mode_updated",
+  servicePlanCreated: "service.plan_created",
+  servicePlanUpdated: "service.plan_updated",
+  givingReceiptIssued: "giving.receipt_issued",
+  givingReceiptRevoked: "giving.receipt_revoked",
+  milestoneReminderSent: "leadership.milestone_reminder_sent",
+  followUpAutomationRun: "leadership.follow_up_automation_run",
+  leadershipAiReportGenerated: "leadership.ai_report_generated",
+  voiceCommandDrafted: "leadership.voice_command_drafted",
+  documentIntelligenceRun: "leadership.document_intelligence_run"
 } as const;

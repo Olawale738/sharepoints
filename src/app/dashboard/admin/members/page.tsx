@@ -28,6 +28,7 @@ function serializeProfile(profile: Awaited<ReturnType<typeof getMembers>>[number
     salvationAt: profile?.salvationAt?.toISOString() ?? null,
     baptismAt: profile?.baptismAt?.toISOString() ?? null,
     membershipStartedAt: profile?.membershipStartedAt?.toISOString() ?? null,
+    weddingAnniversaryAt: profile?.weddingAnniversaryAt?.toISOString() ?? null,
     organizationPosition: profile?.organizationPosition ?? null,
     digitalIdLocation: profile?.digitalIdLocation ?? "LETTW Worldwide",
     communicationPreference: profile?.communicationPreference ?? null,

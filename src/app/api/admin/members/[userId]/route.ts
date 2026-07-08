@@ -25,6 +25,7 @@ const profileSchema = z.object({
   salvationAt: z.string().date().nullable().optional(),
   baptismAt: z.string().date().nullable().optional(),
   membershipStartedAt: z.string().date().nullable().optional(),
+  weddingAnniversaryAt: z.string().date().nullable().optional(),
   organizationPosition: nullableText(120),
   digitalIdLocation: z.string().trim().min(2).max(160),
   communicationPreference: nullableText(80),
@@ -53,7 +54,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
       select: { id: true, email: true }
     });
     if (!target) throw new ApiError(404, "Member not found.");
-    const { dateOfBirth, firstVisitAt, salvationAt, baptismAt, membershipStartedAt, ...data } = parsed.data;
+    const { dateOfBirth, firstVisitAt, salvationAt, baptismAt, membershipStartedAt, weddingAnniversaryAt, ...data } = parsed.data;
     const profile = await prisma.memberProfile.upsert({
       where: { userId },
       update: {
@@ -62,7 +63,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
         firstVisitAt: dateOrNull(firstVisitAt),
         salvationAt: dateOrNull(salvationAt),
         baptismAt: dateOrNull(baptismAt),
-        membershipStartedAt: dateOrNull(membershipStartedAt)
+        membershipStartedAt: dateOrNull(membershipStartedAt),
+        weddingAnniversaryAt: dateOrNull(weddingAnniversaryAt)
       },
       create: {
         userId,
@@ -71,7 +73,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
         firstVisitAt: dateOrNull(firstVisitAt),
         salvationAt: dateOrNull(salvationAt),
         baptismAt: dateOrNull(baptismAt),
-        membershipStartedAt: dateOrNull(membershipStartedAt)
+        membershipStartedAt: dateOrNull(membershipStartedAt),
+        weddingAnniversaryAt: dateOrNull(weddingAnniversaryAt)
       }
     });
 

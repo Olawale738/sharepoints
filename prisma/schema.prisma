@@ -16,6 +16,13 @@ enum WorkspaceRole {
   VIEWER    @map("viewer")
 }
 
+enum WorkspaceAudienceMode {
+  MEMBER_FACING
+  WORKER_TEAM
+  LEADERSHIP
+  EXECUTIVE_BOARD
+}
+
 enum IntegrationType {
   WEBHOOK @map("webhook")
 }
@@ -208,6 +215,19 @@ enum ResourceBookingStatus {
   APPROVED
   REJECTED
   CANCELLED
+}
+
+enum GivingReceiptStatus {
+  ACTIVE
+  REVOKED
+  VOID
+}
+
+enum ServicePlanStatus {
+  DRAFT
+  READY
+  COMPLETED
+  ARCHIVED
 }
 
 enum OrganizationUnitType {
@@ -886,6 +906,8 @@ model Workspace {
   templateId          String?
   organizationUnitId  String?
   scopeType           OrganizationUnitType?
+  audienceMode        WorkspaceAudienceMode       @default(WORKER_TEAM)
+  memberDirectoryOpen Boolean                     @default(false)
   deletedAt           DateTime?
   deletedById         String?
   restoreUntil        DateTime?
@@ -896,6 +918,7 @@ model Workspace {
   @@index([deletedAt, restoreUntil])
   @@index([templateId])
   @@index([organizationUnitId, scopeType])
+  @@index([audienceMode])
 }
 
 model WorkspaceDepartmentAccess {
@@ -1030,6 +1053,7 @@ model MemberProfile {
   salvationAt               DateTime?
   baptismAt                 DateTime?
   membershipStartedAt       DateTime?
+  weddingAnniversaryAt      DateTime?
   organizationPosition      String?
   digitalIdLocation         String    @default("LETTW Worldwide")
   communicationPreference   String?
@@ -1456,14 +1480,14 @@ model DirectMessage {
 }
 
 model WhatsAppConversation {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String?
   workspaceId   String?
-  phone         String   @unique
+  phone         String    @unique
   displayName   String?
   lastMessageAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([userId, lastMessageAt])
   @@index([workspaceId, lastMessageAt])
@@ -1471,25 +1495,25 @@ model WhatsAppConversation {
 }
 
 model WhatsAppMessage {
-  id             String                    @id @default(cuid())
+  id             String                   @id @default(cuid())
   conversationId String
   userId         String?
   workspaceId    String?
   direction      WhatsAppMessageDirection
-  status         WhatsAppMessageStatus     @default(RECEIVED)
-  providerId     String?                   @unique
+  status         WhatsAppMessageStatus    @default(RECEIVED)
+  providerId     String?                  @unique
   fromPhone      String?
   toPhone        String?
   messageType    String
-  body           String?                   @db.Text
+  body           String?                  @db.Text
   mediaId        String?
   mediaMimeType  String?
   mediaSha256    String?
   rawPayload     Json?
   sentById       String?
   receivedAt     DateTime?
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
   @@index([conversationId, createdAt])
   @@index([userId, createdAt])
@@ -2091,6 +2115,83 @@ model ResourceBooking {
 
   @@index([resourceId, startsAt, endsAt])
   @@index([workspaceId, status])
+}
+
+model ServicePlan {
+  id                 String            @id @default(cuid())
+  eventId            String?
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  serviceType        ChurchEventType   @default(SERVICE)
+  status             ServicePlanStatus @default(DRAFT)
+  theme              String?
+  preacher           String?
+  coordinatorId      String?
+  startsAt           DateTime
+  endsAt             DateTime?
+  orderOfService     Json?
+  ministers          Json?
+  choirSongs         Json?
+  mediaTeam          Json?
+  prayerPoints       String?           @db.Text
+  attendanceTotal    Int?
+  newVisitors        Int?
+  salvationDecisions Int?
+  testimoniesCount   Int?
+  offeringSummary    String?           @db.Text
+  postServiceReport  String?           @db.Text
+  createdById        String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([workspaceId, status, startsAt])
+  @@index([organizationUnitId, status, startsAt])
+  @@index([eventId])
+  @@index([coordinatorId, status])
+}
+
+model GivingReceipt {
+  id            String              @id @default(cuid())
+  userId        String?
+  donorName     String
+  donorEmail    String?
+  donorPhone    String?
+  amountCents   Int
+  currency      String              @default("GBP")
+  fund          String
+  paymentMethod String?
+  receivedAt    DateTime
+  receiptNumber String              @unique
+  qrToken       String              @unique
+  status        GivingReceiptStatus @default(ACTIVE)
+  notes         String?             @db.Text
+  issuedById    String
+  revokedAt     DateTime?
+  revokedById   String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([userId, receivedAt])
+  @@index([status, receivedAt])
+  @@index([fund, receivedAt])
+  @@index([donorEmail])
+}
+
+model LeadershipCommandDraft {
+  id          String    @id @default(cuid())
+  userId      String
+  commandText String    @db.Text
+  intent      String
+  summary     String    @db.Text
+  payload     Json?
+  status      String    @default("DRAFT")
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ChurchProject {

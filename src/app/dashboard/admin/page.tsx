@@ -9,6 +9,7 @@ import {
   CalendarClock,
   ClipboardCheck,
   ContactRound,
+  Crown,
   Database,
   FileClock,
   Files,
@@ -324,6 +325,12 @@ export default async function AdminControlCenterPage() {
           label: "Global church network",
           detail: "Countries, regions, branches, churches, ministries, and leaders.",
           icon: Globe2
+        },
+        {
+          href: "/dashboard/leadership",
+          label: "Leadership suite",
+          detail: "Role-based home, branch directory, service planning, receipts, follow-ups, reports, and command map.",
+          icon: Crown
         },
         {
           href: "/dashboard/admin/branches",
