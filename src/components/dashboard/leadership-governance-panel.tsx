@@ -716,6 +716,10 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
         <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <form className="rounded-lg border border-ink/10 bg-white p-4" onSubmit={(event) => void createLetter(event)}>
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Mail className="h-4 w-4 text-moss" />Official letter generator</p>
+            <p className="mt-2 rounded-md bg-paper p-3 text-xs leading-5 text-ink/60">
+              Use this for appointment, transfer, ordination, recommendation, invitation, and membership confirmation letters. The PDF now adds LETW letterhead,
+              protected QR verification, official record details, scope, seal, signature block, and multi-page formatting automatically.
+            </p>
             <div className="mt-4 space-y-3">
               <FieldSelect name="letterType" label="Letter type" defaultValue="APPOINTMENT">
                 <option value="APPOINTMENT">Appointment letter</option>
@@ -733,7 +737,12 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
               <Input name="recipientName" placeholder="Recipient name" required />
               <Input name="recipientEmail" type="email" placeholder="Recipient email" />
               {optionLists}
-              <Textarea name="body" placeholder="Letter body" required />
+              <Textarea
+                className="min-h-40"
+                name="body"
+                placeholder="Recommended structure: purpose of the letter, authority/approval, effective date, role or assignment details, responsibilities, reporting line, expected conduct, support provided by LETW, and any next steps."
+                required
+              />
               <Input name="signatureName" placeholder="Signature name, default: Olawale N Sanni" />
               <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-paper px-3 py-2 text-sm text-ink">
                 <input name="issueNow" type="checkbox" defaultChecked />
