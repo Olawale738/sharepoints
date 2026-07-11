@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import {
   cardCsvRow,
@@ -431,7 +432,7 @@ export async function POST(request: Request) {
           issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
           certificateNumber: data.certificateNumber || `LETW-CERT-${randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`,
           verifyToken: randomUUID(),
-          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+          expiresAt: normalizeCertificateExpiry(data.expiresAt),
           createdById: actor.id
         }
       });

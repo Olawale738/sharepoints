@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Award, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 
@@ -32,11 +33,8 @@ export default async function CertificateVerificationPage(context: PageContext) 
         }
       })
     : null;
-  const valid =
-    Boolean(certificate) &&
-    certificate?.status === "ACTIVE" &&
-    !certificate.revokedAt &&
-    (!certificate.expiresAt || certificate.expiresAt > new Date());
+  const valid = Boolean(certificate && certificateIsLive(certificate));
+  const statusLabel = certificate ? certificatePublicStatus(certificate).toLowerCase() : "not found";
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10">
@@ -53,7 +51,7 @@ export default async function CertificateVerificationPage(context: PageContext) 
               </div>
             </div>
             <Badge className={valid ? "border-white/20 bg-white/10 text-white" : "bg-clay text-white"}>
-              {valid ? "verified active" : certificate ? "not active" : "not found"}
+              {valid ? "verified active" : statusLabel}
             </Badge>
           </div>
         </div>

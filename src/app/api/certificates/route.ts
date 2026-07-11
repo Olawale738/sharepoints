@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
         certificateNumber:
           data.certificateNumber || `LETW-CERT-${new Date().getFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
         verifyToken: randomUUID(),
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        expiresAt: normalizeCertificateExpiry(data.expiresAt),
         createdById: actor.id
       }
     });

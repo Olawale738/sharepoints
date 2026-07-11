@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { restoredCertificateData } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
@@ -24,12 +25,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       throw new ApiError(422, "Invalid certificate action.");
     }
 
+    const existing = await prisma.memberCertificationBadge.findUnique({ where: { id } });
+    if (!existing) throw new ApiError(404, "Certificate not found.");
+
     const certificate = await prisma.memberCertificationBadge.update({
       where: { id },
       data:
         parsed.data.action === "REVOKE"
           ? { status: "REVOKED", revokedAt: new Date() }
-          : { status: "ACTIVE", revokedAt: null }
+          : restoredCertificateData(existing)
     });
 
     await logActivity({

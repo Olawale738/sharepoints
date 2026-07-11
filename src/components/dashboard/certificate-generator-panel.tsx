@@ -7,6 +7,7 @@ import { Award, BadgeCheck, Download, ExternalLink, Loader2, PenLine, Printer, Q
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 
 type CertificateUser = {
   id: string;
@@ -285,7 +286,8 @@ export function CertificateGeneratorPanel({
             <p className="rounded-md bg-paper px-4 py-8 text-sm text-ink/55">No certificates found.</p>
           ) : null}
           {filteredCertificates.map((certificate) => {
-            const valid = certificate.status === "ACTIVE" && !certificate.revokedAt && (!certificate.expiresAt || new Date(certificate.expiresAt) > new Date());
+            const valid = certificateIsLive(certificate);
+            const publicStatus = certificatePublicStatus(certificate).toLowerCase();
             const verifyHref = `/verify/certificate/${certificate.verifyToken}`;
             const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
             const position = certificate.user.memberProfile?.organizationPosition ?? "LETW Member";
@@ -306,7 +308,7 @@ export function CertificateGeneratorPanel({
                       </div>
                     </div>
                     <Badge className={valid ? "certificate-status-active" : "certificate-status-inactive"}>
-                      {valid ? "verified active" : certificate.revokedAt ? "revoked" : "inactive"}
+                      {valid ? "verified active" : publicStatus}
                     </Badge>
                   </header>
 

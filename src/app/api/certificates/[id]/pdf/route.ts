@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
+import { certificateIsLive } from "@/lib/certificates";
 import { getObjectBuffer } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
@@ -215,7 +216,7 @@ export async function GET(request: Request, context: RouteContext) {
     const certificateNumber = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
     const position = certificateUser.memberProfile?.organizationPosition ?? "LETW Member";
     const memberNumber = certificateUser.memberProfile?.membershipNumber ?? "Member number pending";
-    const valid = certificate.status === "ACTIVE" && !certificate.revokedAt && (!certificate.expiresAt || certificate.expiresAt > new Date());
+    const valid = certificateIsLive(certificate);
 
     page.drawRectangle({ x: 0, y: 0, width, height, color: white });
     page.drawRectangle({ x: 22, y: 22, width: width - 44, height: height - 44, borderColor: navy, borderWidth: 7 });

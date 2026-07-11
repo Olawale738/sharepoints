@@ -1,4 +1,5 @@
 import { ApiError, handleRouteError, ok } from "@/lib/api";
+import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = { params: Promise<{ token: string }> };
@@ -16,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
         memberProfile: { select: { membershipNumber: true, organizationPosition: true } }
       }
     });
-    const valid = badge.status === "ACTIVE" && !badge.revokedAt && (!badge.expiresAt || badge.expiresAt > new Date());
+    const valid = certificateIsLive(badge);
     return ok({
       valid,
       organization: "Light Encounter Tabernacle Worldwide",
@@ -24,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
         title: badge.title,
         certificateNumber: badge.certificateNumber,
         issuer: badge.issuer,
-        status: valid ? "VALID" : badge.revokedAt ? "REVOKED" : badge.expiresAt && badge.expiresAt <= new Date() ? "EXPIRED" : badge.status,
+        status: certificatePublicStatus(badge),
         issuedAt: badge.issuedAt,
         expiresAt: badge.expiresAt
       },

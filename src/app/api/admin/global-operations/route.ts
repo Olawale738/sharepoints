@@ -7,6 +7,7 @@ import {
   GovernanceHoldStatus,
   MembershipCardStatus,
   OrganizationUnitType,
+  Prisma,
   SafeguardingCaseStatus,
   SafeguardingSeverity
 } from "@prisma/client";
@@ -18,6 +19,7 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { getOrganizationScopeUserIds } from "@/lib/organization-access";
 import { prisma } from "@/lib/prisma";
+import { refreshOfflinePayload } from "@/lib/qr-identity";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
 const sourceTypes = ["announcement", "task", "knowledge", "meeting", "chat", "policy", "file"] as const;
@@ -792,6 +794,13 @@ export async function PATCH(request: Request) {
             expiresAt: null,
             revokedAt: null,
             revokedById: null,
+            lostAt: null,
+            lostById: null,
+            lastStatusReason: null,
+            offlinePayload: Prisma.JsonNull,
+            offlinePayloadHash: null,
+            qrRotatedAt: new Date(),
+            qrRotationCount: { increment: 1 },
             credentialId: null,
             credentialJwt: null,
             credentialKeyId: null,
@@ -799,6 +808,7 @@ export async function PATCH(request: Request) {
             credentialIssuedAt: null
           }
         });
+        await refreshOfflinePayload(card.id);
         action = activityActions.membershipCardReissued;
       } else {
         if (card.status !== MembershipCardStatus.REVOKED) {

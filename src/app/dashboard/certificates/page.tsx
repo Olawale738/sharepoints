@@ -4,6 +4,7 @@ import { Award } from "lucide-react";
 import { auth } from "@/auth";
 import { CertificateGeneratorPanel } from "@/components/dashboard/certificate-generator-panel";
 import { Badge } from "@/components/ui/badge";
+import { certificateIsLive } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
@@ -78,7 +79,7 @@ export default async function CertificatesPage() {
     }
   }));
 
-  const activeCount = certificates.filter((certificate) => certificate.status === "ACTIVE" && !certificate.revokedAt).length;
+  const activeCount = certificates.filter((certificate) => certificateIsLive(certificate)).length;
 
   return (
     <div className="space-y-6">
