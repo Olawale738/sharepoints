@@ -72,6 +72,39 @@ function drawCenteredText(page: PDFPage, text: string, centerX: number, y: numbe
   });
 }
 
+function drawFittedText(input: {
+  page: PDFPage;
+  text: string;
+  x: number;
+  y: number;
+  maxWidth: number;
+  font: PDFFont;
+  preferredSize: number;
+  minimumSize: number;
+  color: ReturnType<typeof rgb>;
+}) {
+  const { page, text, x, y, maxWidth, font, preferredSize, minimumSize, color } = input;
+  const size = fittedFontSize(font, text, maxWidth, preferredSize, minimumSize);
+  let displayText = text;
+
+  if (font.widthOfTextAtSize(displayText, size) > maxWidth) {
+    let headLength = Math.ceil(text.length / 2);
+    let tailLength = Math.floor(text.length / 2);
+    displayText = `${text.slice(0, headLength)}...${text.slice(-tailLength)}`;
+
+    while (font.widthOfTextAtSize(displayText, size) > maxWidth && (headLength > 4 || tailLength > 4)) {
+      if (headLength >= tailLength) {
+        headLength = Math.max(4, headLength - 1);
+      } else {
+        tailLength = Math.max(4, tailLength - 1);
+      }
+      displayText = `${text.slice(0, headLength)}...${text.slice(-tailLength)}`;
+    }
+  }
+
+  page.drawText(displayText, { x, y, size, font, color });
+}
+
 function drawVerificationSealChip(input: {
   page: PDFPage;
   logo: PDFImage;
@@ -302,10 +335,32 @@ export async function GET(request: Request, context: RouteContext) {
       ["Expires", formatDate(certificate.expiresAt)]
     ];
     details.forEach(([label, value], index) => {
-      const x = 70 + index * 132;
-      page.drawRectangle({ x, y: detailY, width: 118, height: 48, color: lightBlue, borderColor: rgb(0.8, 0.87, 0.96), borderWidth: 0.6 });
-      page.drawText(label.toUpperCase(), { x: x + 8, y: detailY + 29, size: 7, font: sansBold, color: blue });
-      page.drawText(value.slice(0, 24), { x: x + 8, y: detailY + 12, size: 8.5, font: sansBold, color: navy });
+      const x = 70 + index * 130;
+      const cardWidth = 122;
+      const inset = 9;
+      page.drawRectangle({ x, y: detailY, width: cardWidth, height: 48, color: lightBlue, borderColor: rgb(0.8, 0.87, 0.96), borderWidth: 0.6 });
+      drawFittedText({
+        page,
+        text: label.toUpperCase(),
+        x: x + inset,
+        y: detailY + 29,
+        maxWidth: cardWidth - inset * 2,
+        font: sansBold,
+        preferredSize: 7,
+        minimumSize: 5.8,
+        color: blue
+      });
+      drawFittedText({
+        page,
+        text: value,
+        x: x + inset,
+        y: detailY + 12,
+        maxWidth: cardWidth - inset * 2,
+        font: sansBold,
+        preferredSize: 8.4,
+        minimumSize: 5.6,
+        color: navy
+      });
     });
 
     page.drawText("Olawale N Sanni", { x: 98, y: 80, size: 22, font: script, color: navy });
