@@ -22,6 +22,7 @@ const marginX = 54;
 const contentWidth = pageSize[0] - marginX * 2;
 const bodyTop = 650;
 const bodyBottom = 116;
+const signatureBlockTop = 256;
 
 function formatDate(value?: Date | null) {
   if (!value) return "Not issued";
@@ -98,6 +99,32 @@ function wrapByWidth(text: string, font: PDFFont, size: number, maxWidth: number
   return lines;
 }
 
+function wrapParagraphsByWidth(text: string, font: PDFFont, size: number, maxWidth: number) {
+  return text.split(/\n+/).map((paragraph) => wrapByWidth(paragraph, font, size, maxWidth));
+}
+
+function drawJustifiedLine(page: PDFPage, text: string, x: number, y: number, width: number, font: PDFFont, size: number, color: PdfColor) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) {
+    page.drawText(text, { x, y, size, font, color });
+    return;
+  }
+
+  const wordsWidth = words.reduce((total, word) => total + font.widthOfTextAtSize(word, size), 0);
+  const gap = (width - wordsWidth) / (words.length - 1);
+  const naturalGap = font.widthOfTextAtSize(" ", size);
+  if (gap <= naturalGap || gap > 11) {
+    page.drawText(text, { x, y, size, font, color });
+    return;
+  }
+
+  let currentX = x;
+  words.forEach((word) => {
+    page.drawText(word, { x: currentX, y, size, font, color });
+    currentX += font.widthOfTextAtSize(word, size) + gap;
+  });
+}
+
 function drawCenteredText(page: PDFPage, text: string, centerX: number, y: number, font: PDFFont, size: number, color: PdfColor) {
   page.drawText(text, {
     x: centerX - font.widthOfTextAtSize(text, size) / 2,
@@ -142,7 +169,7 @@ function drawFooter(input: {
   const { page, fonts, pageNumber, navy, gold, muted } = input;
   page.drawLine({ start: { x: marginX, y: 82 }, end: { x: pageSize[0] - marginX, y: 82 }, thickness: 0.7, color: gold });
   page.drawText("Light Encounter Tabernacle Worldwide | letw.org", { x: marginX, y: 62, size: 8.6, font: fonts.bold, color: navy });
-  page.drawText("Official LETW record. Confirm status from the protected verification QR before relying on this letter.", {
+  page.drawText("Official LETW record. Confirm current status from the verification QR before relying on this letter.", {
     x: marginX,
     y: 48,
     size: 7.3,
@@ -167,6 +194,53 @@ function drawSeal(input: {
   page.drawEllipse({ x, y, xScale: 27, yScale: 27, borderColor: navy, borderWidth: 0.9 });
   page.drawImage(logo, { x: x - 20, y: y - 20, width: 40, height: 40, opacity: 0.94 });
   drawCenteredText(page, "LETW SEAL", x, y - 43, fonts.bold, 6.4, navy);
+}
+
+function drawQrChip(input: {
+  page: PDFPage;
+  qr: PDFImage;
+  fonts: FontSet;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  letterNumber: string;
+  navy: PdfColor;
+  blue: PdfColor;
+  gold: PdfColor;
+  white: PdfColor;
+}) {
+  const { page, qr, fonts, x, y, width, height, letterNumber, navy, blue, gold, white } = input;
+  page.drawRectangle({ x, y, width, height, color: rgb(0.965, 0.984, 1), borderColor: gold, borderWidth: 1.15 });
+  page.drawRectangle({ x: x + 5, y: y + 5, width: width - 10, height: height - 10, borderColor: rgb(0.58, 0.73, 0.91), borderWidth: 0.6 });
+  page.drawRectangle({ x: x + 8, y: y + height - 25, width: width - 16, height: 17, color: rgb(0.9, 0.96, 1), borderColor: rgb(0.68, 0.8, 0.93), borderWidth: 0.45 });
+  drawCenteredText(page, "SECURE QR CHIP", x + width / 2, y + height - 20, fonts.bold, 6.6, blue);
+
+  for (let index = 0; index < 7; index += 1) {
+    page.drawLine({
+      start: { x: x + 12 + index * 19, y: y + 12 },
+      end: { x: x + 12 + index * 19, y: y + height - 32 },
+      thickness: 0.25,
+      color: rgb(0.54, 0.72, 0.91),
+      opacity: 0.28
+    });
+    page.drawLine({
+      start: { x: x + 10, y: y + 20 + index * 17 },
+      end: { x: x + width - 10, y: y + 20 + index * 17 },
+      thickness: 0.25,
+      color: rgb(0.54, 0.72, 0.91),
+      opacity: 0.24
+    });
+  }
+
+  const qrSize = Math.min(width - 30, height - 70);
+  const qrX = x + (width - qrSize) / 2;
+  const qrY = y + 42;
+  page.drawRectangle({ x: qrX - 7, y: qrY - 7, width: qrSize + 14, height: qrSize + 14, color: white, borderColor: gold, borderWidth: 0.9 });
+  page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+  drawCenteredText(page, "SCAN TO VERIFY", x + width / 2, y + 28, fonts.bold, 7.7, navy);
+  drawCenteredText(page, "LIVE LETTER STATUS", x + width / 2, y + 17, fonts.bold, 6.7, blue);
+  drawFittedText(page, letterNumber, x + 11, y + 7, width - 22, fonts.bold, 6.1, navy);
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -221,10 +295,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const white = rgb(1, 1, 1);
     const revoked = rgb(0.65, 0.28, 0.2);
     const origin = new URL(request.url).origin;
-    const qrDataUrl = await QRCode.toDataURL(`${origin}/api/leadership-governance/letters/${letter.id}/pdf`, {
-      width: 220,
-      margin: 1,
-      errorCorrectionLevel: "M",
+    const verifyUrl = `${origin}/verify/letter/${letter.id}`;
+    const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+      width: 520,
+      margin: 2,
+      errorCorrectionLevel: "H",
       color: { dark: "#0b1b3d", light: "#ffffff" }
     });
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
@@ -292,15 +367,26 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     page.drawText(`Dear ${letter.recipientName},`, { x: marginX, y, size: 10.8, font: fonts.bold, color: ink });
     y -= 27;
 
-    const bodyLines = wrapByWidth(letter.body, fonts.sans, 10.5, contentWidth);
-    for (const line of bodyLines) {
-      if (y < bodyBottom + 38) y = addPage();
-      if (!line) {
+    const bodyParagraphs = wrapParagraphsByWidth(letter.body, fonts.sans, 10.8, contentWidth);
+    for (const paragraph of bodyParagraphs) {
+      const visibleLines = paragraph.filter(Boolean);
+      if (!visibleLines.length) {
         y -= 9;
         continue;
       }
-      page.drawText(line, { x: marginX, y, size: 10.5, font: fonts.sans, color: ink });
-      y -= 16;
+
+      for (let index = 0; index < visibleLines.length; index += 1) {
+        if (y < bodyBottom + 38) y = addPage();
+        const line = visibleLines[index];
+        const isLastLine = index === visibleLines.length - 1;
+        if (isLastLine) {
+          page.drawText(line, { x: marginX, y, size: 10.8, font: fonts.sans, color: ink });
+        } else {
+          drawJustifiedLine(page, line, marginX, y, contentWidth, fonts.sans, 10.8, ink);
+        }
+        y -= 16.5;
+      }
+      y -= 7;
     }
 
     const closingLines = [
@@ -314,19 +400,29 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       y -= 14;
     }
 
-    if (y < 232) y = addPage();
-    page.drawText("Yours in kingdom service,", { x: marginX, y: y - 10, size: 10, font: fonts.sans, color: ink });
-    page.drawText(letter.signatureName, { x: marginX, y: y - 52, size: 22, font: fonts.script, color: navy });
-    page.drawLine({ start: { x: marginX, y: y - 58 }, end: { x: marginX + 198, y: y - 58 }, thickness: 0.8, color: navy });
-    page.drawText("Authorized Signature", { x: marginX + 18, y: y - 74, size: 8, font: fonts.bold, color: muted });
-    page.drawText("For: Light Encounter Tabernacle Worldwide", { x: marginX, y: y - 90, size: 8.5, font: fonts.bold, color: navy });
+    if (y < signatureBlockTop + 20) y = addPage();
+    const footY = 216;
+    page.drawText("Yours in kingdom service,", { x: marginX, y: footY, size: 10.5, font: fonts.sans, color: ink });
+    page.drawText(letter.signatureName, { x: marginX, y: footY - 43, size: 23, font: fonts.script, color: navy });
+    page.drawLine({ start: { x: marginX, y: footY - 50 }, end: { x: marginX + 205, y: footY - 50 }, thickness: 0.8, color: navy });
+    page.drawText("Authorized Signature", { x: marginX + 18, y: footY - 67, size: 8.3, font: fonts.bold, color: muted });
+    page.drawText("For: Light Encounter Tabernacle Worldwide", { x: marginX, y: footY - 84, size: 8.8, font: fonts.bold, color: navy });
 
-    drawSeal({ page, logo, fonts, x: 338, y: y - 52, navy, gold, white });
-    page.drawRectangle({ x: 405, y: y - 94, width: 136, height: 110, color: light, borderColor: gold, borderWidth: 0.8 });
-    page.drawImage(qr, { x: 438, y: y - 46, width: 70, height: 70 });
-    page.drawText("PROTECTED", { x: 435, y: y - 61, size: 7, font: fonts.bold, color: navy });
-    page.drawText("VERIFICATION", { x: 428, y: y - 73, size: 7, font: fonts.bold, color: navy });
-    drawFittedText(page, letter.letterNumber, 418, y - 86, 110, fonts.bold, 6.6, blue);
+    drawSeal({ page, logo, fonts, x: 300, y: 151, navy, gold, white });
+    drawQrChip({
+      page,
+      qr,
+      fonts,
+      x: 371,
+      y: 96,
+      width: 170,
+      height: 180,
+      letterNumber: letter.letterNumber,
+      navy,
+      blue,
+      gold,
+      white
+    });
 
     if (letter.status === "REVOKED") {
       page.drawRectangle({ x: 92, y: 366, width: 412, height: 82, color: white, opacity: 0.82 });

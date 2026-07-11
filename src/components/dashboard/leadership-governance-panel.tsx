@@ -167,6 +167,13 @@ function jsonLines(value: unknown) {
   return String(value);
 }
 
+function officialLetterActionLabel(status: string) {
+  if (status === "ISSUED") return "issue / re-sign";
+  if (status === "REVOKED") return "revoke";
+  if (status === "ARCHIVED") return "archive";
+  return status.toLowerCase();
+}
+
 async function jsonRequest<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
@@ -770,9 +777,13 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
                     <Download className="h-3.5 w-3.5" />
                     PDF
                   </Link>
+                  <Link className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium text-ink hover:bg-mint/40" href={`/verify/letter/${letter.id}`}>
+                    <Eye className="h-3.5 w-3.5" />
+                    Verify
+                  </Link>
                   {["ISSUED", "REVOKED", "ARCHIVED"].map((status) => (
                     <Button className="h-8 px-3 text-xs" key={status} variant={status === "REVOKED" ? "danger" : "secondary"} onClick={() => void patchEntity("OFFICIAL_LETTER", letter.id, status, `Letter marked ${status.toLowerCase()}.`)}>
-                      {status.toLowerCase()}
+                      {officialLetterActionLabel(status)}
                     </Button>
                   ))}
                 </div>
