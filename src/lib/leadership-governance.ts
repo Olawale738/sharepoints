@@ -466,15 +466,19 @@ export async function generateMonthlyReport(actorId: string, input: {
   const completedFollowUps = followUps
     .filter((row) => row.status === FollowUpStatus.COMPLETED || row.status === FollowUpStatus.CLOSED)
     .reduce((sum, row) => sum + row._count.id, 0);
+  const totalFollowUps = followUps.reduce((sum, row) => sum + row._count.id, 0);
+  const followUpCompletionRate = totalFollowUps ? Math.round((completedFollowUps / totalFollowUps) * 100) : 0;
   const totalAttendance = attendance + smartAttendance;
   const activeProjects = projects.filter((project) => !["COMPLETED", "CANCELLED"].includes(project.status));
+  const overdueProjects = activeProjects.filter((project) => project.dueAt && project.dueAt < end).length;
   const risks = [
     totalAttendance === 0 ? "No attendance was recorded this month." : null,
     completedFollowUps === 0 ? "No completed follow-ups were recorded this month." : null,
-    activeProjects.filter((project) => project.dueAt && project.dueAt < end).length ? "Some projects are overdue or need review." : null,
+    overdueProjects ? "Some projects are overdue or need review." : null,
     decisions === 0 ? "No leadership decisions were logged for this scope." : null
-  ].filter(Boolean);
+  ].filter((risk): risk is string => Boolean(risk));
   const label = unit ? `${unit.type.toLowerCase()} ${unit.name}` : workspace ? workspace.name : "LETW organization";
+  const periodLabel = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(start);
   const metrics = {
     events: events.length,
     services: events.filter((event) => event.eventType === ChurchEventType.SERVICE).length,
@@ -485,15 +489,37 @@ export async function generateMonthlyReport(actorId: string, input: {
     givingAmountCents: giving._sum.amountCents ?? 0,
     projects: projects.length,
     activeProjects: activeProjects.length,
+    overdueProjects,
+    followUpsTotal: totalFollowUps,
     followUpsCompleted: completedFollowUps,
+    followUpCompletionRate,
     documentsAdded: files,
     decisions
   };
+  const recommendations = [
+    totalAttendance === 0 ? "Confirm that attendance scanners or manual attendance records are being used consistently." : null,
+    completedFollowUps === 0 ? "Assign follow-up owners and review new-convert/visitor care every week until closure improves." : null,
+    overdueProjects ? "Hold a project review meeting for overdue work, assign owners, and record revised deadlines." : null,
+    decisions === 0 ? "Record major leadership decisions in LETW so accountability and history remain searchable." : null,
+    risks.length === 0 ? "Maintain the current operating rhythm and capture testimonies, blockers, and next-month goals." : null
+  ].filter((recommendation): recommendation is string => Boolean(recommendation));
+  const operatingHighlights = [
+    `${events.length} event(s) and ${events.filter((event) => event.eventType === ChurchEventType.SERVICE).length} service(s) were captured.`,
+    `${totalAttendance} attendance/check-in record(s) were recorded across available sources.`,
+    `${visitors} new-convert signal(s), ${baptisms} baptism record(s), and ${completedFollowUps} completed follow-up(s) were found.`,
+    `${files} document(s) and ${decisions} leadership decision(s) were added in this reporting scope.`
+  ];
+  const riskRegister = risks.map((risk, index) => ({
+    id: index + 1,
+    risk,
+    severity: risk.includes("No") ? "High" : "Medium",
+    action: "Assign an owner, agree a due date, and review in the next leadership meeting."
+  }));
   const summary = [
-    `Monthly report for ${label}, ${input.year}-${String(input.month).padStart(2, "0")}.`,
+    `Executive monthly report for ${label}, ${periodLabel}.`,
     `Recorded ${events.length} event(s), ${totalAttendance} attendance/check-in record(s), ${visitors} new-convert signal(s), and ${baptisms} baptism record(s).`,
     `Giving receipts totalled ${(giving._sum.amountCents ?? 0) / 100} from ${giving._count.id} active receipt(s).`,
-    risks.length ? `Risks: ${risks.join(" ")}` : "No critical report risk was detected from the available data."
+    risks.length ? `Management attention required: ${risks.join(" ")}` : "No critical report risk was detected from the available data."
   ].join("\n");
   const report = await prisma.monthlyMinistryReport.create({
     data: {
@@ -509,7 +535,24 @@ export async function generateMonthlyReport(actorId: string, input: {
         workspaceIds: scope.workspaceIds,
         unitIds: scope.unitIds,
         memberCount: scope.memberIds.length,
-        workspaceNames: scope.workspaceNames
+        workspaceNames: scope.workspaceNames,
+        executive: {
+          scopeLabel: label,
+          periodLabel,
+          preparedFor: "LETW executive leadership",
+          reportStandard: "LETW Executive Ministry Performance Report",
+          conclusion: risks.length
+            ? "This period requires leadership review because one or more operating controls need attention."
+            : "This period is stable based on available LETW records."
+        },
+        operatingHighlights,
+        recommendations,
+        riskRegister,
+        assurance: [
+          "Generated from authorized LETW SharePoint records.",
+          "Scope includes permitted branch, ministry, workspace, attendance, giving, follow-up, file, and decision records.",
+          "Figures reflect records available in the system at generation time."
+        ]
       }),
       generatedById: actorId
     }
@@ -773,6 +816,35 @@ export async function updateOfficialLetter(actorId: string, id: string, status: 
   });
   await logActivity({ userId: actorId, action: activityActions.officialLetterUpdated, targetId: id, metadata: { status } });
   return letter;
+}
+
+export async function deleteOfficialLetter(actorId: string, id: string) {
+  const existing = await prisma.officialLetter.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      letterNumber: true,
+      workspaceId: true,
+      organizationUnitId: true,
+      issuedById: true,
+      recipientUserId: true,
+      status: true
+    }
+  });
+  if (!existing) throw new ApiError(404, "Official letter not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, {
+    ...existing,
+    participantIds: [existing.recipientUserId]
+  });
+  await prisma.officialLetter.delete({ where: { id } });
+  await logActivity({
+    userId: actorId,
+    workspaceId: existing.workspaceId ?? undefined,
+    action: activityActions.officialLetterDeleted,
+    targetId: id,
+    metadata: { letterNumber: existing.letterNumber, status: existing.status }
+  });
+  return existing;
 }
 
 export function canOpenGovernanceFromShell(workspaces: Array<{ role: string }>) {

@@ -13,7 +13,8 @@ import {
   Loader2,
   LockKeyhole,
   Mail,
-  ShieldCheck
+  ShieldCheck,
+  Trash2
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,7 @@ type MonthlyReport = {
   summary: string;
   metrics: Record<string, unknown>;
   risks: unknown;
+  sourceSnapshot: unknown;
   createdAt: string;
 };
 
@@ -174,6 +176,45 @@ function officialLetterActionLabel(status: string) {
   return status.toLowerCase();
 }
 
+function itemsFromUnknown(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item)).filter(Boolean);
+  if (typeof value === "string") return value ? [value] : [];
+  return [];
+}
+
+function recordFromUnknown(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function metricLabel(value: string) {
+  return value
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function metricValue(key: string, value: unknown) {
+  if (key.toLowerCase().includes("amountcents") && typeof value === "number") {
+    return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(value / 100);
+  }
+  if (key.toLowerCase().includes("rate") && typeof value === "number") return `${value}%`;
+  if (typeof value === "number") return new Intl.NumberFormat("en-GB").format(value);
+  return String(value ?? "0");
+}
+
+function reportPrimaryMetrics(metrics: Record<string, unknown>) {
+  const preferred = ["attendance", "soulsWon", "baptisms", "followUpsCompleted", "followUpCompletionRate", "givingReceipts", "activeProjects", "overdueProjects", "decisions"];
+  return preferred
+    .filter((key) => Object.prototype.hasOwnProperty.call(metrics, key))
+    .map((key) => [key, metrics[key]] as const)
+    .slice(0, 9);
+}
+
+function handoverItemCount(handover: Handover) {
+  return ["duties", "documents", "passwordAssets", "pendingTasks", "branchRecords"].reduce((total, key) => total + itemsFromUnknown(handover[key as keyof Handover]).length, 0);
+}
+
 async function jsonRequest<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
@@ -273,6 +314,26 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
       setMessage(success);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Update failed.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  async function deleteEntity(entity: string, id: string, success: string) {
+    const confirmed = window.confirm("This permanently deletes the selected record. Continue?");
+    if (!confirmed) return;
+    setLoading(`${entity}-${id}-DELETE`);
+    setError("");
+    setMessage("");
+    try {
+      await jsonRequest("/api/leadership-governance", {
+        method: "DELETE",
+        body: JSON.stringify({ entity, id })
+      });
+      await refresh();
+      setMessage(success);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Delete failed.");
     } finally {
       setLoading("");
     }
@@ -513,8 +574,11 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
       {activeTab === "Reports" ? (
         <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <form className="rounded-lg border border-ink/10 bg-white p-4" onSubmit={(event) => void createMonthlyReport(event)}>
-            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><BarChart3 className="h-4 w-4 text-moss" />Monthly auto report pack</p>
-            <p className="mt-2 text-xs leading-5 text-ink/55">Reports include attendance, souls won/new converts, baptisms, giving, projects, follow-ups, events, documents, decisions, and risks.</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><BarChart3 className="h-4 w-4 text-moss" />Executive monthly report pack</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">
+              Creates a modern leadership report with executive summary, KPI dashboard, operating highlights, risk register,
+              recommendations, source assurance, and sign-off area.
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Input name="month" type="number" min={1} max={12} defaultValue={currentMonth} required />
               <Input name="year" type="number" min={2000} max={2100} defaultValue={currentYear} required />
@@ -539,37 +603,60 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
             </div>
           </form>
           <div className="space-y-3">
-            {data.reports.map((report) => (
-              <div className="rounded-lg border border-ink/10 bg-white p-4" key={report.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-ink">{report.title}</p>
-                    <p className="mt-1 text-xs text-ink/50">{report.year}-{String(report.month).padStart(2, "0")} - created {formatDate(report.createdAt)}</p>
+            {data.reports.map((report) => {
+              const snapshot = recordFromUnknown(report.sourceSnapshot);
+              const executive = recordFromUnknown(snapshot.executive);
+              const risks = itemsFromUnknown(report.risks);
+              const metrics = reportPrimaryMetrics(report.metrics ?? {});
+              return (
+                <div className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft" key={report.id}>
+                  <div className="border-b border-ink/10 bg-[#0b1b3d] px-4 py-4 text-white">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#d4af37]">Executive ministry performance report</p>
+                        <p className="mt-1 text-lg font-semibold">{report.title}</p>
+                        <p className="mt-1 text-xs text-white/70">
+                          {String(executive.periodLabel ?? `${report.year}-${String(report.month).padStart(2, "0")}`)} - {String(executive.scopeLabel ?? "LETW scope")}
+                        </p>
+                      </div>
+                      <Badge className="border-white/20 bg-white/10 text-white">{report.status.toLowerCase()}</Badge>
+                    </div>
                   </div>
-                  <Badge>{report.status.toLowerCase()}</Badge>
+                  <div className="p-4">
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-ink/68">{report.summary}</p>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                      {metrics.map(([key, value]) => (
+                        <p className="rounded-md border border-ink/10 bg-paper px-3 py-2 text-xs text-ink/60" key={key}>
+                          <span className="block text-base font-semibold text-ink">{metricValue(key, value)}</span>
+                          {metricLabel(key)}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      <div className="rounded-md border border-ink/10 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-moss">Management conclusion</p>
+                        <p className="mt-1 text-sm leading-5 text-ink/60">{String(executive.conclusion ?? "Review the PDF for full operating highlights, risk register, and source assurance.")}</p>
+                      </div>
+                      <div className="rounded-md border border-ink/10 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-clay">Risk register</p>
+                        <p className="mt-1 text-sm leading-5 text-ink/60">{risks.length ? risks.slice(0, 2).join(" ") : "No critical risk detected in available records."}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium text-ink hover:bg-mint/40" href={`/api/leadership-governance/reports/${report.id}/pdf`}>
+                        <Download className="h-3.5 w-3.5" />
+                        Executive PDF
+                      </Link>
+                      {["FINAL", "ARCHIVED"].map((status) => (
+                        <Button className="h-8 px-3 text-xs" key={status} variant="secondary" onClick={() => void patchEntity("MONTHLY_REPORT", report.id, status, `Report marked ${status.toLowerCase()}.`)}>
+                          {status.toLowerCase()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/65">{report.summary}</p>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  {Object.entries(report.metrics ?? {}).slice(0, 9).map(([key, value]) => (
-                    <p className="rounded-md bg-paper px-3 py-2 text-xs text-ink/60" key={key}>
-                      <span className="block font-semibold text-ink">{String(value)}</span>
-                      {key.replace(/([A-Z])/g, " $1").toLowerCase()}
-                    </p>
-                  ))}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium text-ink hover:bg-mint/40" href={`/api/leadership-governance/reports/${report.id}/pdf`}>
-                    <Download className="h-3.5 w-3.5" />
-                    PDF
-                  </Link>
-                  {["FINAL", "ARCHIVED"].map((status) => (
-                    <Button className="h-8 px-3 text-xs" key={status} variant="secondary" onClick={() => void patchEntity("MONTHLY_REPORT", report.id, status, `Report marked ${status.toLowerCase()}.`)}>
-                      {status.toLowerCase()}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {data.reports.length === 0 ? <p className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No monthly reports generated yet.</p> : null}
           </div>
         </section>
@@ -665,7 +752,10 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
         <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <form className="rounded-lg border border-ink/10 bg-white p-4" onSubmit={(event) => void createHandover(event)}>
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><KeyRound className="h-4 w-4 text-moss" />Leadership handover system</p>
-            <p className="mt-2 text-xs leading-5 text-ink/55">Track duties, documents, password asset references, tasks, branch records, and formal acceptance when a leader is transferred or replaced.</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">
+              Creates a formal transition dossier with outgoing/incoming leaders, scope, duties, documents, secure asset references,
+              pending matters, branch records, acceptance stages, and printable sign-off PDF.
+            </p>
             <div className="mt-4 space-y-3">
               <FieldSelect name="fromLeaderId" label="Outgoing leader">
                 {userOptions}
@@ -677,11 +767,11 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
               <Input name="title" placeholder="Handover title" required />
               <Textarea name="reason" placeholder="Reason for transfer/replacement" />
               {optionLists}
-              <Textarea name="duties" placeholder="Duties, one per line" />
-              <Textarea name="documents" placeholder="Documents and folders to hand over" />
-              <Textarea name="passwordAssets" placeholder="Password vault references only, not raw passwords" />
-              <Textarea name="pendingTasks" placeholder="Pending matters/tasks" />
-              <Textarea name="branchRecords" placeholder="Branch records, projects, issues, contacts" />
+              <Textarea name="duties" placeholder="Duties, one per line: worship oversight, pastoral care, reporting, budgets, approvals..." />
+              <Textarea name="documents" placeholder="Documents/folders: minutes, reports, policy files, finance packs, contact lists..." />
+              <Textarea name="passwordAssets" placeholder="Secure vault references only, not raw passwords" />
+              <Textarea name="pendingTasks" placeholder="Pending matters: open approvals, unresolved issues, deadlines, risks..." />
+              <Textarea name="branchRecords" placeholder="Branch/ministry records: projects, contacts, assets, emergencies, pastoral context..." />
               <Button type="submit" disabled={Boolean(loading)}>
                 {loading === "HANDOVER" ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
                 Create handover
@@ -689,31 +779,50 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
             </div>
           </form>
           <div className="space-y-3">
-            {data.handovers.map((handover) => (
-              <div className="rounded-lg border border-ink/10 bg-white p-4" key={handover.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-ink">{handover.title}</p>
-                    <p className="mt-1 text-xs text-ink/50">{userName.get(handover.fromLeaderId)} to {handover.toLeaderId ? userName.get(handover.toLeaderId) : "unassigned"} - {formatDate(handover.createdAt)}</p>
+            {data.handovers.map((handover) => {
+              const totalItems = handoverItemCount(handover);
+              return (
+                <div className="overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft" key={handover.id}>
+                  <div className="border-b border-ink/10 bg-paper p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-moss">Formal transition dossier</p>
+                        <p className="mt-1 text-lg font-semibold text-ink">{handover.title}</p>
+                        <p className="mt-1 text-xs text-ink/50">
+                          {userName.get(handover.fromLeaderId)} to {handover.toLeaderId ? userName.get(handover.toLeaderId) : "unassigned"} - created {formatDate(handover.createdAt)}
+                        </p>
+                      </div>
+                      <Badge>{handover.status.toLowerCase().replaceAll("_", " ")}</Badge>
+                    </div>
                   </div>
-                  <Badge>{handover.status.toLowerCase().replaceAll("_", " ")}</Badge>
+                  <div className="p-4">
+                    {handover.reason ? <p className="rounded-md border border-ink/10 bg-white p-3 text-sm leading-6 text-ink/65">{handover.reason}</p> : null}
+                    <div className="mt-3 grid gap-2 md:grid-cols-3">
+                      <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="block text-base font-semibold text-ink">{totalItems}</span>handover items captured</p>
+                      <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="block text-base font-semibold text-ink">{itemsFromUnknown(handover.pendingTasks).length}</span>pending matters</p>
+                      <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="block text-base font-semibold text-ink">{itemsFromUnknown(handover.passwordAssets).length}</span>secure asset refs</p>
+                    </div>
+                    <div className="mt-3 grid gap-2 md:grid-cols-2">
+                      <p className="rounded-md border border-ink/10 bg-white p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Duties:</span> {jsonLines(handover.duties)}</p>
+                      <p className="rounded-md border border-ink/10 bg-white p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Documents:</span> {jsonLines(handover.documents)}</p>
+                      <p className="rounded-md border border-ink/10 bg-white p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Pending:</span> {jsonLines(handover.pendingTasks)}</p>
+                      <p className="rounded-md border border-ink/10 bg-white p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Branch records:</span> {jsonLines(handover.branchRecords)}</p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link className="inline-flex h-8 items-center justify-center gap-2 rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium text-ink hover:bg-mint/40" href={`/api/leadership-governance/handovers/${handover.id}/pdf`}>
+                        <Download className="h-3.5 w-3.5" />
+                        Handover PDF
+                      </Link>
+                      {["PENDING_ACCEPTANCE", "ACCEPTED", "COMPLETED", "CANCELLED"].map((status) => (
+                        <Button className="h-8 px-3 text-xs" key={status} variant={status === "CANCELLED" ? "danger" : "secondary"} onClick={() => void patchEntity("HANDOVER", handover.id, status, `Handover marked ${status.toLowerCase().replaceAll("_", " ")}.`)}>
+                          {status.toLowerCase().replaceAll("_", " ")}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                {handover.reason ? <p className="mt-3 text-sm text-ink/60">{handover.reason}</p> : null}
-                <div className="mt-3 grid gap-2 md:grid-cols-2">
-                  <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Duties:</span> {jsonLines(handover.duties)}</p>
-                  <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Documents:</span> {jsonLines(handover.documents)}</p>
-                  <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Password assets:</span> {jsonLines(handover.passwordAssets)}</p>
-                  <p className="rounded-md bg-paper p-3 text-xs text-ink/55"><span className="font-semibold text-ink">Pending tasks:</span> {jsonLines(handover.pendingTasks)}</p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {["PENDING_ACCEPTANCE", "ACCEPTED", "COMPLETED", "CANCELLED"].map((status) => (
-                    <Button className="h-8 px-3 text-xs" key={status} variant={status === "CANCELLED" ? "danger" : "secondary"} onClick={() => void patchEntity("HANDOVER", handover.id, status, `Handover marked ${status.toLowerCase().replaceAll("_", " ")}.`)}>
-                      {status.toLowerCase().replaceAll("_", " ")}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {data.handovers.length === 0 ? <p className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No leadership handovers created yet.</p> : null}
           </div>
         </section>
@@ -786,6 +895,10 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
                       {officialLetterActionLabel(status)}
                     </Button>
                   ))}
+                  <Button className="h-8 px-3 text-xs" variant="danger" onClick={() => void deleteEntity("OFFICIAL_LETTER", letter.id, "Official letter deleted.")}>
+                    {loading === `OFFICIAL_LETTER-${letter.id}-DELETE` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    delete
+                  </Button>
                 </div>
               </div>
             ))}

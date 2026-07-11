@@ -200,5 +200,6 @@ export const activityActions = {
   leadershipHandoverCreated: "leadership.handover_created",
   leadershipHandoverUpdated: "leadership.handover_updated",
   officialLetterCreated: "letter.created",
-  officialLetterUpdated: "letter.updated"
+  officialLetterUpdated: "letter.updated",
+  officialLetterDeleted: "letter.deleted"
 } as const;
