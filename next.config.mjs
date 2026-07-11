@@ -14,13 +14,6 @@ const nextConfig = {
   },
   experimental: {
     cpus: 2
-  },
-  webpack(config, { isServer }) {
-    if (isServer && config.optimization) {
-      config.optimization.splitChunks = false;
-    }
-
-    return config;
   }
 };
 

@@ -1,6 +1,9 @@
 {
   "installCommand": "npm ci --no-audit --no-fund",
   "buildCommand": "npm run build:vercel",
+  "env": {
+    "VERCEL_BUILD_SYSTEM_REPORT": "1"
+  },
   "crons": [
     {
       "path": "/api/cron/notifications",
