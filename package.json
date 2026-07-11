@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "node --max-old-space-size=8192 ./node_modules/next/dist/bin/next build",
+    "build:vercel": "node --max-old-space-size=8192 ./node_modules/next/dist/bin/next build --experimental-build-mode compile",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
