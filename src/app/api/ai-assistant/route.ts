@@ -7,6 +7,7 @@ import {
   describeAiAccess,
   type AiSource
 } from "@/lib/ai-assistant";
+import { generateAiText, isAiTextConfigured } from "@/lib/ai-provider";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { getOrganizationAncestorIds, getOrganizationUnitAccess } from "@/lib/organization-access";
 import { prisma } from "@/lib/prisma";
@@ -29,21 +30,6 @@ function sourceContext(sources: AiSource[]) {
         `${source.excerpt}`
     )
     .join("\n\n");
-}
-
-function extractOutput(body: {
-  output_text?: string;
-  output?: Array<{ content?: Array<{ text?: string }> }>;
-}) {
-  return (
-    body.output_text ??
-    body.output
-      ?.flatMap((item) => item.content ?? [])
-      .map((item) => item.text ?? "")
-      .join("")
-      .trim() ??
-    ""
-  );
 }
 
 async function canUseOrganizationAgent(userId: string, organizationUnitId: string) {
@@ -106,7 +92,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid assistant request.");
     }
-    if (!process.env.OPENAI_API_KEY) {
+    if (!isAiTextConfigured()) {
       throw new ApiError(503, "The LETW AI Assistant is not configured yet.");
     }
 
@@ -190,7 +176,8 @@ export async function POST(request: Request) {
       return ok({ threadId: thread.id, answer, sources: [] });
     }
 
-    const model = process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-5-mini";
+    const openAiModel = process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-5-mini";
+    const anthropicModel = process.env.ANTHROPIC_ASSISTANT_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest";
     const instructions = [
       "You are the private LETW permission-aware organizational assistant.",
       "Use only the authorized source excerpts supplied below. Never infer hidden filenames, workspaces, people, or metadata.",
@@ -217,25 +204,23 @@ export async function POST(request: Request) {
         question,
         workspaceIds: retrieval.workspaceIds,
         sources: sourceAudit,
-        model,
+        model: process.env.AI_PROVIDER ?? "auto",
         status: "PROCESSING"
       }
     });
-    let response: Response;
+    let answer = "";
+    let providerModel = "";
 
     try {
-      response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model,
-          instructions,
-          input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(authorizedSources)}`
-        })
+      const generated = await generateAiText({
+        instructions,
+        input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(authorizedSources)}`,
+        openAiModel,
+        anthropicModel,
+        maxTokens: 2200
       });
+      answer = generated.text;
+      providerModel = `${generated.provider}:${generated.model}`;
     } catch (serviceError) {
       await prisma.aiAssistantAudit.update({
         where: { id: audit.id },
@@ -246,26 +231,6 @@ export async function POST(request: Request) {
       });
       throw new ApiError(502, "The LETW AI Assistant could not connect to the AI service.");
     }
-    const body = (await response.json().catch(() => null)) as
-      | {
-          output_text?: string;
-          output?: Array<{ content?: Array<{ text?: string }> }>;
-          error?: { message?: string };
-        }
-      | null;
-
-    if (!response.ok || !body) {
-      await prisma.aiAssistantAudit.update({
-        where: { id: audit.id },
-        data: {
-          status: "FAILED",
-          errorMessage: body?.error?.message ?? "AI service failed."
-        }
-      });
-      throw new ApiError(502, body?.error?.message ?? "The LETW AI Assistant could not answer right now.");
-    }
-
-    const answer = extractOutput(body);
     if (!answer) {
       await prisma.aiAssistantAudit.update({
         where: { id: audit.id },
@@ -286,7 +251,7 @@ export async function POST(request: Request) {
       }),
       prisma.aiAssistantAudit.update({
         where: { id: audit.id },
-        data: { status: "COMPLETED" }
+        data: { status: "COMPLETED", model: providerModel }
       }),
       prisma.aiAssistantThread.update({
         where: { id: thread.id },

@@ -40,7 +40,7 @@ export default async function PublicSiteIntegrationPage() {
       take: 8
     }),
     prisma.sermonResource.findMany({
-      where: { visibility: "PUBLIC" },
+      where: { visibility: "PUBLIC", approvalStatus: "APPROVED" },
       orderBy: { createdAt: "desc" },
       take: 8
     }),
@@ -108,7 +108,7 @@ export default async function PublicSiteIntegrationPage() {
           {[
             "Announcements must be approved and pinned.",
             "Events must still be upcoming.",
-            "Sermons must be marked PUBLIC.",
+            "Sermons must be approved and marked PUBLIC.",
             "Branches and ministries must be active.",
             "Forms must be OPEN."
           ].map((rule) => (

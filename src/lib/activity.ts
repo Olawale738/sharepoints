@@ -211,5 +211,12 @@ export const activityActions = {
   digitalSignatureRevoked: "signature.revoked",
   confidentialEvidenceCreated: "evidence.created",
   confidentialEvidenceUpdated: "evidence.updated",
-  confidentialEvidenceOpened: "evidence.opened"
+  confidentialEvidenceOpened: "evidence.opened",
+  presidentialActionCreated: "presidential.action_created",
+  presidentialActionUpdated: "presidential.action_updated",
+  presidentialActionDeleted: "presidential.action_deleted",
+  mediaArchiveUploaded: "media.archive_uploaded",
+  mediaArchiveUpdated: "media.archive_updated",
+  mediaArchiveDeleted: "media.archive_deleted",
+  executiveSecretaryAsked: "executive.secretary_asked"
 } as const;

@@ -3,15 +3,18 @@
 import { FormEvent, useMemo, useState, type ReactNode } from "react";
 import {
   Archive,
+  Bot,
   CheckCircle2,
   ClipboardCheck,
   FileSignature,
+  FileVideo,
   Gavel,
   Loader2,
   MessageCircle,
   RadioTower,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
   UserCheck,
   XCircle,
   type LucideIcon
@@ -73,6 +76,48 @@ type Evidence = {
   updatedAt: string;
 };
 
+type PresidentialAction = {
+  id: string;
+  workspaceId: string | null;
+  organizationUnitId: string | null;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  status: string;
+  sourceType: string | null;
+  sourceId: string | null;
+  assignedToId: string | null;
+  dueAt: string | null;
+  decisionNote: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type MediaArchiveItem = {
+  id: string;
+  workspaceId: string | null;
+  organizationUnitId: string | null;
+  title: string;
+  speaker: string;
+  scripture: string | null;
+  language: string;
+  mediaType: string;
+  mediaUrl: string | null;
+  mediaFileName: string | null;
+  mediaFileType: string | null;
+  mediaSize: number | null;
+  notes: string | null;
+  visibility: string;
+  approvalStatus: string;
+  isFeatured: boolean;
+  retentionLabel: string | null;
+  transcriptSummary: string | null;
+  createdById: string;
+  createdAt: string;
+};
+
 type BriefingItem = {
   id: string;
   title: string;
@@ -91,6 +136,9 @@ type ExecutiveData = {
     canManageDigitalSignatures: boolean;
     canManageEvidenceVault: boolean;
     canViewExecutiveBriefing: boolean;
+    canManagePresidentialActions: boolean;
+    canManageMediaArchive: boolean;
+    canUseExecutiveSecretary: boolean;
   };
   workspaces: WorkspaceOption[];
   units: UnitOption[];
@@ -108,9 +156,11 @@ type ExecutiveData = {
   commands: Command[];
   signatures: Signature[];
   evidence: Evidence[];
+  presidentialActions: PresidentialAction[];
+  mediaArchive: MediaArchiveItem[];
 };
 
-const tabs = ["Briefing", "WhatsApp bot", "Signatures", "Evidence vault"] as const;
+const tabs = ["Briefing", "Action desk", "Media archive", "Secretary", "WhatsApp bot", "Signatures", "Evidence vault"] as const;
 
 function emptyToNull(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
@@ -203,6 +253,8 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
   const [loading, setLoading] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [secretaryAnswer, setSecretaryAnswer] = useState("");
+  const [secretaryModel, setSecretaryModel] = useState("");
 
   const userName = useMemo(() => {
     const names = new Map<string, string>();
@@ -253,6 +305,25 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
     }
   }
 
+  async function submitDelete(entity: string, id: string, success: string) {
+    if (!window.confirm("Permanently delete this executive record?")) return;
+    setLoading(`${entity}-${id}-DELETE`);
+    setMessage("");
+    setError("");
+    try {
+      await jsonRequest("/api/executive-command-center", {
+        method: "DELETE",
+        body: JSON.stringify({ entity, id })
+      });
+      await refresh();
+      setMessage(success);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Delete failed.");
+    } finally {
+      setLoading("");
+    }
+  }
+
   async function createCommand(event: FormEvent<HTMLFormElement>) {
     const form = new FormData(event.currentTarget);
     await submitCreate(event, "WHATSAPP_COMMAND", {
@@ -285,6 +356,67 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
       workspaceId: emptyToNull(form.get("workspaceId")),
       organizationUnitId: emptyToNull(form.get("organizationUnitId"))
     }, "Evidence saved under restricted legal-hold control.");
+  }
+
+  async function createPresidentialAction(event: FormEvent<HTMLFormElement>) {
+    const form = new FormData(event.currentTarget);
+    await submitCreate(event, "PRESIDENTIAL_ACTION", {
+      title: String(form.get("title")),
+      description: String(form.get("description")),
+      category: emptyToNull(form.get("category")),
+      priority: String(form.get("priority")),
+      assignedToId: emptyToNull(form.get("assignedToId")),
+      dueAt: form.get("dueAt") ? new Date(String(form.get("dueAt"))).toISOString() : null,
+      workspaceId: emptyToNull(form.get("workspaceId")),
+      organizationUnitId: emptyToNull(form.get("organizationUnitId")),
+      sourceType: emptyToNull(form.get("sourceType")),
+      sourceId: emptyToNull(form.get("sourceId"))
+    }, "Presidential action created and audited.");
+  }
+
+  async function uploadMediaArchive(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setLoading("MEDIA_ARCHIVE_UPLOAD");
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch("/api/media-archive/upload", {
+        method: "POST",
+        body: formData
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(data?.error ?? "Media archive upload failed.");
+      form.reset();
+      await refresh();
+      setMessage("Secure media archive item saved for approval.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Media archive upload failed.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  async function askSecretary(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setLoading("EXECUTIVE_SECRETARY");
+    setMessage("");
+    setError("");
+    try {
+      const response = await jsonRequest<{ answer: string; model: string }>("/api/executive-command-center", {
+        method: "POST",
+        body: JSON.stringify({ entity: "EXECUTIVE_SECRETARY", prompt: String(form.get("prompt")) })
+      });
+      setSecretaryAnswer(response.answer);
+      setSecretaryModel(response.model);
+      setMessage("Executive Secretary response generated.");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Executive Secretary failed.");
+    } finally {
+      setLoading("");
+    }
   }
 
   const userOptions = data.users.map((user) => (
@@ -400,6 +532,179 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
                 {data.briefing.weakBranches.length === 0 ? <p className="py-3 text-sm text-ink/50">No missing branch/ministry reports found.</p> : null}
               </div>
             </SectionCard>
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "Action desk" ? (
+        <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
+          <form className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft" onSubmit={(event) => void createPresidentialAction(event)}>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><ClipboardCheck className="h-4 w-4 text-moss" />Presidential action desk</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">Create executive instructions, assign owners, set deadlines, and track decisions until completion.</p>
+            <div className="mt-4 space-y-3">
+              <Input name="title" placeholder="Action title" required />
+              <Input name="category" placeholder="Category, e.g. Branch, Media, Finance, Pastoral" />
+              <SelectField name="priority" label="Priority" defaultValue="HIGH">
+                {["LOW", "NORMAL", "HIGH", "URGENT", "CRITICAL"].map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
+              </SelectField>
+              <SelectField name="assignedToId" label="Assign to">
+                <option value="">Not assigned</option>
+                {userOptions}
+              </SelectField>
+              <Input name="dueAt" type="datetime-local" />
+              {scopeFields}
+              <Input name="sourceType" placeholder="Optional source type, e.g. REPORT" />
+              <Input name="sourceId" placeholder="Optional source ID/reference" />
+              <Textarea name="description" placeholder="Instruction, decision, risk, context, expected evidence, and completion standard" required />
+              <Button type="submit" disabled={loading === "PRESIDENTIAL_ACTION"}>
+                {loading === "PRESIDENTIAL_ACTION" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
+                Create action
+              </Button>
+            </div>
+          </form>
+          <div className="space-y-3">
+            {data.presidentialActions.map((action) => (
+              <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft" key={action.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-ink">{action.title}</p>
+                    <p className="mt-1 text-xs text-ink/50">
+                      {titleCase(action.category)} - {titleCase(action.priority)} - assigned to {userName.get(action.assignedToId ?? "") ?? "not assigned"}
+                    </p>
+                  </div>
+                  <Badge>{titleCase(action.status)}</Badge>
+                </div>
+                <p className="mt-3 whitespace-pre-wrap rounded-md border border-ink/10 bg-white p-3 text-sm leading-6 text-ink/65">{action.description}</p>
+                {action.decisionNote ? <p className="mt-2 rounded-md bg-paper p-3 text-xs text-ink/60">{action.decisionNote}</p> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["IN_REVIEW", "APPROVED", "REJECTED", "ASSIGNED", "COMPLETED", "ARCHIVED"].map((status) => (
+                    <Button
+                      className="h-8 px-3 text-xs"
+                      key={status}
+                      variant={status === "REJECTED" ? "danger" : "secondary"}
+                      onClick={() => void submitPatch("PRESIDENTIAL_ACTION", action.id, { status }, `Action marked ${titleCase(status)}.`)}
+                    >
+                      {titleCase(status)}
+                    </Button>
+                  ))}
+                  <Button className="h-8 px-3 text-xs" variant="danger" onClick={() => void submitDelete("PRESIDENTIAL_ACTION", action.id, "Presidential action deleted.")}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {data.presidentialActions.length === 0 ? <p className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No presidential action items yet.</p> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "Media archive" ? (
+        <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
+          <form className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft" onSubmit={(event) => void uploadMediaArchive(event)}>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><FileVideo className="h-4 w-4 text-moss" />Secure media archive</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">Upload sermons, service videos, audio, images, notes, and resources. Public publishing requires approval.</p>
+            <div className="mt-4 space-y-3">
+              <Input name="title" placeholder="Sermon/resource title" required />
+              <Input name="speaker" placeholder="Speaker/minister" required />
+              <Input name="scripture" placeholder="Scripture reference" />
+              <Input name="language" defaultValue="en" placeholder="Language code" />
+              <SelectField name="mediaType" label="Media type" defaultValue="VIDEO">
+                {["VIDEO", "AUDIO", "DOCUMENT", "IMAGE", "LINK"].map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
+              </SelectField>
+              <input className="block w-full rounded-md border border-ink/10 bg-white px-3 py-2 text-sm" name="file" type="file" accept="video/*,audio/*,image/*,.pdf,.doc,.docx,.ppt,.pptx" />
+              <Input name="mediaUrl" type="url" placeholder="Or paste YouTube/Vimeo/audio/document URL" />
+              <SelectField name="visibility" label="Visibility" defaultValue="MEMBERS">
+                {["PRIVATE", "LEADERSHIP", "MEMBERS", "PUBLIC"].map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
+              </SelectField>
+              {scopeFields}
+              <Input name="tags" placeholder="Tags: sermon, worship, youth, doctrine" />
+              <Input name="retentionLabel" placeholder="Retention label" defaultValue="LETW media archive" />
+              <Textarea name="notes" placeholder="Summary, altar call, testimony notes, study guide, or publishing notes" />
+              <Button type="submit" disabled={loading === "MEDIA_ARCHIVE_UPLOAD"}>
+                {loading === "MEDIA_ARCHIVE_UPLOAD" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileVideo className="h-4 w-4" />}
+                Save media
+              </Button>
+            </div>
+          </form>
+          <div className="space-y-3">
+            {data.mediaArchive.map((item) => (
+              <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft" key={item.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-ink">{item.title}</p>
+                    <p className="mt-1 text-xs text-ink/50">{item.speaker} - {item.scripture ?? "No scripture"} - {item.language.toUpperCase()}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge>{titleCase(item.approvalStatus)}</Badge>
+                    <Badge>{titleCase(item.visibility)}</Badge>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-ink/60">{item.notes ?? item.transcriptSummary ?? "No notes yet."}</p>
+                {item.mediaUrl ? <a className="mt-2 inline-flex text-xs font-medium text-moss underline" href={item.mediaUrl} target="_blank" rel="noreferrer">Open media</a> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {["APPROVED", "REJECTED", "PENDING"].map((approvalStatus) => (
+                    <Button className="h-8 px-3 text-xs" key={approvalStatus} variant={approvalStatus === "REJECTED" ? "danger" : "secondary"} onClick={() => void submitPatch("MEDIA_ARCHIVE", item.id, { approvalStatus }, `Media marked ${titleCase(approvalStatus)}.`)}>
+                      {titleCase(approvalStatus)}
+                    </Button>
+                  ))}
+                  {["PRIVATE", "LEADERSHIP", "MEMBERS", "PUBLIC"].map((visibility) => (
+                    <Button className="h-8 px-3 text-xs" key={visibility} variant="secondary" onClick={() => void submitPatch("MEDIA_ARCHIVE", item.id, { visibility }, `Media visibility set to ${titleCase(visibility)}.`)}>
+                      {titleCase(visibility)}
+                    </Button>
+                  ))}
+                  <Button className="h-8 px-3 text-xs" variant="secondary" onClick={() => void submitPatch("MEDIA_ARCHIVE", item.id, { isFeatured: !item.isFeatured }, item.isFeatured ? "Media unfeatured." : "Media featured.")}>
+                    {item.isFeatured ? "unfeature" : "feature"}
+                  </Button>
+                  <Button className="h-8 px-3 text-xs" variant="danger" onClick={() => void submitDelete("MEDIA_ARCHIVE", item.id, "Media archive item deleted.")}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {data.mediaArchive.length === 0 ? <p className="rounded-lg border border-ink/10 bg-white p-8 text-sm text-ink/55">No media archive items yet.</p> : null}
+          </div>
+        </section>
+      ) : null}
+
+      {activeTab === "Secretary" ? (
+        <section className="grid gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
+          <form className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft" onSubmit={(event) => void askSecretary(event)}>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Bot className="h-4 w-4 text-moss" />AI Executive Secretary</p>
+            <p className="mt-2 text-xs leading-5 text-ink/55">Ask for executive briefings, action drafts, media approval summaries, pending reports, and decision follow-up suggestions.</p>
+            <div className="mt-4 space-y-3">
+              <Textarea name="prompt" className="min-h-32" placeholder="Prepare my Sunday leadership briefing. Show urgent actions, pending reports, unsigned documents, and media awaiting approval." required />
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "Prepare my Sunday leadership briefing.",
+                  "Show actions that need presidential approval.",
+                  "Draft instructions to all leaders with overdue reports.",
+                  "Summarize media items waiting for public approval."
+                ].map((example) => (
+                  <button className="rounded-md border border-ink/10 bg-paper px-3 py-2 text-left text-xs text-ink/65 hover:bg-mint/40" key={example} type="button" onClick={(event) => {
+                    const form = event.currentTarget.closest("form");
+                    const textarea = form?.querySelector<HTMLTextAreaElement>("textarea[name='prompt']");
+                    if (textarea) textarea.value = example;
+                  }}>
+                    {example}
+                  </button>
+                ))}
+              </div>
+              <Button type="submit" disabled={loading === "EXECUTIVE_SECRETARY"}>
+                {loading === "EXECUTIVE_SECRETARY" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                Ask secretary
+              </Button>
+            </div>
+          </form>
+          <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
+            <p className="text-sm font-semibold text-ink">Secretary response</p>
+            {secretaryModel ? <p className="mt-1 text-xs text-ink/45">Generated by {secretaryModel}</p> : null}
+            {secretaryAnswer ? (
+              <div className="mt-4 whitespace-pre-wrap rounded-md bg-paper p-4 text-sm leading-7 text-ink/75">{secretaryAnswer}</div>
+            ) : (
+              <p className="mt-4 rounded-md bg-paper p-4 text-sm text-ink/55">Ask the Executive Secretary to prepare a briefing or draft. It is read-only and requires human confirmation before any action is taken.</p>
+            )}
           </div>
         </section>
       ) : null}

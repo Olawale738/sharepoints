@@ -23,7 +23,10 @@ export const permissionKeys = [
   "canManageEvidenceVault",
   "canViewExecutiveBriefing",
   "canDeleteReports",
-  "canClearReportLogs"
+  "canClearReportLogs",
+  "canManagePresidentialActions",
+  "canManageMediaArchive",
+  "canUseExecutiveSecretary"
 ] as const;
 
 export type WorkspacePermissionKey = (typeof permissionKeys)[number];
@@ -49,7 +52,10 @@ export const allWorkspacePermissions: WorkspacePermissions = {
   canManageEvidenceVault: true,
   canViewExecutiveBriefing: true,
   canDeleteReports: true,
-  canClearReportLogs: true
+  canClearReportLogs: true,
+  canManagePresidentialActions: true,
+  canManageMediaArchive: true,
+  canUseExecutiveSecretary: true
 };
 
 export function defaultPermissionsForRole(role: WorkspaceRole | string): WorkspacePermissions {
@@ -77,7 +83,10 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canManageEvidenceVault: false,
       canViewExecutiveBriefing: false,
       canDeleteReports: false,
-      canClearReportLogs: false
+      canClearReportLogs: false,
+      canManagePresidentialActions: false,
+      canManageMediaArchive: false,
+      canUseExecutiveSecretary: false
     };
   }
 
@@ -101,7 +110,10 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canManageEvidenceVault: false,
       canViewExecutiveBriefing: false,
       canDeleteReports: false,
-      canClearReportLogs: false
+      canClearReportLogs: false,
+      canManagePresidentialActions: false,
+      canManageMediaArchive: false,
+      canUseExecutiveSecretary: false
     };
   }
 
@@ -124,7 +136,10 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
     canManageEvidenceVault: false,
     canViewExecutiveBriefing: false,
     canDeleteReports: false,
-    canClearReportLogs: false
+    canClearReportLogs: false,
+    canManagePresidentialActions: false,
+    canManageMediaArchive: false,
+    canUseExecutiveSecretary: false
   };
 }
 
@@ -301,7 +316,10 @@ export async function getRolePermissions(workspaceId: string, role: WorkspaceRol
     canManageEvidenceVault: saved.canManageEvidenceVault,
     canViewExecutiveBriefing: saved.canViewExecutiveBriefing,
     canDeleteReports: saved.canDeleteReports,
-    canClearReportLogs: saved.canClearReportLogs
+    canClearReportLogs: saved.canClearReportLogs,
+    canManagePresidentialActions: saved.canManagePresidentialActions,
+    canManageMediaArchive: saved.canManageMediaArchive,
+    canUseExecutiveSecretary: saved.canUseExecutiveSecretary
   };
 }
 

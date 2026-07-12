@@ -35,7 +35,10 @@ function serializeRolePermissions(role: WorkspaceRole, saved?: SavedRolePermissi
     canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaultPermissionsForRole(role).canManageEvidenceVault,
     canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaultPermissionsForRole(role).canViewExecutiveBriefing,
     canDeleteReports: saved?.canDeleteReports ?? defaultPermissionsForRole(role).canDeleteReports,
-    canClearReportLogs: saved?.canClearReportLogs ?? defaultPermissionsForRole(role).canClearReportLogs
+    canClearReportLogs: saved?.canClearReportLogs ?? defaultPermissionsForRole(role).canClearReportLogs,
+    canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaultPermissionsForRole(role).canManagePresidentialActions,
+    canManageMediaArchive: saved?.canManageMediaArchive ?? defaultPermissionsForRole(role).canManageMediaArchive,
+    canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaultPermissionsForRole(role).canUseExecutiveSecretary
   };
 }
 

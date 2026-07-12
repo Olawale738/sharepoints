@@ -64,7 +64,8 @@ export async function GET(request: Request) {
     }),
     prisma.sermonResource.findMany({
       where: {
-        visibility: "PUBLIC"
+        visibility: "PUBLIC",
+        approvalStatus: "APPROVED"
       },
       orderBy: { createdAt: "desc" },
       take: 24
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
       rules: {
         announcements: "approved and pinned",
         events: "upcoming only",
-        sermons: "PUBLIC visibility only",
+        sermons: "approved and PUBLIC visibility only",
         branches: "active public organization units",
         forms: "open forms from active workspaces"
       },

@@ -85,7 +85,10 @@ export const updateWorkspaceRolePermissionSchema = z.object({
   canManageEvidenceVault: z.boolean(),
   canViewExecutiveBriefing: z.boolean(),
   canDeleteReports: z.boolean(),
-  canClearReportLogs: z.boolean()
+  canClearReportLogs: z.boolean(),
+  canManagePresidentialActions: z.boolean(),
+  canManageMediaArchive: z.boolean(),
+  canUseExecutiveSecretary: z.boolean()
 });
 
 export const updateProfileSchema = z.object({

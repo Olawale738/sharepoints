@@ -1,17 +1,23 @@
 import { createHash, randomBytes } from "crypto";
 import {
+  ApprovalStatus,
   DigitalSignatureStatus,
   EvidenceVaultStatus,
   EvidenceVaultType,
   LeadershipDecisionStatus,
   LeadershipHandoverStatus,
+  MediaArchiveType,
   MonthlyReportStatus,
+  PresidentialActionPriority,
+  PresidentialActionStatus,
   Prisma,
+  SermonResourceVisibility,
   WhatsAppCommandStatus,
   WorkspaceRole
 } from "@prisma/client";
 
 import { activityActions, logActivity } from "@/lib/activity";
+import { generateAiText, isAiTextConfigured } from "@/lib/ai-provider";
 import { ApiError } from "@/lib/api";
 import { requireLeadershipGovernanceScopeAccess } from "@/lib/leadership-governance";
 import { notifyUsers } from "@/lib/notifications";
@@ -45,13 +51,19 @@ export async function getExecutiveCommandAccess(userId: string) {
     canUseWhatsAppCommandBot,
     canManageDigitalSignatures,
     canManageEvidenceVault,
-    canViewExecutiveBriefing
+    canViewExecutiveBriefing,
+    canManagePresidentialActions,
+    canManageMediaArchive,
+    canUseExecutiveSecretary
   ] = await Promise.all([
     hasAnyWorkspaceAdminRole(userId),
     hasAnyWorkspacePermission(userId, "canUseWhatsAppCommandBot"),
     hasAnyWorkspacePermission(userId, "canManageDigitalSignatures"),
     hasAnyWorkspacePermission(userId, "canManageEvidenceVault"),
-    hasAnyWorkspacePermission(userId, "canViewExecutiveBriefing")
+    hasAnyWorkspacePermission(userId, "canViewExecutiveBriefing"),
+    hasAnyWorkspacePermission(userId, "canManagePresidentialActions"),
+    hasAnyWorkspacePermission(userId, "canManageMediaArchive"),
+    hasAnyWorkspacePermission(userId, "canUseExecutiveSecretary")
   ]);
 
   return {
@@ -59,7 +71,10 @@ export async function getExecutiveCommandAccess(userId: string) {
     canUseWhatsAppCommandBot,
     canManageDigitalSignatures,
     canManageEvidenceVault,
-    canViewExecutiveBriefing
+    canViewExecutiveBriefing,
+    canManagePresidentialActions,
+    canManageMediaArchive,
+    canUseExecutiveSecretary
   };
 }
 
@@ -150,7 +165,10 @@ export async function getExecutiveCommandCenterData(userId: string) {
     !access.canViewExecutiveBriefing &&
     !access.canUseWhatsAppCommandBot &&
     !access.canManageDigitalSignatures &&
-    !access.canManageEvidenceVault
+    !access.canManageEvidenceVault &&
+    !access.canManagePresidentialActions &&
+    !access.canManageMediaArchive &&
+    !access.canUseExecutiveSecretary
   ) {
     throw new ApiError(403, "You do not have executive command permissions.");
   }
@@ -176,7 +194,9 @@ export async function getExecutiveCommandCenterData(userId: string) {
     recentReports,
     commands,
     signatures,
-    evidence
+    evidence,
+    presidentialActions,
+    mediaArchive
   ] = await Promise.all([
     prisma.workspace.findMany({
       where: access.isAdmin ? { deletedAt: null } : { id: { in: workspaceIds.length ? workspaceIds : ["__none__"] }, deletedAt: null },
@@ -272,6 +292,36 @@ export async function getExecutiveCommandCenterData(userId: string) {
       : Promise.resolve([]),
     access.canManageEvidenceVault
       ? prisma.confidentialEvidenceItem.findMany({ orderBy: [{ status: "asc" }, { updatedAt: "desc" }], take: 100 })
+      : Promise.resolve([]),
+    access.canManagePresidentialActions || access.canViewExecutiveBriefing
+      ? prisma.presidentialActionItem.findMany({
+          where: access.isAdmin
+            ? {}
+            : {
+                OR: [
+                  { assignedToId: userId },
+                  { createdById: userId },
+                  { workspaceId: { in: workspaceIds.length ? workspaceIds : ["__none__"] } }
+                ]
+              },
+          orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+          take: 120
+        })
+      : Promise.resolve([]),
+    access.canManageMediaArchive || access.canViewExecutiveBriefing
+      ? prisma.sermonResource.findMany({
+          where: access.isAdmin
+            ? {}
+            : {
+                OR: [
+                  { createdById: userId },
+                  { workspaceId: { in: workspaceIds.length ? workspaceIds : ["__none__"] } },
+                  { visibility: { in: [SermonResourceVisibility.MEMBERS, SermonResourceVisibility.PUBLIC] }, approvalStatus: ApprovalStatus.APPROVED }
+                ]
+              },
+          orderBy: [{ approvalStatus: "asc" }, { createdAt: "desc" }],
+          take: 120
+        })
       : Promise.resolve([])
   ]);
 
@@ -300,7 +350,9 @@ export async function getExecutiveCommandCenterData(userId: string) {
     },
     commands,
     signatures,
-    evidence
+    evidence,
+    presidentialActions,
+    mediaArchive
   };
 }
 
@@ -495,4 +547,293 @@ export async function updateConfidentialEvidence(actorId: string, id: string, st
     metadata: { status: item.status, legalHold: item.legalHold }
   });
   return item;
+}
+
+export async function createPresidentialAction(actorId: string, input: {
+  title: string;
+  description: string;
+  category?: string | null;
+  priority?: PresidentialActionPriority;
+  assignedToId?: string | null;
+  dueAt?: string | null;
+  workspaceId?: string | null;
+  organizationUnitId?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+}) {
+  await requireAnyWorkspacePermission(actorId, "canManagePresidentialActions", "Your role cannot manage the Presidential Action Desk.");
+  await requireLeadershipGovernanceScopeAccess(actorId, input);
+  const action = await prisma.presidentialActionItem.create({
+    data: {
+      title: input.title,
+      description: input.description,
+      category: input.category || "EXECUTIVE",
+      priority: input.priority ?? PresidentialActionPriority.HIGH,
+      assignedToId: input.assignedToId ?? null,
+      dueAt: input.dueAt ? new Date(input.dueAt) : null,
+      workspaceId: input.workspaceId ?? null,
+      organizationUnitId: input.organizationUnitId ?? null,
+      sourceType: input.sourceType ?? null,
+      sourceId: input.sourceId ?? null,
+      createdById: actorId
+    }
+  });
+  if (action.assignedToId) {
+    await notifyUsers([action.assignedToId], {
+      type: "PRESIDENTIAL_ACTION",
+      title: "Presidential action assigned",
+      body: action.title,
+      href: "/dashboard/executive-briefing"
+    });
+  }
+  await logActivity({
+    userId: actorId,
+    workspaceId: action.workspaceId ?? undefined,
+    action: activityActions.presidentialActionCreated,
+    targetId: action.id,
+    metadata: { priority: action.priority, status: action.status }
+  });
+  return action;
+}
+
+export async function updatePresidentialAction(actorId: string, id: string, input: {
+  status: PresidentialActionStatus;
+  assignedToId?: string | null;
+  decisionNote?: string | null;
+  dueAt?: string | null;
+}) {
+  await requireAnyWorkspacePermission(actorId, "canManagePresidentialActions", "Your role cannot manage the Presidential Action Desk.");
+  const existing = await prisma.presidentialActionItem.findUnique({ where: { id } });
+  if (!existing) throw new ApiError(404, "Presidential action not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  const isDecisionStatus = input.status === PresidentialActionStatus.APPROVED || input.status === PresidentialActionStatus.REJECTED;
+  const action = await prisma.presidentialActionItem.update({
+    where: { id },
+    data: {
+      status: input.status,
+      assignedToId: input.assignedToId === undefined ? undefined : input.assignedToId,
+      dueAt: input.dueAt ? new Date(input.dueAt) : undefined,
+      decisionNote: input.decisionNote === undefined ? undefined : input.decisionNote,
+      decidedById: isDecisionStatus ? actorId : undefined,
+      decidedAt: isDecisionStatus ? new Date() : undefined,
+      completedAt: input.status === PresidentialActionStatus.COMPLETED ? new Date() : undefined
+    }
+  });
+  if (action.assignedToId && action.assignedToId !== existing.assignedToId) {
+    await notifyUsers([action.assignedToId], {
+      type: "PRESIDENTIAL_ACTION",
+      title: "Presidential action assigned",
+      body: action.title,
+      href: "/dashboard/executive-briefing"
+    });
+  }
+  await logActivity({
+    userId: actorId,
+    workspaceId: action.workspaceId ?? undefined,
+    action: activityActions.presidentialActionUpdated,
+    targetId: id,
+    metadata: { status: action.status, assignedToId: action.assignedToId }
+  });
+  return action;
+}
+
+export async function deletePresidentialAction(actorId: string, id: string) {
+  await requireAnyWorkspacePermission(actorId, "canManagePresidentialActions", "Your role cannot delete Presidential Action Desk records.");
+  const existing = await prisma.presidentialActionItem.findUnique({ where: { id } });
+  if (!existing) throw new ApiError(404, "Presidential action not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  await prisma.presidentialActionItem.delete({ where: { id } });
+  await logActivity({
+    userId: actorId,
+    workspaceId: existing.workspaceId ?? undefined,
+    action: activityActions.presidentialActionDeleted,
+    targetId: id,
+    metadata: { title: existing.title, status: existing.status }
+  });
+  return existing;
+}
+
+export async function createMediaArchiveResource(actorId: string, input: {
+  workspaceId?: string | null;
+  organizationUnitId?: string | null;
+  title: string;
+  speaker: string;
+  scripture?: string | null;
+  language?: string | null;
+  mediaType?: MediaArchiveType;
+  mediaUrl?: string | null;
+  mediaStorageKey?: string | null;
+  mediaFileName?: string | null;
+  mediaFileType?: string | null;
+  mediaSize?: number | null;
+  notes?: string | null;
+  visibility?: SermonResourceVisibility;
+  tags?: string[] | null;
+  retentionLabel?: string | null;
+}) {
+  await requireAnyWorkspacePermission(actorId, "canManageMediaArchive", "Your role cannot manage the secure media archive.");
+  await requireLeadershipGovernanceScopeAccess(actorId, input);
+  const resource = await prisma.sermonResource.create({
+    data: {
+      workspaceId: input.workspaceId ?? null,
+      organizationUnitId: input.organizationUnitId ?? null,
+      title: input.title,
+      speaker: input.speaker,
+      scripture: input.scripture ?? null,
+      language: (input.language || "en").toLowerCase(),
+      mediaType: input.mediaType ?? MediaArchiveType.LINK,
+      mediaUrl: input.mediaUrl ?? null,
+      mediaStorageKey: input.mediaStorageKey ?? null,
+      mediaFileName: input.mediaFileName ?? null,
+      mediaFileType: input.mediaFileType ?? null,
+      mediaSize: input.mediaSize ?? null,
+      notes: input.notes ?? null,
+      visibility: input.visibility ?? SermonResourceVisibility.MEMBERS,
+      approvalStatus: ApprovalStatus.PENDING,
+      tags: asJson(input.tags ?? []),
+      retentionLabel: input.retentionLabel ?? "LETW media archive",
+      createdById: actorId
+    }
+  });
+  await logActivity({
+    userId: actorId,
+    workspaceId: resource.workspaceId ?? undefined,
+    action: activityActions.mediaArchiveUploaded,
+    targetId: resource.id,
+    metadata: { mediaType: resource.mediaType, approvalStatus: resource.approvalStatus, visibility: resource.visibility }
+  });
+  return resource;
+}
+
+export async function updateMediaArchiveResource(actorId: string, id: string, input: {
+  approvalStatus?: ApprovalStatus;
+  visibility?: SermonResourceVisibility;
+  isFeatured?: boolean;
+  transcriptSummary?: string | null;
+  transcript?: string | null;
+}) {
+  await requireAnyWorkspacePermission(actorId, "canManageMediaArchive", "Your role cannot manage the secure media archive.");
+  const existing = await prisma.sermonResource.findUnique({ where: { id } });
+  if (!existing) throw new ApiError(404, "Media archive item not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  const resource = await prisma.sermonResource.update({
+    where: { id },
+    data: {
+      approvalStatus: input.approvalStatus,
+      visibility: input.visibility,
+      isFeatured: input.isFeatured,
+      transcriptSummary: input.transcriptSummary === undefined ? undefined : input.transcriptSummary,
+      transcript: input.transcript === undefined ? undefined : input.transcript,
+      approvedById: input.approvalStatus === ApprovalStatus.APPROVED ? actorId : undefined,
+      approvedAt: input.approvalStatus === ApprovalStatus.APPROVED ? new Date() : undefined
+    }
+  });
+  await logActivity({
+    userId: actorId,
+    workspaceId: resource.workspaceId ?? undefined,
+    action: activityActions.mediaArchiveUpdated,
+    targetId: id,
+    metadata: { approvalStatus: resource.approvalStatus, visibility: resource.visibility, isFeatured: resource.isFeatured }
+  });
+  return resource;
+}
+
+export async function deleteMediaArchiveResource(actorId: string, id: string) {
+  await requireAnyWorkspacePermission(actorId, "canManageMediaArchive", "Your role cannot delete media archive records.");
+  const existing = await prisma.sermonResource.findUnique({ where: { id } });
+  if (!existing) throw new ApiError(404, "Media archive item not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  await prisma.sermonResource.delete({ where: { id } });
+  await logActivity({
+    userId: actorId,
+    workspaceId: existing.workspaceId ?? undefined,
+    action: activityActions.mediaArchiveDeleted,
+    targetId: id,
+    metadata: { title: existing.title, mediaType: existing.mediaType }
+  });
+  return existing;
+}
+
+function executiveSecretaryFallback(prompt: string, data: Awaited<ReturnType<typeof getExecutiveCommandCenterData>>) {
+  const lines = [
+    "LETW AI Executive Secretary briefing",
+    "",
+    `Prompt: ${prompt}`,
+    `Pending approvals: ${data.briefing.pendingApprovals}`,
+    `Pending command drafts: ${data.commands.filter((item) => item.status === "PENDING_APPROVAL").length}`,
+    `Pending presidential actions: ${data.presidentialActions.filter((item) => !["COMPLETED", "ARCHIVED", "REJECTED"].includes(item.status)).length}`,
+    `Pending signatures: ${data.signatures.filter((item) => item.status === "REQUESTED").length}`,
+    `Open restricted vault records: ${data.briefing.openVaultRecords}`,
+    `Media awaiting approval: ${data.mediaArchive.filter((item) => item.approvalStatus === "PENDING").length}`,
+    "",
+    "Recommended next actions:",
+    "- Review urgent decisions and delayed handovers.",
+    "- Finalize pending monthly reports.",
+    "- Approve or reject media items before public publishing.",
+    "- Assign owners and due dates to presidential actions."
+  ];
+  return lines.join("\n");
+}
+
+export async function askExecutiveSecretary(actorId: string, prompt: string) {
+  await requireAnyWorkspacePermission(actorId, "canUseExecutiveSecretary", "Your role cannot use the AI Executive Secretary.");
+  const data = await getExecutiveCommandCenterData(actorId);
+  const sources = [
+    { type: "briefing", count: data.briefing.urgentDecisions.length + data.briefing.pendingReports.length + data.briefing.delayedHandovers.length },
+    { type: "presidential_actions", count: data.presidentialActions.length },
+    { type: "signatures", count: data.signatures.length },
+    { type: "media_archive", count: data.mediaArchive.length },
+    { type: "commands", count: data.commands.length }
+  ];
+  const context = {
+    briefing: data.briefing,
+    presidentialActions: data.presidentialActions.slice(0, 25),
+    signatures: data.signatures.slice(0, 20),
+    commands: data.commands.slice(0, 20),
+    mediaArchive: data.mediaArchive.slice(0, 20)
+  };
+  let answer = executiveSecretaryFallback(prompt, data);
+  let model = "local-fallback";
+  let status = "COMPLETED";
+
+  if (isAiTextConfigured()) {
+    try {
+      const generated = await generateAiText({
+        openAiModel: process.env.OPENAI_EXECUTIVE_SECRETARY_MODEL ?? process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-5-mini",
+        anthropicModel: process.env.ANTHROPIC_EXECUTIVE_SECRETARY_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest",
+        instructions: [
+          "You are LETW's private AI Executive Secretary for the president and top pastors.",
+          "Use only the supplied authorized JSON context. Do not invent hidden records.",
+          "Produce concise executive briefings, action drafts, decision summaries, risk summaries, and follow-up recommendations.",
+          "Never claim you changed records, sent messages, approved documents, or signed anything.",
+          "Clearly mark suggestions that need human confirmation."
+        ].join(" "),
+        input: `REQUEST:\n${prompt}\n\nAUTHORIZED EXECUTIVE CONTEXT:\n${JSON.stringify(context, null, 2)}`,
+        maxTokens: 2400
+      });
+      answer = generated.text;
+      model = `${generated.provider}:${generated.model}`;
+    } catch (error) {
+      status = "FAILED_WITH_FALLBACK";
+      model = "local-fallback";
+    }
+  }
+
+  await prisma.aiAssistantAudit.create({
+    data: {
+      userId: actorId,
+      mode: "EXECUTIVE_SECRETARY",
+      question: prompt,
+      workspaceIds: asJson(data.workspaces.map((workspace) => workspace.id)),
+      sources: asJson(sources),
+      model,
+      status
+    }
+  });
+  await logActivity({
+    userId: actorId,
+    action: activityActions.executiveSecretaryAsked,
+    metadata: { prompt: prompt.slice(0, 200), model, status }
+  });
+  return { answer, sources, model };
 }

@@ -27,6 +27,9 @@ type RolePermission = {
   canViewExecutiveBriefing: boolean;
   canDeleteReports: boolean;
   canClearReportLogs: boolean;
+  canManagePresidentialActions: boolean;
+  canManageMediaArchive: boolean;
+  canUseExecutiveSecretary: boolean;
 };
 
 type PermissionKey = Exclude<keyof RolePermission, "role">;
@@ -55,7 +58,10 @@ const permissionLabels: Array<{ key: PermissionKey; label: string }> = [
   { key: "canManageEvidenceVault", label: "Manage confidential evidence vault" },
   { key: "canViewExecutiveBriefing", label: "View executive briefing room" },
   { key: "canDeleteReports", label: "Delete executive reports" },
-  { key: "canClearReportLogs", label: "Clear report activity logs" }
+  { key: "canClearReportLogs", label: "Clear report activity logs" },
+  { key: "canManagePresidentialActions", label: "Manage presidential action desk" },
+  { key: "canManageMediaArchive", label: "Manage secure media archive" },
+  { key: "canUseExecutiveSecretary", label: "Use AI executive secretary" }
 ];
 
 export function RolePermissionsPanel({ workspaceId, permissions: initialPermissions }: RolePermissionsPanelProps) {

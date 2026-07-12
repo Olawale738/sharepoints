@@ -461,12 +461,15 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks,
       canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaults.canUseWhatsAppCommandBot,
       canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaults.canManageDigitalSignatures,
-      canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
-      canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
-      canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
-      canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs
-    };
-  });
+        canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
+        canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
+        canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
+        canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs,
+        canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaults.canManagePresidentialActions,
+        canManageMediaArchive: saved?.canManageMediaArchive ?? defaults.canManageMediaArchive,
+        canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaults.canUseExecutiveSecretary
+      };
+    });
 
   return (
     <div className="space-y-6">

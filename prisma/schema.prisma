@@ -691,6 +691,32 @@ enum EvidenceVaultStatus {
   RELEASED
 }
 
+enum PresidentialActionStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  ASSIGNED
+  COMPLETED
+  ARCHIVED
+}
+
+enum PresidentialActionPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum MediaArchiveType {
+  VIDEO
+  AUDIO
+  DOCUMENT
+  IMAGE
+  LINK
+}
+
 enum LeadershipHandoverStatus {
   DRAFT
   PENDING_ACCEPTANCE
@@ -1099,31 +1125,34 @@ model WorkspaceMember {
 }
 
 model WorkspaceRolePermission {
-  id                         String        @id @default(cuid())
-  workspaceId                String
-  role                       WorkspaceRole
-  canUploadFiles             Boolean       @default(false)
-  canDeleteFiles             Boolean       @default(false)
-  canCreateFolders           Boolean       @default(false)
-  canCreateChannels          Boolean       @default(false)
-  canSendMessages            Boolean       @default(true)
-  canManageMembers           Boolean       @default(false)
-  canManageIntegrations      Boolean       @default(false)
-  canViewActivity            Boolean       @default(false)
-  canClearActivity           Boolean       @default(false)
-  canCreateAnnouncements     Boolean       @default(false)
-  canManageTasks             Boolean       @default(false)
-  canScheduleMeetings        Boolean       @default(false)
-  canCreateShareLinks        Boolean       @default(false)
-  canUseWhatsAppCommandBot   Boolean       @default(false)
-  canManageDigitalSignatures Boolean       @default(false)
-  canManageEvidenceVault     Boolean       @default(false)
-  canViewExecutiveBriefing   Boolean       @default(false)
-  canDeleteReports           Boolean       @default(false)
-  canClearReportLogs         Boolean       @default(false)
-  workspace                  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt                  DateTime      @default(now())
-  updatedAt                  DateTime      @updatedAt
+  id                           String        @id @default(cuid())
+  workspaceId                  String
+  role                         WorkspaceRole
+  canUploadFiles               Boolean       @default(false)
+  canDeleteFiles               Boolean       @default(false)
+  canCreateFolders             Boolean       @default(false)
+  canCreateChannels            Boolean       @default(false)
+  canSendMessages              Boolean       @default(true)
+  canManageMembers             Boolean       @default(false)
+  canManageIntegrations        Boolean       @default(false)
+  canViewActivity              Boolean       @default(false)
+  canClearActivity             Boolean       @default(false)
+  canCreateAnnouncements       Boolean       @default(false)
+  canManageTasks               Boolean       @default(false)
+  canScheduleMeetings          Boolean       @default(false)
+  canCreateShareLinks          Boolean       @default(false)
+  canUseWhatsAppCommandBot     Boolean       @default(false)
+  canManageDigitalSignatures   Boolean       @default(false)
+  canManageEvidenceVault       Boolean       @default(false)
+  canViewExecutiveBriefing     Boolean       @default(false)
+  canDeleteReports             Boolean       @default(false)
+  canClearReportLogs           Boolean       @default(false)
+  canManagePresidentialActions Boolean       @default(false)
+  canManageMediaArchive        Boolean       @default(false)
+  canUseExecutiveSecretary     Boolean       @default(false)
+  workspace                    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
 
   @@unique([workspaceId, role])
   @@index([workspaceId])
@@ -1638,6 +1667,35 @@ model WhatsAppAdminCommand {
   @@index([status, createdAt])
   @@index([requestedById, createdAt])
   @@index([parsedIntent, status])
+}
+
+model PresidentialActionItem {
+  id                 String                     @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  title              String
+  description        String                     @db.Text
+  category           String                     @default("EXECUTIVE")
+  priority           PresidentialActionPriority @default(HIGH)
+  status             PresidentialActionStatus   @default(PENDING)
+  sourceType         String?
+  sourceId           String?
+  assignedToId       String?
+  dueAt              DateTime?
+  decisionNote       String?                    @db.Text
+  createdById        String
+  decidedById        String?
+  decidedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@index([status, priority, dueAt])
+  @@index([assignedToId, status, dueAt])
+  @@index([workspaceId, status, priority])
+  @@index([organizationUnitId, status, priority])
+  @@index([sourceType, sourceId])
+  @@index([createdById, createdAt])
 }
 
 model OrgChatRoom {
@@ -3104,9 +3162,21 @@ model SermonResource {
   speaker            String
   scripture          String?
   language           String                   @default("en")
+  mediaType          MediaArchiveType         @default(LINK)
   mediaUrl           String?
+  mediaStorageKey    String?
+  mediaFileName      String?
+  mediaFileType      String?
+  mediaSize          Int?
   notes              String?                  @db.Text
   visibility         SermonResourceVisibility @default(MEMBERS)
+  approvalStatus     ApprovalStatus           @default(PENDING)
+  approvedById       String?
+  approvedAt         DateTime?
+  isFeatured         Boolean                  @default(false)
+  retentionLabel     String?
+  transcript         String?                  @db.Text
+  transcriptSummary  String?                  @db.Text
   tags               Json?
   createdById        String
   createdAt          DateTime                 @default(now())
@@ -3114,6 +3184,8 @@ model SermonResource {
 
   @@index([workspaceId, visibility, createdAt])
   @@index([organizationUnitId, visibility, createdAt])
+  @@index([approvalStatus, visibility, createdAt])
+  @@index([mediaType, approvalStatus])
   @@index([speaker, createdAt])
   @@index([language, visibility])
 }

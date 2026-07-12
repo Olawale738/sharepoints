@@ -31,6 +31,7 @@ import { auth } from "@/auth";
 import { AdminOrganizationPanel } from "@/components/dashboard/admin-organization-panel";
 import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
 import { ApprovalQueue } from "@/components/dashboard/approval-queue";
+import { ClearAiAuditButton } from "@/components/dashboard/clear-ai-audit-button";
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
 import { ClearOrganizationActivityButton } from "@/components/dashboard/clear-organization-activity-button";
 import { SecurityCenterPanel } from "@/components/dashboard/security-center-panel";
@@ -592,7 +593,10 @@ export default async function AdminControlCenterPage() {
                 <Sparkles className="h-4 w-4 text-moss" />
                 <h2 className="text-sm font-semibold">AI access audit</h2>
               </div>
-              <Badge>{aiAudits.length}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge>{aiAudits.length}</Badge>
+                <ClearAiAuditButton disabled={aiAudits.length === 0} />
+              </div>
             </div>
             <div className="divide-y divide-ink/10">
               {aiAudits.length === 0 ? (

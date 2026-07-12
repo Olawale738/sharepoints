@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { generateAiText, isAiTextConfigured } from "@/lib/ai-provider";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { localeEnglishName, supportedLocales } from "@/lib/i18n";
 
@@ -13,41 +14,19 @@ export async function POST(request: Request) {
     await requireUser();
     const parsed = translateSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid translation request.");
-    if (!process.env.OPENAI_API_KEY) {
-      throw new ApiError(503, "Translation requires OPENAI_API_KEY.");
+    if (!isAiTextConfigured()) {
+      throw new ApiError(503, "Translation requires OPENAI_API_KEY or ANTHROPIC_API_KEY.");
     }
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
-        instructions:
-          `Translate the user's text into ${localeEnglishName(parsed.data.targetLanguage)}. ` +
-          "Preserve names, scripture references, formatting, and meaning. Return only the translation.",
-        input: parsed.data.text
-      })
+    const generated = await generateAiText({
+      openAiModel: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
+      anthropicModel: process.env.ANTHROPIC_TRANSLATION_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest",
+      instructions:
+        `Translate the user's text into ${localeEnglishName(parsed.data.targetLanguage)}. ` +
+        "Preserve names, scripture references, formatting, and meaning. Return only the translation.",
+      input: parsed.data.text,
+      maxTokens: 3000
     });
-    const body = (await response.json().catch(() => null)) as
-      | {
-          output_text?: string;
-          output?: Array<{ content?: Array<{ text?: string }> }>;
-          error?: { message?: string };
-        }
-      | null;
-    if (!response.ok || !body) {
-      throw new ApiError(502, body?.error?.message ?? "Translation service failed.");
-    }
-    const translation =
-      body.output_text ??
-      body.output
-        ?.flatMap((item) => item.content ?? [])
-        .map((item) => item.text ?? "")
-        .join("")
-        .trim() ??
-      "";
+    const translation = generated.text;
     if (!translation) throw new ApiError(502, "The translation service returned an empty response.");
     return ok({ translation, targetLanguage: parsed.data.targetLanguage });
   } catch (error) {

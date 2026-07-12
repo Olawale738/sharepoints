@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
+import { generateAiText, isAiTextConfigured } from "@/lib/ai-provider";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { localeEnglishName, supportedLocales } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
@@ -194,24 +195,17 @@ async function generateVolunteerMatches(opportunityId: string) {
 }
 
 async function translateText(targetLanguage: (typeof supportedLocales)[number], text: string) {
-  if (!process.env.OPENAI_API_KEY) throw new ApiError(503, "Translation requires OPENAI_API_KEY.");
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
-      instructions:
-        `Translate the user's church collaboration content into ${localeEnglishName(targetLanguage)}. ` +
-        "Preserve names, scripture references, formatting, dates, and meaning. Return only the translation.",
-      input: text
-    })
+  if (!isAiTextConfigured()) throw new ApiError(503, "Translation requires OPENAI_API_KEY or ANTHROPIC_API_KEY.");
+  const generated = await generateAiText({
+    openAiModel: process.env.OPENAI_TRANSLATION_MODEL ?? "gpt-5-mini",
+    anthropicModel: process.env.ANTHROPIC_TRANSLATION_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest",
+    instructions:
+      `Translate the user's church collaboration content into ${localeEnglishName(targetLanguage)}. ` +
+      "Preserve names, scripture references, formatting, dates, and meaning. Return only the translation.",
+    input: text,
+    maxTokens: 3000
   });
-  const body = (await response.json().catch(() => null)) as { output_text?: string; error?: { message?: string } } | null;
-  if (!response.ok || !body) throw new ApiError(502, body?.error?.message ?? "Translation service failed.");
-  const translation = body.output_text?.trim();
+  const translation = generated.text.trim();
   if (!translation) throw new ApiError(502, "The translation service returned an empty response.");
   return translation;
 }

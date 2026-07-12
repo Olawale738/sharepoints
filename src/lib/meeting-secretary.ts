@@ -1,3 +1,4 @@
+import { generateAiText, isAiTextConfigured } from "@/lib/ai-provider";
 import { analyzeTranscript } from "@/lib/transcription";
 
 export type MeetingSecretaryActionItem = {
@@ -13,7 +14,7 @@ export type MeetingSecretaryPack = {
   followUpDraft: string;
   risks: string[];
   attendanceInsight: string;
-  generatedBy: "openai" | "fallback";
+  generatedBy: "openai" | "anthropic" | "fallback";
 };
 
 type MeetingSecretaryInput = {
@@ -43,11 +44,6 @@ function sourceText(input: MeetingSecretaryInput) {
   ]
     .filter(Boolean)
     .join("\n\n");
-}
-
-function extractOutput(body: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }) {
-  if (body.output_text) return body.output_text;
-  return body.output?.flatMap((item) => item.content ?? []).map((content) => content.text).filter(Boolean).join("\n") ?? "";
 }
 
 function parseJsonPack(value: string) {
@@ -117,20 +113,15 @@ function fallbackSecretary(input: MeetingSecretaryInput): MeetingSecretaryPack {
 
 export async function generateMeetingSecretaryPack(input: MeetingSecretaryInput): Promise<MeetingSecretaryPack> {
   const text = sourceText(input);
-  if (!process.env.OPENAI_API_KEY || !text.trim()) {
+  if (!isAiTextConfigured() || !text.trim()) {
     return fallbackSecretary(input);
   }
 
   const fallback = fallbackSecretary(input);
-  const model = process.env.OPENAI_MEETING_SECRETARY_MODEL ?? process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-5-mini";
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model,
+  try {
+    const generated = await generateAiText({
+      openAiModel: process.env.OPENAI_MEETING_SECRETARY_MODEL ?? process.env.OPENAI_ASSISTANT_MODEL ?? "gpt-5-mini",
+      anthropicModel: process.env.ANTHROPIC_MEETING_SECRETARY_MODEL ?? process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest",
       instructions: [
         "You are LETW's AI Meeting Secretary.",
         "Use only the supplied meeting data. Do not invent attendees, decisions, or confidential facts.",
@@ -158,22 +149,17 @@ export async function generateMeetingSecretaryPack(input: MeetingSecretaryInput)
           email: item.user.email
         })),
         content: compact(text, 18000)
-      })
-    })
-  });
-  const body = (await response.json().catch(() => null)) as
-    | { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } }
-    | null;
-
-  if (!response.ok || !body) {
+      }),
+      maxTokens: 2500
+    });
+    const parsed = parseJsonPack(generated.text);
+    if (!parsed) {
+      return normalizePack({ summary: generated.text }, fallback.summary, generated.provider);
+    }
+    return normalizePack(parsed, fallback.summary, generated.provider);
+  } catch {
     return fallback;
   }
-
-  const parsed = parseJsonPack(extractOutput(body));
-  if (!parsed) {
-    return normalizePack({ summary: extractOutput(body) }, fallback.summary, "openai");
-  }
-  return normalizePack(parsed, fallback.summary, "openai");
 }
 
 export function renderMeetingSecretaryNotes(pack: MeetingSecretaryPack) {
