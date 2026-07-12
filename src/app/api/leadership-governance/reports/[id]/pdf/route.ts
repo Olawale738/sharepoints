@@ -30,6 +30,8 @@ function listFrom(value: unknown): string[] {
 }
 
 function humanize(value: string) {
+  if (value === "givingAmountCents") return "Giving Amount";
+  if (value === "followUpCompletionRate") return "Follow-Up Completion";
   return value
     .replace(/([A-Z])/g, " $1")
     .replace(/[_-]+/g, " ")
@@ -96,12 +98,12 @@ function drawHeader(input: {
   page.drawRectangle({ x: 0, y: 735, width: pageSize[0], height: 107, color: navy });
   page.drawRectangle({ x: 0, y: 728, width: pageSize[0], height: 7, color: gold });
   page.drawImage(logo, { x: 42, y: 754, width: 62, height: 62 });
-  page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 122, y: 791, size: 14, font: fonts.bold, color: white });
+  drawFittedText(page, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", 122, 791, 250, fonts.bold, 13.4, white);
   page.drawText("Executive Ministry Performance Report", { x: 122, y: 770, size: 10.2, font: fonts.bold, color: gold });
   page.drawText("Governance | Operations | Ministry Impact | Risk Review", { x: 122, y: 754, size: 8.3, font: fonts.sans, color: white });
-  page.drawRectangle({ x: 401, y: 768, width: 146, height: 45, color: white, opacity: 0.11, borderColor: gold, borderWidth: 0.7 });
-  drawFittedText(page, reportCode, 414, 794, 120, fonts.bold, 8, gold);
-  drawFittedText(page, period, 414, 777, 120, fonts.bold, 10.5, white);
+  page.drawRectangle({ x: 414, y: 768, width: 133, height: 45, color: white, opacity: 0.11, borderColor: gold, borderWidth: 0.7 });
+  drawFittedText(page, reportCode, 425, 794, 110, fonts.bold, 7.4, gold);
+  drawFittedText(page, period, 425, 777, 110, fonts.bold, 10, white);
 }
 
 function drawFooter(page: PDFPage, fonts: FontSet, pageNumber: number, navy: PdfColor, gold: PdfColor, muted: PdfColor) {
@@ -272,15 +274,16 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       .filter((key) => Object.prototype.hasOwnProperty.call(metrics, key))
       .map((key) => [key, metrics[key]] as const)
       .slice(0, 12);
-    metricEntries.forEach(([key, value], index) => {
-      if (index % 3 === 0) ensureSpace(64);
-      const col = index % 3;
-      const row = Math.floor(index / 3);
-      const x = marginX + col * 166;
-      const cardY = y - row * 68;
-      drawMetricCard({ page, fonts, x, y: cardY - 56, width: 152, label: humanize(key), value: formatMetric(key, value), navy, blue, gold, light });
-    });
-    y -= Math.ceil(metricEntries.length / 3) * 68 + 8;
+    for (let start = 0; start < metricEntries.length; start += 3) {
+      ensureSpace(72);
+      const rowEntries = metricEntries.slice(start, start + 3);
+      rowEntries.forEach(([key, value], col) => {
+        const x = marginX + col * 166;
+        drawMetricCard({ page, fonts, x, y: y - 56, width: 152, label: humanize(key), value: formatMetric(key, value), navy, blue, gold, light });
+      });
+      y -= 68;
+    }
+    y -= 8;
 
     drawSectionTitle("Operating Highlights", "What happened this month and what it means for leadership.");
     drawBullets(operatingHighlights, "No operating highlights were stored for this report.");

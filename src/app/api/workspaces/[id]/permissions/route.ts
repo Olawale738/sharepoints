@@ -29,7 +29,13 @@ function serializeRolePermissions(role: WorkspaceRole, saved?: SavedRolePermissi
       saved?.canCreateAnnouncements ?? defaultPermissionsForRole(role).canCreateAnnouncements,
     canManageTasks: saved?.canManageTasks ?? defaultPermissionsForRole(role).canManageTasks,
     canScheduleMeetings: saved?.canScheduleMeetings ?? defaultPermissionsForRole(role).canScheduleMeetings,
-    canCreateShareLinks: saved?.canCreateShareLinks ?? defaultPermissionsForRole(role).canCreateShareLinks
+    canCreateShareLinks: saved?.canCreateShareLinks ?? defaultPermissionsForRole(role).canCreateShareLinks,
+    canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaultPermissionsForRole(role).canUseWhatsAppCommandBot,
+    canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaultPermissionsForRole(role).canManageDigitalSignatures,
+    canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaultPermissionsForRole(role).canManageEvidenceVault,
+    canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaultPermissionsForRole(role).canViewExecutiveBriefing,
+    canDeleteReports: saved?.canDeleteReports ?? defaultPermissionsForRole(role).canDeleteReports,
+    canClearReportLogs: saved?.canClearReportLogs ?? defaultPermissionsForRole(role).canClearReportLogs
   };
 }
 

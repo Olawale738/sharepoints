@@ -124,6 +124,16 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                   <span className="hidden 2xl:inline">Governance</span>
                 </Link>
               ) : null}
+              {canOpenLeadershipGovernance ? (
+                <Link
+                  aria-label="Executive briefing room"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                  href="/dashboard/executive-briefing"
+                >
+                  <RadioTower className="h-4 w-4" />
+                  <span className="hidden 2xl:inline">Executive</span>
+                </Link>
+              ) : null}
               <Link
                 aria-label="Member portal"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"

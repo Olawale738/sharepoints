@@ -16,6 +16,8 @@ import {
   createLeadershipDecision,
   createLeadershipHandover,
   createOfficialLetter,
+  clearMonthlyReportLogs,
+  deleteMonthlyReport,
   deleteOfficialLetter,
   generateMonthlyReport,
   generateMonthlyReportPack,
@@ -106,10 +108,17 @@ const updateSchema = z.discriminatedUnion("entity", [
   z.object({ entity: z.literal("OFFICIAL_LETTER"), id: z.string().cuid(), status: z.nativeEnum(OfficialLetterStatus) })
 ]);
 
-const deleteSchema = z.object({
-  entity: z.literal("OFFICIAL_LETTER"),
-  id: z.string().cuid()
-});
+const deleteSchema = z.discriminatedUnion("entity", [
+  z.object({
+    entity: z.literal("OFFICIAL_LETTER"),
+    id: z.string().cuid()
+  }),
+  z.object({
+    entity: z.literal("MONTHLY_REPORT"),
+    id: z.string().cuid(),
+    mode: z.enum(["DELETE", "CLEAR_LOGS"]).default("DELETE")
+  })
+]);
 
 export async function GET() {
   try {
@@ -159,6 +168,14 @@ export async function DELETE(request: Request) {
     const user = await requireUser();
     const parsed = deleteSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid governance delete request.");
+    if (parsed.data.entity === "MONTHLY_REPORT") {
+      return ok({
+        result:
+          parsed.data.mode === "CLEAR_LOGS"
+            ? await clearMonthlyReportLogs(user.id, parsed.data.id)
+            : await deleteMonthlyReport(user.id, parsed.data.id)
+      });
+    }
     return ok({ result: await deleteOfficialLetter(user.id, parsed.data.id) });
   } catch (error) {
     return handleRouteError(error);

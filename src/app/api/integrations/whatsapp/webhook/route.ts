@@ -2,6 +2,7 @@ import { WhatsAppMessageDirection, WhatsAppMessageStatus, type Prisma } from "@p
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok } from "@/lib/api";
+import { createWhatsAppAdminCommand } from "@/lib/executive-command-center";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { normalizeWhatsAppPhone, verifyWhatsAppWebhookSignature } from "@/lib/whatsapp";
@@ -63,6 +64,18 @@ function inboundMessageBody(message: WhatsAppWebhookMessage) {
   if (message.document?.caption) return message.document.caption;
   if (message.document?.filename) return `Document: ${message.document.filename}`;
   return `[${message.type ?? "whatsapp"} message]`;
+}
+
+function looksLikeAdminCommand(body: string) {
+  const value = body.trim().toLowerCase();
+  return (
+    value.startsWith("admin ") ||
+    value.startsWith("/admin") ||
+    value.includes("show pending reports") ||
+    (value.includes("remind") && value.includes("leader")) ||
+    value.includes("create sunday service plan") ||
+    value.includes("sunday service plan")
+  );
 }
 
 function inboundMedia(message: WhatsAppWebhookMessage) {
@@ -195,7 +208,8 @@ async function handleInboundMessage(value: WhatsAppWebhookValue, message: WhatsA
   });
   const media = inboundMedia(message);
 
-  await prisma.whatsAppMessage.create({
+  const body = inboundMessageBody(message);
+  const savedMessage = await prisma.whatsAppMessage.create({
     data: {
       conversationId: conversation.id,
       userId: user?.id ?? null,
@@ -206,7 +220,7 @@ async function handleInboundMessage(value: WhatsAppWebhookValue, message: WhatsA
       fromPhone: phone,
       toPhone: normalizeWhatsAppPhone(value.metadata?.display_phone_number),
       messageType: message.type ?? "unknown",
-      body: inboundMessageBody(message),
+      body,
       mediaId: media.mediaId,
       mediaMimeType: media.mediaMimeType,
       mediaSha256: media.mediaSha256,
@@ -214,6 +228,13 @@ async function handleInboundMessage(value: WhatsAppWebhookValue, message: WhatsA
       receivedAt
     }
   });
+
+  if (user?.id && looksLikeAdminCommand(body)) {
+    await createWhatsAppAdminCommand(user.id, body.replace(/^\/?admin\s*:?/i, "").trim() || body, {
+      conversationId: conversation.id,
+      messageId: savedMessage.id
+    }).catch(() => null);
+  }
 
   await logActivity({
     userId: user?.id,

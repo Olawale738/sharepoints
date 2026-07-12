@@ -79,7 +79,13 @@ export const updateWorkspaceRolePermissionSchema = z.object({
   canCreateAnnouncements: z.boolean(),
   canManageTasks: z.boolean(),
   canScheduleMeetings: z.boolean(),
-  canCreateShareLinks: z.boolean()
+  canCreateShareLinks: z.boolean(),
+  canUseWhatsAppCommandBot: z.boolean(),
+  canManageDigitalSignatures: z.boolean(),
+  canManageEvidenceVault: z.boolean(),
+  canViewExecutiveBriefing: z.boolean(),
+  canDeleteReports: z.boolean(),
+  canClearReportLogs: z.boolean()
 });
 
 export const updateProfileSchema = z.object({

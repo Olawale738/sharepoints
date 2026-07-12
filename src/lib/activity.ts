@@ -194,6 +194,8 @@ export const activityActions = {
   leadershipDecisionUpdated: "leadership.decision_updated",
   monthlyReportGenerated: "leadership.monthly_report_generated",
   monthlyReportUpdated: "leadership.monthly_report_updated",
+  monthlyReportDeleted: "leadership.monthly_report_deleted",
+  monthlyReportLogsCleared: "leadership.monthly_report_logs_cleared",
   confidentialVaultRecordCreated: "vault.record_created",
   confidentialVaultRecordOpened: "vault.record_opened",
   confidentialVaultRecordUpdated: "vault.record_updated",
@@ -201,5 +203,13 @@ export const activityActions = {
   leadershipHandoverUpdated: "leadership.handover_updated",
   officialLetterCreated: "letter.created",
   officialLetterUpdated: "letter.updated",
-  officialLetterDeleted: "letter.deleted"
+  officialLetterDeleted: "letter.deleted",
+  whatsAppAdminCommandCreated: "executive.whatsapp_command_created",
+  whatsAppAdminCommandUpdated: "executive.whatsapp_command_updated",
+  digitalSignatureRequested: "signature.requested",
+  digitalSignatureSigned: "signature.signed",
+  digitalSignatureRevoked: "signature.revoked",
+  confidentialEvidenceCreated: "evidence.created",
+  confidentialEvidenceUpdated: "evidence.updated",
+  confidentialEvidenceOpened: "evidence.opened"
 } as const;

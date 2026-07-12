@@ -66,6 +66,15 @@ enum WhatsAppMessageStatus {
   FAILED
 }
 
+enum WhatsAppCommandStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  CANCELLED
+  FAILED
+}
+
 enum ApprovalStatus {
   PENDING
   APPROVED
@@ -666,6 +675,22 @@ enum ConfidentialVaultStatus {
   ARCHIVED
 }
 
+enum EvidenceVaultType {
+  DOCUMENT
+  SCREENSHOT
+  SIGNATURE
+  WITNESS_RECORD
+  INCIDENT_FILE
+  OTHER
+}
+
+enum EvidenceVaultStatus {
+  OPEN
+  LEGAL_HOLD
+  ARCHIVED
+  RELEASED
+}
+
 enum LeadershipHandoverStatus {
   DRAFT
   PENDING_ACCEPTANCE
@@ -688,6 +713,12 @@ enum OfficialLetterStatus {
   ISSUED
   REVOKED
   ARCHIVED
+}
+
+enum DigitalSignatureStatus {
+  REQUESTED
+  SIGNED
+  REVOKED
 }
 
 enum TrainingProgramStatus {
@@ -1068,25 +1099,31 @@ model WorkspaceMember {
 }
 
 model WorkspaceRolePermission {
-  id                     String        @id @default(cuid())
-  workspaceId            String
-  role                   WorkspaceRole
-  canUploadFiles         Boolean       @default(false)
-  canDeleteFiles         Boolean       @default(false)
-  canCreateFolders       Boolean       @default(false)
-  canCreateChannels      Boolean       @default(false)
-  canSendMessages        Boolean       @default(true)
-  canManageMembers       Boolean       @default(false)
-  canManageIntegrations  Boolean       @default(false)
-  canViewActivity        Boolean       @default(false)
-  canClearActivity       Boolean       @default(false)
-  canCreateAnnouncements Boolean       @default(false)
-  canManageTasks         Boolean       @default(false)
-  canScheduleMeetings    Boolean       @default(false)
-  canCreateShareLinks    Boolean       @default(false)
-  workspace              Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  id                         String        @id @default(cuid())
+  workspaceId                String
+  role                       WorkspaceRole
+  canUploadFiles             Boolean       @default(false)
+  canDeleteFiles             Boolean       @default(false)
+  canCreateFolders           Boolean       @default(false)
+  canCreateChannels          Boolean       @default(false)
+  canSendMessages            Boolean       @default(true)
+  canManageMembers           Boolean       @default(false)
+  canManageIntegrations      Boolean       @default(false)
+  canViewActivity            Boolean       @default(false)
+  canClearActivity           Boolean       @default(false)
+  canCreateAnnouncements     Boolean       @default(false)
+  canManageTasks             Boolean       @default(false)
+  canScheduleMeetings        Boolean       @default(false)
+  canCreateShareLinks        Boolean       @default(false)
+  canUseWhatsAppCommandBot   Boolean       @default(false)
+  canManageDigitalSignatures Boolean       @default(false)
+  canManageEvidenceVault     Boolean       @default(false)
+  canViewExecutiveBriefing   Boolean       @default(false)
+  canDeleteReports           Boolean       @default(false)
+  canClearReportLogs         Boolean       @default(false)
+  workspace                  Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
 
   @@unique([workspaceId, role])
   @@index([workspaceId])
@@ -1579,6 +1616,28 @@ model WhatsAppMessage {
   @@index([userId, createdAt])
   @@index([workspaceId, createdAt])
   @@index([direction, status, createdAt])
+}
+
+model WhatsAppAdminCommand {
+  id                   String                @id @default(cuid())
+  command              String                @db.Text
+  parsedIntent         String
+  targetScope          String?
+  draftAction          Json
+  status               WhatsAppCommandStatus @default(PENDING_APPROVAL)
+  requestedById        String
+  approvedById         String?
+  approvedAt           DateTime?
+  sentAt               DateTime?
+  resultSummary        String?               @db.Text
+  sourceConversationId String?
+  sourceMessageId      String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([status, createdAt])
+  @@index([requestedById, createdAt])
+  @@index([parsedIntent, status])
 }
 
 model OrgChatRoom {
@@ -2750,6 +2809,66 @@ model MonthlyMinistryReport {
   @@index([organizationUnitId, year, month])
   @@index([workspaceId, year, month])
   @@index([status, createdAt])
+}
+
+model DigitalSignature {
+  id               String                 @id @default(cuid())
+  targetType       String
+  targetId         String
+  title            String
+  signerId         String?
+  signerName       String
+  signerEmail      String?
+  requestedById    String
+  status           DigitalSignatureStatus @default(REQUESTED)
+  signatureName    String?
+  signedAt         DateTime?
+  revokedAt        DateTime?
+  ipAddress        String?
+  userAgent        String?
+  verificationHash String                 @unique
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([targetType, targetId])
+  @@index([signerId, status])
+  @@index([status, createdAt])
+}
+
+model ConfidentialEvidenceItem {
+  id                 String              @id @default(cuid())
+  workspaceId        String?
+  organizationUnitId String?
+  evidenceType       EvidenceVaultType
+  title              String
+  subjectName        String?
+  summary            String              @db.Text
+  sourceUrl          String?
+  storageKey         String?
+  restrictedTo       String              @default("TOP_PASTORS_AND_ADMINS")
+  legalHold          Boolean             @default(true)
+  status             EvidenceVaultStatus @default(LEGAL_HOLD)
+  createdById        String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+  @@index([evidenceType, status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model ConfidentialEvidenceAccessLog {
+  id         String   @id @default(cuid())
+  evidenceId String
+  userId     String
+  action     String
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([evidenceId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ConfidentialVaultRecord {

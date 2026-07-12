@@ -319,16 +319,21 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
     }
   }
 
-  async function deleteEntity(entity: string, id: string, success: string) {
-    const confirmed = window.confirm("This permanently deletes the selected record. Continue?");
+  async function deleteEntity(entity: string, id: string, success: string, extra: Record<string, unknown> = {}) {
+    const isClearLog = extra.mode === "CLEAR_LOGS";
+    const confirmed = window.confirm(
+      isClearLog
+        ? "This clears activity logs for the selected record. Continue?"
+        : "This permanently deletes the selected record. Continue?"
+    );
     if (!confirmed) return;
-    setLoading(`${entity}-${id}-DELETE`);
+    setLoading(`${entity}-${id}-${String(extra.mode ?? "DELETE")}`);
     setError("");
     setMessage("");
     try {
       await jsonRequest("/api/leadership-governance", {
         method: "DELETE",
-        body: JSON.stringify({ entity, id })
+        body: JSON.stringify({ entity, id, ...extra })
       });
       await refresh();
       setMessage(success);
@@ -652,6 +657,14 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
                           {status.toLowerCase()}
                         </Button>
                       ))}
+                      <Button className="h-8 px-3 text-xs" variant="secondary" onClick={() => void deleteEntity("MONTHLY_REPORT", report.id, "Report activity logs cleared.", { mode: "CLEAR_LOGS" })}>
+                        {loading === `MONTHLY_REPORT-${report.id}-CLEAR_LOGS` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+                        clear log
+                      </Button>
+                      <Button className="h-8 px-3 text-xs" variant="danger" onClick={() => void deleteEntity("MONTHLY_REPORT", report.id, "Monthly report deleted.", { mode: "DELETE" })}>
+                        {loading === `MONTHLY_REPORT-${report.id}-DELETE` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        delete
+                      </Button>
                     </div>
                   </div>
                 </div>

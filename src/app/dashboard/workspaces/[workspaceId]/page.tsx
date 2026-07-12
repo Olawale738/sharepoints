@@ -458,7 +458,13 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       canCreateAnnouncements: saved?.canCreateAnnouncements ?? defaults.canCreateAnnouncements,
       canManageTasks: saved?.canManageTasks ?? defaults.canManageTasks,
       canScheduleMeetings: saved?.canScheduleMeetings ?? defaults.canScheduleMeetings,
-      canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks
+      canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks,
+      canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaults.canUseWhatsAppCommandBot,
+      canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaults.canManageDigitalSignatures,
+      canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
+      canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
+      canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
+      canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs
     };
   });
 

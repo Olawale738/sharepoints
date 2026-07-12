@@ -17,7 +17,13 @@ export const permissionKeys = [
   "canCreateAnnouncements",
   "canManageTasks",
   "canScheduleMeetings",
-  "canCreateShareLinks"
+  "canCreateShareLinks",
+  "canUseWhatsAppCommandBot",
+  "canManageDigitalSignatures",
+  "canManageEvidenceVault",
+  "canViewExecutiveBriefing",
+  "canDeleteReports",
+  "canClearReportLogs"
 ] as const;
 
 export type WorkspacePermissionKey = (typeof permissionKeys)[number];
@@ -37,7 +43,13 @@ export const allWorkspacePermissions: WorkspacePermissions = {
   canCreateAnnouncements: true,
   canManageTasks: true,
   canScheduleMeetings: true,
-  canCreateShareLinks: true
+  canCreateShareLinks: true,
+  canUseWhatsAppCommandBot: true,
+  canManageDigitalSignatures: true,
+  canManageEvidenceVault: true,
+  canViewExecutiveBriefing: true,
+  canDeleteReports: true,
+  canClearReportLogs: true
 };
 
 export function defaultPermissionsForRole(role: WorkspaceRole | string): WorkspacePermissions {
@@ -59,7 +71,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canCreateAnnouncements: true,
       canManageTasks: true,
       canScheduleMeetings: false,
-      canCreateShareLinks: true
+      canCreateShareLinks: true,
+      canUseWhatsAppCommandBot: false,
+      canManageDigitalSignatures: false,
+      canManageEvidenceVault: false,
+      canViewExecutiveBriefing: false,
+      canDeleteReports: false,
+      canClearReportLogs: false
     };
   }
 
@@ -77,7 +95,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canCreateAnnouncements: true,
       canManageTasks: true,
       canScheduleMeetings: false,
-      canCreateShareLinks: false
+      canCreateShareLinks: false,
+      canUseWhatsAppCommandBot: false,
+      canManageDigitalSignatures: false,
+      canManageEvidenceVault: false,
+      canViewExecutiveBriefing: false,
+      canDeleteReports: false,
+      canClearReportLogs: false
     };
   }
 
@@ -94,7 +118,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
     canCreateAnnouncements: false,
     canManageTasks: false,
     canScheduleMeetings: false,
-    canCreateShareLinks: false
+    canCreateShareLinks: false,
+    canUseWhatsAppCommandBot: false,
+    canManageDigitalSignatures: false,
+    canManageEvidenceVault: false,
+    canViewExecutiveBriefing: false,
+    canDeleteReports: false,
+    canClearReportLogs: false
   };
 }
 
@@ -265,8 +295,38 @@ export async function getRolePermissions(workspaceId: string, role: WorkspaceRol
     canCreateAnnouncements: saved.canCreateAnnouncements,
     canManageTasks: saved.canManageTasks,
     canScheduleMeetings: saved.canScheduleMeetings,
-    canCreateShareLinks: saved.canCreateShareLinks
+    canCreateShareLinks: saved.canCreateShareLinks,
+    canUseWhatsAppCommandBot: saved.canUseWhatsAppCommandBot,
+    canManageDigitalSignatures: saved.canManageDigitalSignatures,
+    canManageEvidenceVault: saved.canManageEvidenceVault,
+    canViewExecutiveBriefing: saved.canViewExecutiveBriefing,
+    canDeleteReports: saved.canDeleteReports,
+    canClearReportLogs: saved.canClearReportLogs
   };
+}
+
+export async function hasAnyWorkspacePermission(userId: string, permission: WorkspacePermissionKey) {
+  if (await hasAnyWorkspaceAdminRole(userId)) return true;
+  const memberships = await prisma.workspaceMember.findMany({
+    where: {
+      userId,
+      workspace: { deletedAt: null },
+      role: { in: [WorkspaceRole.LEADER, WorkspaceRole.MODERATOR] }
+    },
+    select: { workspaceId: true, role: true },
+    take: 100
+  });
+  for (const membership of memberships) {
+    const permissions = await getRolePermissions(membership.workspaceId, membership.role);
+    if (permissions[permission]) return true;
+  }
+  return false;
+}
+
+export async function requireAnyWorkspacePermission(userId: string, permission: WorkspacePermissionKey, message = "Your role cannot perform this action.") {
+  if (!(await hasAnyWorkspacePermission(userId, permission))) {
+    throw new ApiError(403, message);
+  }
 }
 
 export async function getUserWorkspacePermissions(userId: string, workspaceId: string) {

@@ -21,6 +21,12 @@ type RolePermission = {
   canManageTasks: boolean;
   canScheduleMeetings: boolean;
   canCreateShareLinks: boolean;
+  canUseWhatsAppCommandBot: boolean;
+  canManageDigitalSignatures: boolean;
+  canManageEvidenceVault: boolean;
+  canViewExecutiveBriefing: boolean;
+  canDeleteReports: boolean;
+  canClearReportLogs: boolean;
 };
 
 type PermissionKey = Exclude<keyof RolePermission, "role">;
@@ -43,7 +49,13 @@ const permissionLabels: Array<{ key: PermissionKey; label: string }> = [
   { key: "canCreateAnnouncements", label: "Create announcements" },
   { key: "canManageTasks", label: "Manage tasks" },
   { key: "canScheduleMeetings", label: "Schedule audio/video calls" },
-  { key: "canCreateShareLinks", label: "Create share links" }
+  { key: "canCreateShareLinks", label: "Create share links" },
+  { key: "canUseWhatsAppCommandBot", label: "Use WhatsApp admin command bot" },
+  { key: "canManageDigitalSignatures", label: "Request and manage digital signatures" },
+  { key: "canManageEvidenceVault", label: "Manage confidential evidence vault" },
+  { key: "canViewExecutiveBriefing", label: "View executive briefing room" },
+  { key: "canDeleteReports", label: "Delete executive reports" },
+  { key: "canClearReportLogs", label: "Clear report activity logs" }
 ];
 
 export function RolePermissionsPanel({ workspaceId, permissions: initialPermissions }: RolePermissionsPanelProps) {

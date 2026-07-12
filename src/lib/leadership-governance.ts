@@ -18,7 +18,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
+import { hasAnyWorkspaceAdminRole, requireAnyWorkspacePermission } from "@/lib/rbac";
 import { getLeadershipWorkspaces, requireLeadershipAccess } from "@/lib/leadership-suite";
 
 function asJson(value: unknown): Prisma.InputJsonValue {
@@ -589,6 +589,84 @@ export async function updateMonthlyReportStatus(actorId: string, id: string, sta
     metadata: { status }
   });
   return report;
+}
+
+export async function deleteMonthlyReport(actorId: string, id: string) {
+  const existing = await prisma.monthlyMinistryReport.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      month: true,
+      year: true,
+      workspaceId: true,
+      organizationUnitId: true,
+      generatedById: true,
+      status: true
+    }
+  });
+  if (!existing) throw new ApiError(404, "Monthly report not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  await requireAnyWorkspacePermission(actorId, "canDeleteReports", "Only admins or permitted leaders can delete executive reports.");
+  await prisma.monthlyMinistryReport.delete({ where: { id } });
+  await logActivity({
+    userId: actorId,
+    workspaceId: existing.workspaceId ?? undefined,
+    action: activityActions.monthlyReportDeleted,
+    targetId: id,
+    metadata: {
+      title: existing.title,
+      month: existing.month,
+      year: existing.year,
+      status: existing.status,
+      organizationUnitId: existing.organizationUnitId ?? null
+    }
+  });
+  return existing;
+}
+
+export async function clearMonthlyReportLogs(actorId: string, id: string) {
+  const existing = await prisma.monthlyMinistryReport.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      workspaceId: true,
+      organizationUnitId: true,
+      generatedById: true
+    }
+  });
+  if (!existing) throw new ApiError(404, "Monthly report not found.");
+  await requireLeadershipGovernanceScopeAccess(actorId, existing);
+  await requireAnyWorkspacePermission(actorId, "canClearReportLogs", "Only admins or permitted leaders can clear report logs.");
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { email: true } });
+  const deleted = await prisma.activityLog.deleteMany({
+    where: {
+      targetId: id,
+      action: {
+        in: [
+          activityActions.monthlyReportGenerated,
+          activityActions.monthlyReportUpdated,
+          activityActions.monthlyReportDeleted,
+          activityActions.monthlyReportLogsCleared
+        ]
+      }
+    }
+  });
+  await prisma.securityEvent.create({
+    data: {
+      userId: actorId,
+      email: actor?.email ?? null,
+      type: "ACTIVITY_LOGS_CLEARED",
+      metadata: {
+        scope: "MONTHLY_REPORT",
+        reportId: id,
+        reportTitle: existing.title,
+        clearedCount: deleted.count
+      }
+    }
+  });
+  return { ...existing, clearedCount: deleted.count };
 }
 
 export async function generateMonthlyReportPack(actorId: string, input: { month: number; year: number }) {
