@@ -286,7 +286,8 @@ export function LeadershipSuitePanel({ initialData }: { initialData: LeadershipD
 
   async function createServicePlan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading("service-plan");
     setError("");
     setMessage("");
@@ -309,7 +310,7 @@ export function LeadershipSuitePanel({ initialData }: { initialData: LeadershipD
           prayerPoints: String(form.get("prayerPoints") || "") || null
         })
       });
-      event.currentTarget.reset();
+      formElement.reset();
       await refresh();
       setMessage("Service plan created.");
     } catch (nextError) {
@@ -350,7 +351,8 @@ export function LeadershipSuitePanel({ initialData }: { initialData: LeadershipD
 
   async function issueReceipt(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setLoading("giving");
     setError("");
     setMessage("");
@@ -369,7 +371,7 @@ export function LeadershipSuitePanel({ initialData }: { initialData: LeadershipD
           notes: String(form.get("notes") || "") || null
         })
       });
-      event.currentTarget.reset();
+      formElement.reset();
       await refresh();
       setMessage("Giving receipt issued with QR verification.");
     } catch (nextError) {

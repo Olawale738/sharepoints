@@ -332,7 +332,7 @@ export async function GET(request: Request, context: RouteContext) {
       ["Certificate number", certificateNumber],
       ["Member number", memberNumber],
       ["Issued", formatDate(certificate.issuedAt)],
-      ["Expires", formatDate(certificate.expiresAt)]
+      ["Expires", certificate.expiresAt ? formatDate(certificate.expiresAt) : "No expiry"]
     ];
     details.forEach(([label, value], index) => {
       const x = 70 + index * 130;

@@ -283,6 +283,7 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
 
   async function createEntity(event: FormEvent<HTMLFormElement>, entity: string, payload: Record<string, unknown>, success: string) {
     event.preventDefault();
+    const form = event.currentTarget;
     setLoading(entity);
     setError("");
     setMessage("");
@@ -291,7 +292,7 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
         method: "POST",
         body: JSON.stringify({ entity, ...payload })
       });
-      event.currentTarget.reset();
+      form.reset();
       await refresh();
       setMessage(success);
     } catch (nextError) {

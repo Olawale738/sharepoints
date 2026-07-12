@@ -361,7 +361,7 @@ export function CertificateGeneratorPanel({
                     </div>
                     <div>
                       <span>Expires</span>
-                      <strong>{formatDate(certificate.expiresAt)}</strong>
+                      <strong>{certificate.expiresAt ? formatDate(certificate.expiresAt) : "No expiry"}</strong>
                     </div>
                   </section>
 
