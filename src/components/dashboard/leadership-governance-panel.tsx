@@ -171,6 +171,96 @@ const letterTemplates: Record<string, string> = {
     "",
     "Please treat this transfer as an official LETW record and ensure all related responsibilities are completed in good order."
   ].join("\n"),
+  RETIREMENT: [
+    "This letter formally recognizes your retirement from the stated office, assignment, or active service responsibility within Light Encounter Tabernacle Worldwide.",
+    "",
+    "LETW acknowledges your years of service, sacrifice, leadership, labour, and contribution to the advancement of the work. This retirement is recorded with honour and becomes effective from the date stated on this letter unless otherwise directed by authorized LETW leadership.",
+    "",
+    "You are requested to complete any remaining handover, return entrusted property or documents, settle outstanding administrative matters, and provide any final report required by the leadership office.",
+    "",
+    "This letter does not remove your value, fellowship, honour, or spiritual standing in LETW. It records the conclusion of the stated service assignment and preserves the official record for future reference."
+  ].join("\n"),
+  RELIEVE_OF_SERVICE: [
+    "This letter formally relieves you of the stated office, assignment, duty, or service responsibility within Light Encounter Tabernacle Worldwide.",
+    "",
+    "The decision is issued under LETW leadership authority and becomes effective from the date stated on this letter. From that date, you are no longer required to perform the duties attached to the stated assignment unless a new written instruction is issued by authorized leadership.",
+    "",
+    "You are required to complete all handover obligations, return LETW property, files, access materials, keys, devices, records, credentials, or confidential documents entrusted to you, and cooperate with any closing review requested by leadership.",
+    "",
+    "This letter should be treated as an official LETW administrative record and should only be relied upon while the QR verification page confirms an active issued status."
+  ].join("\n"),
+  PROMOTION: [
+    "This letter confirms your promotion or elevation to the stated office, rank, ministry responsibility, or leadership capacity within Light Encounter Tabernacle Worldwide.",
+    "",
+    "This promotion follows leadership review and is issued in recognition of service, character, maturity, accountability, diligence, and the needs of the ministry. The new responsibility becomes effective from the date stated on this letter unless otherwise directed.",
+    "",
+    "You are expected to discharge this responsibility with humility, integrity, excellence, confidentiality, pastoral sensitivity, doctrinal soundness, and submission to LETW leadership order.",
+    "",
+    "Kindly complete all onboarding, handover, briefing, training, reporting, or workspace requirements assigned to you in the LETW system."
+  ].join("\n"),
+  DEPLOYMENT: [
+    "This letter confirms your official deployment for the stated LETW assignment, location, branch, department, ministry, event, mission, outreach, or project.",
+    "",
+    "The deployment is made for ministry effectiveness, operational support, leadership coverage, or strategic assignment. You are expected to report to the designated leader or receiving authority and follow the approved scope, timeline, and instructions.",
+    "",
+    "Where documents, resources, travel, accommodation, budgets, team members, or equipment are attached to this deployment, they must be handled according to LETW policy and accounted for after the assignment.",
+    "",
+    "This deployment remains valid only while the QR verification page confirms an active issued status."
+  ].join("\n"),
+  COMMISSIONING: [
+    "This letter confirms that you have been officially commissioned by Light Encounter Tabernacle Worldwide for the stated spiritual, ministerial, leadership, branch, project, outreach, or service assignment.",
+    "",
+    "This commissioning is issued under LETW authority and affirms your mandate to carry out the stated assignment within the approved scope. You are expected to uphold LETW doctrine, values, safeguarding standards, reporting requirements, and leadership accountability.",
+    "",
+    "The commissioning does not authorize activity outside the scope stated by LETW leadership and may be reviewed, suspended, replaced, or revoked where required.",
+    "",
+    "Please retain this record and verify its current status through the QR code where confirmation is required."
+  ].join("\n"),
+  SABBATICAL_LEAVE: [
+    "This letter confirms the approval of sabbatical leave, ministry rest, study leave, recovery leave, or temporary withdrawal from active duty within Light Encounter Tabernacle Worldwide.",
+    "",
+    "The leave is granted for the period and purpose approved by LETW leadership. During this period, your active responsibilities may be transferred, delegated, or paused according to the handover arrangement approved by leadership.",
+    "",
+    "You are expected to remain reachable for agreed matters, protect confidential information, and resume or report back according to the stated instruction unless a further written approval is issued.",
+    "",
+    "This letter is an official LETW record and should be accepted only while the QR verification page confirms active status."
+  ].join("\n"),
+  DISCIPLINARY_NOTICE: [
+    "This letter serves as an official LETW disciplinary notice concerning the matter stated in this record.",
+    "",
+    "The notice is issued under leadership authority after administrative or pastoral review. The recipient is required to observe the instruction, restriction, corrective action, response deadline, reporting requirement, or review process communicated by authorized leadership.",
+    "",
+    "This document must be handled confidentially. It must not be circulated, altered, or used outside the purpose for which it was issued. Any appeal, clarification, or response should be submitted through the approved LETW leadership channel.",
+    "",
+    "This notice remains valid only while the QR verification page confirms an active issued status."
+  ].join("\n"),
+  APPRECIATION: [
+    "Light Encounter Tabernacle Worldwide hereby issues this official letter of appreciation in recognition of your faithful service, support, giving, leadership, sacrifice, or contribution to the work of the ministry.",
+    "",
+    "LETW acknowledges the value of your labour and the positive impact of your contribution. This appreciation is recorded for honour, encouragement, official reference, and preservation in the LETW administrative record.",
+    "",
+    "We pray that the Lord rewards your labour, strengthens your hands, and multiplies grace for greater impact.",
+    "",
+    "This letter may be verified through the QR code to confirm that it remains an active LETW record."
+  ].join("\n"),
+  AUTHORIZATION: [
+    "This letter confirms that Light Encounter Tabernacle Worldwide authorizes the named recipient for the stated purpose, duty, transaction, representation, access, travel, collection, engagement, or official assignment.",
+    "",
+    "The authorization is limited to the scope, date, location, department, branch, ministry, or activity stated in this letter. It does not grant unlimited authority and may be withdrawn, replaced, or revoked by LETW leadership.",
+    "",
+    "Any person or institution relying on this authorization should verify the letter by scanning the QR code and confirming that the status is active.",
+    "",
+    "The recipient is expected to act with integrity, accountability, confidentiality, and full compliance with LETW instructions."
+  ].join("\n"),
+  INTRODUCTION: [
+    "Light Encounter Tabernacle Worldwide hereby introduces the named recipient for the stated official, ministry, pastoral, administrative, travel, branch, event, or institutional purpose.",
+    "",
+    "This introduction is issued based on the records and leadership knowledge available at the time of issuance. It should be used only for the purpose stated in the letter and should not be altered, transferred, or relied upon after revocation or archival.",
+    "",
+    "Where further confirmation is required, the recipient or receiving organization should scan the QR code or open the verification page to confirm the current LETW registry status.",
+    "",
+    "We request that appropriate courtesy and assistance be extended within the limits of the stated purpose."
+  ].join("\n"),
   ORDINATION: [
     "This letter confirms the official LETW record concerning your ordination and ministerial recognition.",
     "",
@@ -907,13 +997,24 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
           <form className="rounded-lg border border-ink/10 bg-white p-4" onSubmit={(event) => void createLetter(event)}>
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Mail className="h-4 w-4 text-moss" />Official letter generator</p>
             <p className="mt-2 rounded-md bg-paper p-3 text-xs leading-5 text-ink/60">
-              Use this for appointment, transfer, ordination, recommendation, invitation, and membership confirmation letters. The PDF now adds LETW letterhead,
+              Use this for appointment, transfer, retirement, relieve of service, promotion, deployment, commissioning, sabbatical leave, disciplinary notice,
+              appreciation, authorization, introduction, ordination, recommendation, invitation, and membership confirmation letters. The PDF adds LETW letterhead,
               protected QR verification, official record details, scope, seal, signature block, and multi-page formatting automatically.
             </p>
             <div className="mt-4 space-y-3">
               <FieldSelect name="letterType" label="Letter type" defaultValue="APPOINTMENT">
                 <option value="APPOINTMENT">Appointment letter</option>
                 <option value="TRANSFER">Transfer letter</option>
+                <option value="RETIREMENT">Retirement letter</option>
+                <option value="RELIEVE_OF_SERVICE">Relieve of service letter</option>
+                <option value="PROMOTION">Promotion letter</option>
+                <option value="DEPLOYMENT">Deployment letter</option>
+                <option value="COMMISSIONING">Commissioning letter</option>
+                <option value="SABBATICAL_LEAVE">Sabbatical / leave approval</option>
+                <option value="DISCIPLINARY_NOTICE">Disciplinary notice</option>
+                <option value="APPRECIATION">Appreciation letter</option>
+                <option value="AUTHORIZATION">Authorization letter</option>
+                <option value="INTRODUCTION">Introduction / reference letter</option>
                 <option value="ORDINATION">Ordination letter</option>
                 <option value="RECOMMENDATION">Recommendation letter</option>
                 <option value="INVITATION">Invitation letter</option>

@@ -146,16 +146,20 @@ function drawHeader(input: {
   white: PdfColor;
 }) {
   const { page, logo, fonts, letterNumber, status, navy, gold, white } = input;
+  const paleBlue = rgb(0.91, 0.96, 1);
   page.drawRectangle({ x: 0, y: 736, width: pageSize[0], height: 106, color: navy });
   page.drawRectangle({ x: 0, y: 730, width: pageSize[0], height: 6, color: gold });
-  page.drawImage(logo, { x: 44, y: 756, width: 62, height: 62 });
-  drawFittedText(page, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", 122, 795, 272, fonts.bold, 14, white);
-  page.drawText("Official Leadership Letter - letw.org", { x: 122, y: 776, size: 9.2, font: fonts.bold, color: gold });
-  page.drawText("Encounter God. Experience Transformation. Impact Nations.", { x: 122, y: 760, size: 8.2, font: fonts.sans, color: white });
+  page.drawEllipse({ x: 74, y: 787, xScale: 34, yScale: 34, color: white, borderColor: gold, borderWidth: 1.2 });
+  page.drawImage(logo, { x: 48, y: 761, width: 52, height: 52 });
+  drawFittedText(page, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", 124, 797, 248, fonts.bold, 13.2, white);
+  page.drawText("Official Leadership Letter - letw.org", { x: 124, y: 778, size: 9.2, font: fonts.bold, color: gold });
+  page.drawText("Encounter God. Experience Transformation. Impact Nations.", { x: 124, y: 761, size: 7.8, font: fonts.sans, color: white });
 
-  page.drawRectangle({ x: 416, y: 774, width: 126, height: 34, color: white, opacity: 0.11, borderColor: gold, borderWidth: 0.7 });
-  drawFittedText(page, letterNumber, 426, 794, 104, fonts.bold, 8.5, gold);
-  page.drawText(status, { x: 426, y: 780, size: 7.5, font: fonts.bold, color: white });
+  page.drawRectangle({ x: 390, y: 764, width: 154, height: 52, color: white, opacity: 0.12, borderColor: gold, borderWidth: 0.85 });
+  page.drawRectangle({ x: 398, y: 774, width: 62, height: 15, color: gold });
+  page.drawText(status, { x: 410, y: 778.5, size: 6.8, font: fonts.bold, color: navy });
+  page.drawText("DOCUMENT NO.", { x: 398, y: 799, size: 6.2, font: fonts.bold, color: paleBlue });
+  drawFittedText(page, letterNumber, 398, 790, 136, fonts.bold, 8.3, gold);
 }
 
 function drawFooter(input: {
@@ -180,8 +184,8 @@ function drawFooter(input: {
 }
 
 function drawOfficialFrame(page: PDFPage, navy: PdfColor, gold: PdfColor) {
-  page.drawRectangle({ x: 28, y: 30, width: pageSize[0] - 56, height: pageSize[1] - 60, borderColor: navy, borderWidth: 1.05 });
-  page.drawRectangle({ x: 34, y: 36, width: pageSize[0] - 68, height: pageSize[1] - 72, borderColor: gold, borderWidth: 0.45 });
+  page.drawRectangle({ x: 28, y: 30, width: pageSize[0] - 56, height: 692, borderColor: navy, borderWidth: 1.05 });
+  page.drawRectangle({ x: 34, y: 36, width: pageSize[0] - 68, height: 680, borderColor: gold, borderWidth: 0.45 });
   page.drawLine({ start: { x: 42, y: 722 }, end: { x: pageSize[0] - 42, y: 722 }, thickness: 0.55, color: gold });
 }
 
