@@ -158,6 +158,7 @@ export function AccessRequestsPanel({ title, description, requests, reviewMode =
                             <option value="1">Temporary: 1 day</option>
                             <option value="7">Temporary: 7 days</option>
                             <option value="30">Temporary: 30 days</option>
+                            <option value="60">Temporary: 60 days</option>
                           </select>
                         </label>
                       </>

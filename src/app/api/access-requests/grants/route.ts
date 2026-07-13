@@ -53,7 +53,7 @@ export async function GET() {
         where: {
           workspaceId: { in: workspaceIds },
           revokedAt: null,
-          expiresAt: { gt: new Date() }
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
         },
         include: {
           workspace: { select: { id: true, name: true } },

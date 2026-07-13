@@ -23,7 +23,7 @@ type AccessRequestInput = {
   reason?: string | null;
 };
 
-type GrantDurationDays = 1 | 7 | 30;
+type GrantDurationDays = 1 | 7 | 30 | 60;
 
 const workspaceGrantRoles = new Set<WorkspaceRole>([
   WorkspaceRole.VIEWER,
@@ -62,7 +62,7 @@ export async function getActiveTemporaryWorkspaceAccess(userId: string, workspac
       userId,
       workspaceId,
       revokedAt: null,
-      expiresAt: { gt: new Date() },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       workspace: { deletedAt: null }
     },
     include: {
@@ -453,13 +453,10 @@ export async function grantTemporaryAccess(input: {
   targetId: string;
   role?: "USER" | "EDITOR";
   fileAccessLevel?: "VIEW" | "DOWNLOAD";
-  expiresInDays: GrantDurationDays;
+  expiresInDays: GrantDurationDays | null;
   reason?: string | null;
 }) {
   const expiresAt = accessExpiry(input.expiresInDays);
-  if (!expiresAt) {
-    throw new ApiError(422, "Temporary access requires an expiry.");
-  }
 
   const targetUser = await prisma.user.findFirst({
     where: {
@@ -513,7 +510,7 @@ export async function grantTemporaryAccess(input: {
       workspaceId: workspace.id,
       type: "TEMPORARY_ACCESS_GRANTED",
       title: "Temporary workspace access granted",
-      body: `${workspace.name} until ${expiresAt.toLocaleDateString("en-GB")}`,
+      body: expiresAt ? `${workspace.name} until ${expiresAt.toLocaleDateString("en-GB")}` : `${workspace.name} with no expiry date`,
       href: `/dashboard/workspaces/${workspace.id}`,
       priority: NotificationPriority.HIGH
     });
@@ -522,7 +519,7 @@ export async function grantTemporaryAccess(input: {
       workspaceId: workspace.id,
       action: activityActions.temporaryAccessGranted,
       targetId: grant.id,
-      metadata: { targetType: input.targetType, userId: input.userId, expiresAt: expiresAt.toISOString() }
+      metadata: { targetType: input.targetType, userId: input.userId, expiresAt: expiresAt?.toISOString() ?? null }
     });
 
     return { grant, workspace };
@@ -573,7 +570,7 @@ export async function grantTemporaryAccess(input: {
     workspaceId: file.workspaceId,
     type: "TEMPORARY_ACCESS_GRANTED",
     title: accessLevel === "DOWNLOAD" ? "Document download permission granted" : "Temporary file access granted",
-    body: `${file.fileName} until ${expiresAt.toLocaleDateString("en-GB")}`,
+    body: expiresAt ? `${file.fileName} until ${expiresAt.toLocaleDateString("en-GB")}` : `${file.fileName} with no expiry date`,
     href: accessLevel === "DOWNLOAD" ? `/api/files/${file.id}/download` : `/api/files/${file.id}/preview`,
     priority: NotificationPriority.HIGH
   });
@@ -582,7 +579,7 @@ export async function grantTemporaryAccess(input: {
     workspaceId: file.workspaceId,
     action: activityActions.temporaryAccessGranted,
     targetId: grant.id,
-    metadata: { targetType: input.targetType, userId: input.userId, accessLevel, expiresAt: expiresAt.toISOString() }
+    metadata: { targetType: input.targetType, userId: input.userId, accessLevel, expiresAt: expiresAt?.toISOString() ?? null }
   });
 
   return { grant, file };

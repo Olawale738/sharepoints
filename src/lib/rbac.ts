@@ -200,7 +200,7 @@ export async function requireWorkspaceMembership(userId: string, workspaceId: st
         userId,
         workspaceId,
         revokedAt: null,
-        expiresAt: { gt: new Date() },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         workspace: { deletedAt: null }
       },
       select: {

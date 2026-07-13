@@ -20,7 +20,7 @@ type Grant = {
   id: string;
   role: string;
   reason: string | null;
-  expiresAt: string;
+  expiresAt: string | null;
   workspace: { id: string; name: string };
   user: { name: string | null; email: string | null };
   grantedBy: { name: string | null; email: string | null };
@@ -99,7 +99,7 @@ export function TemporaryAccessGrantPanel() {
         userId,
         role,
         fileAccessLevel,
-        expiresInDays: Number(expiresInDays),
+        expiresInDays: expiresInDays === "never" ? null : Number(expiresInDays),
         reason
       })
     });
@@ -142,7 +142,7 @@ export function TemporaryAccessGrantPanel() {
         </p>
         <h2 className="mt-2 text-xl font-semibold text-ink">Grant expiring workspace or file access</h2>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-ink/60">
-          Give a member precise access for 1, 7, or 30 days. Expired or revoked grants stop working automatically.
+          Give a member precise access for 1, 7, 30, 60 days, or keep the grant active until it is manually revoked.
         </p>
       </div>
 
@@ -202,6 +202,8 @@ export function TemporaryAccessGrantPanel() {
                   <option value="1">1 day</option>
                   <option value="7">7 days</option>
                   <option value="30">30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="never">Never expire</option>
                 </select>
               </label>
             )}
@@ -214,6 +216,8 @@ export function TemporaryAccessGrantPanel() {
                 <option value="1">1 day</option>
                 <option value="7">7 days</option>
                 <option value="30">30 days</option>
+                <option value="60">60 days</option>
+                <option value="never">Never expire</option>
               </select>
             </label>
           ) : null}
@@ -242,7 +246,7 @@ export function TemporaryAccessGrantPanel() {
               <div key={grant.id} className="rounded-md border border-ink/10 bg-white p-3">
                 <p className="text-sm font-semibold text-ink">{grant.user.name ?? grant.user.email}</p>
                 <p className="mt-1 text-xs text-ink/55">
-                  {grant.workspace.name} - {grant.role.toLowerCase()} - expires {formatDate(grant.expiresAt)}
+                  {grant.workspace.name} - {grant.role.toLowerCase()} - {grant.expiresAt ? `expires ${formatDate(grant.expiresAt)}` : "never expires"}
                 </p>
               </div>
             ))}
@@ -261,7 +265,7 @@ export function TemporaryAccessGrantPanel() {
                       <p className="text-sm font-semibold text-ink">{grant.user.name ?? grant.user.email}</p>
                       <p className="mt-1 text-xs text-ink/55">
                         {grant.file.fileName} - {grant.file.workspace.name} - {grant.accessLevel.toLowerCase()}
-                        {grant.expiresAt ? ` - expires ${formatDate(grant.expiresAt)}` : ""}
+                        {grant.expiresAt ? ` - expires ${formatDate(grant.expiresAt)}` : " - never expires"}
                       </p>
                     </div>
                     {data?.canManageDownloadGrants ? (

@@ -115,7 +115,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
         userId: session.user.id,
         workspaceId,
         revokedAt: null,
-        expiresAt: { gt: new Date() },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         workspace: { deletedAt: null }
       },
       include: {

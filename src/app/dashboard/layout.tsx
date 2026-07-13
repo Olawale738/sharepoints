@@ -40,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       where: {
         userId: session.user.id,
         revokedAt: null,
-        expiresAt: { gt: new Date() },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         workspace: { deletedAt: null }
       },
       include: {

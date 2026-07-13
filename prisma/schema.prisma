@@ -1577,7 +1577,7 @@ model TemporaryWorkspaceAccess {
   grantedById String
   role        WorkspaceRole @default(USER)
   reason      String?       @db.Text
-  expiresAt   DateTime
+  expiresAt   DateTime?
   revokedAt   DateTime?
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User          @relation("TemporaryWorkspaceAccessUser", fields: [userId], references: [id], onDelete: Cascade)
