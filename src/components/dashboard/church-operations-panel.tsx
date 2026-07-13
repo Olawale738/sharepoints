@@ -150,7 +150,8 @@ export function ChurchOperationsPanel() {
     event.preventDefault();
     setError("");
     setMessage("");
-    const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form).entries());
     const payload: Record<string, unknown> = { entity: mode, ...values };
     for (const optionalKey of [
       "leaderId",
@@ -208,7 +209,7 @@ export function ChurchOperationsPanel() {
       setError(body?.error ?? "Record could not be created.");
       return;
     }
-    event.currentTarget.reset();
+    form.reset();
     setMessage(`${displayEntity(mode)} created.`);
     await load();
   }

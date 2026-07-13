@@ -170,7 +170,8 @@ export function FormsPanel({ workspaceId, canManage }: { workspaceId: string; ca
     if (!activeForm) return;
     setError("");
     setStatus("");
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const response = await fetch(`/api/forms/${activeForm.id}/responses`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -193,7 +194,7 @@ export function FormsPanel({ workspaceId, canManage }: { workspaceId: string; ca
     const approvalMessage = activeForm.requiresApproval ? " It is waiting for approval." : "";
     setStatus(`Your response has been saved.${approvalMessage}`);
     setAnswers({});
-    event.currentTarget.reset();
+    form.reset();
     await loadForms();
   }
 

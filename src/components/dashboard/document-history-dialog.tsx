@@ -80,7 +80,8 @@ export function DocumentHistoryDialog({
     event.preventDefault();
     setBusy(true);
     setError("");
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const response = await fetch(`/api/files/${fileId}/versions`, { method: "POST", body: formData });
     setBusy(false);
 
@@ -90,7 +91,7 @@ export function DocumentHistoryDialog({
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     await loadHistory();
   }
 
@@ -132,7 +133,8 @@ export function DocumentHistoryDialog({
 
   async function addComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const response = await fetch(`/api/files/${fileId}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -140,7 +142,7 @@ export function DocumentHistoryDialog({
     });
 
     if (response.ok) {
-      event.currentTarget.reset();
+      form.reset();
       await loadHistory();
     }
   }

@@ -137,33 +137,38 @@ export function AiAssistantPanel() {
     if (question.trim().length < 2) return;
     setAsking(true);
     setError("");
-    const response = await fetch("/api/ai-assistant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question,
-        mode,
-        workspaceId: workspaceId || null,
-        agentId: agentId || null,
-        threadId
-      })
-    });
-    const data = (await response.json().catch(() => null)) as
-      | { threadId?: string; answer?: string; sources?: Source[]; error?: string }
-      | null;
-    setAsking(false);
-    if (!response.ok || !data?.answer || !data.threadId) {
-      setError(data?.error ?? "The assistant could not answer.");
-      return;
-    }
-    setThreadId(data.threadId);
-    setAnswer(data.answer);
-    setSources(data.sources ?? []);
-    setQuestion("");
-    const refresh = await fetch("/api/ai-assistant");
-    if (refresh.ok) {
-      const refreshed = (await refresh.json()) as { threads: Thread[] };
-      setThreads(refreshed.threads);
+    try {
+      const response = await fetch("/api/ai-assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          mode,
+          workspaceId: workspaceId || null,
+          agentId: agentId || null,
+          threadId
+        })
+      });
+      const data = (await response.json().catch(() => null)) as
+        | { threadId?: string; answer?: string; sources?: Source[]; error?: string }
+        | null;
+      if (!response.ok || !data?.answer || !data.threadId) {
+        setError(data?.error ?? "The assistant could not answer.");
+        return;
+      }
+      setThreadId(data.threadId);
+      setAnswer(data.answer);
+      setSources(data.sources ?? []);
+      setQuestion("");
+      const refresh = await fetch("/api/ai-assistant");
+      if (refresh.ok) {
+        const refreshed = (await refresh.json()) as { threads: Thread[] };
+        setThreads(refreshed.threads);
+      }
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "The assistant request could not be completed.");
+    } finally {
+      setAsking(false);
     }
   }
 

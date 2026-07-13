@@ -280,7 +280,8 @@ export function ComplianceCenter() {
     setError("");
     setMessage("");
     setBusy("create");
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const response = await fetch("/api/compliance/campaigns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -304,7 +305,7 @@ export function ComplianceCenter() {
       setError(result?.error ?? "Campaign could not be created.");
       return;
     }
-    event.currentTarget.reset();
+    form.reset();
     setSelectedFields([]);
     setSelectedUserIds([]);
     setAudienceType("ALL_ACTIVE");

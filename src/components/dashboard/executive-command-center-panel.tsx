@@ -269,6 +269,7 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
 
   async function submitCreate(event: FormEvent<HTMLFormElement>, entity: string, payload: Record<string, unknown>, success: string) {
     event.preventDefault();
+    const form = event.currentTarget;
     setLoading(entity);
     setMessage("");
     setError("");
@@ -277,7 +278,7 @@ export function ExecutiveCommandCenterPanel({ initialData }: { initialData: Exec
         method: "POST",
         body: JSON.stringify({ entity, ...payload })
       });
-      event.currentTarget.reset();
+      form.reset();
       await refresh();
       setMessage(success);
     } catch (nextError) {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState, type ReactNode } from "react";
+import { FormEvent, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import {
   BarChart3,
   CheckCircle2,
@@ -152,6 +152,57 @@ type GovernanceData = {
 
 const tabs = ["Decisions", "Reports", "Vault", "Handovers", "Letters"] as const;
 
+const letterTemplates: Record<string, string> = {
+  APPOINTMENT: [
+    "This letter confirms your appointment to serve in the stated capacity within Light Encounter Tabernacle Worldwide.",
+    "",
+    "This appointment is made under the authority of LETW leadership and is effective from the date stated on this letter. Your responsibilities include faithful service, accountability to assigned leadership, protection of LETW values, timely reporting, and cooperation with all approved policies and instructions.",
+    "",
+    "You are expected to carry out this assignment with integrity, confidentiality, humility, excellence, and a clear commitment to the spiritual and operational growth of the ministry.",
+    "",
+    "Kindly acknowledge this appointment and complete any onboarding, documentation, handover, or reporting requirements assigned to you in the LETW system."
+  ].join("\n"),
+  TRANSFER: [
+    "This letter confirms your official transfer within Light Encounter Tabernacle Worldwide.",
+    "",
+    "The transfer is issued for ministry coordination, leadership alignment, and effective administration. You are required to complete all handover duties, submit pending records, transfer relevant documents, and cooperate with both outgoing and receiving leadership.",
+    "",
+    "Your new assignment becomes effective from the date stated on this letter unless otherwise communicated by authorized LETW leadership.",
+    "",
+    "Please treat this transfer as an official LETW record and ensure all related responsibilities are completed in good order."
+  ].join("\n"),
+  ORDINATION: [
+    "This letter confirms the official LETW record concerning your ordination and ministerial recognition.",
+    "",
+    "This recognition is granted after leadership review and is subject to continued spiritual integrity, sound doctrine, faithful service, accountability, and compliance with LETW governance, safeguarding, and pastoral standards.",
+    "",
+    "You are expected to discharge ministerial duties with holiness, wisdom, compassion, confidentiality, and respect for the authority and order of Light Encounter Tabernacle Worldwide.",
+    "",
+    "This record remains valid only while the verification page confirms an active status."
+  ].join("\n"),
+  RECOMMENDATION: [
+    "Light Encounter Tabernacle Worldwide hereby issues this recommendation based on the official records and leadership knowledge available at the time of issuance.",
+    "",
+    "The named recipient is recognized in relation to the purpose stated in this letter. This recommendation should be used only for the stated purpose and should not be altered, transferred, or relied upon after revocation or archival.",
+    "",
+    "For confirmation, scan the QR code or open the verification page to confirm the current status of this letter."
+  ].join("\n"),
+  INVITATION: [
+    "Light Encounter Tabernacle Worldwide is pleased to issue this official invitation.",
+    "",
+    "The recipient is invited to participate in the stated LETW activity, meeting, assignment, service, conference, or ministry engagement. Participation is subject to LETW order, security requirements, schedule, and any additional instructions communicated by authorized leadership.",
+    "",
+    "Please present this letter where required and confirm its current status through the verification QR code."
+  ].join("\n"),
+  MEMBERSHIP_CONFIRMATION: [
+    "This letter confirms the membership record of the named recipient within Light Encounter Tabernacle Worldwide.",
+    "",
+    "Based on LETW records, the recipient is recognized in connection with the membership status, role, branch, ministry, or assignment stated in this letter. This confirmation is issued for administrative, pastoral, or official reference purposes only.",
+    "",
+    "This letter should be accepted only while the QR verification page confirms an active issued status."
+  ].join("\n")
+};
+
 function emptyToNull(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
   return text || null;
@@ -209,6 +260,15 @@ function reportPrimaryMetrics(metrics: Record<string, unknown>) {
     .filter((key) => Object.prototype.hasOwnProperty.call(metrics, key))
     .map((key) => [key, metrics[key]] as const)
     .slice(0, 9);
+}
+
+function applyLetterTemplate(event: MouseEvent<HTMLButtonElement>) {
+  const form = event.currentTarget.closest("form");
+  const type = form?.querySelector<HTMLSelectElement>("select[name='letterType']")?.value ?? "APPOINTMENT";
+  const body = form?.querySelector<HTMLTextAreaElement>("textarea[name='body']");
+  if (!body) return;
+  body.value = letterTemplates[type] ?? letterTemplates.APPOINTMENT;
+  body.focus();
 }
 
 function handoverItemCount(handover: Handover) {
@@ -867,6 +927,10 @@ export function LeadershipGovernancePanel({ initialData }: { initialData: Govern
               <Input name="recipientName" placeholder="Recipient name" required />
               <Input name="recipientEmail" type="email" placeholder="Recipient email" />
               {optionLists}
+              <Button type="button" variant="secondary" onClick={applyLetterTemplate}>
+                <FileText className="h-4 w-4" />
+                Insert professional body template
+              </Button>
               <Textarea
                 className="min-h-40"
                 name="body"

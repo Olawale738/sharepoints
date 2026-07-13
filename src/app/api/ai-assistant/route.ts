@@ -32,6 +32,71 @@ function sourceContext(sources: AiSource[]) {
     .join("\n\n");
 }
 
+function localAssistantFallback(input: {
+  question: string;
+  mode: string;
+  sources: AiSource[];
+}) {
+  const selectedSources = input.sources.slice(0, 6);
+  const sourceLines = selectedSources.map((source, index) => {
+    const marker = `[S${index + 1}]`;
+    return `${marker} ${source.title} (${source.type}) - ${source.excerpt.slice(0, 420)}${source.excerpt.length > 420 ? "..." : ""}`;
+  });
+  const sourceList = sourceLines.join("\n\n");
+
+  if (input.mode === "DRAFT") {
+    return [
+      "Draft suggestion based only on authorized LETW sources:",
+      "",
+      "Peace be unto you,",
+      "",
+      `Following the approved information available to this account, please review the matters below:\n${sourceList}`,
+      "",
+      "This is an AI draft. Confirm the details in LETW before sending or acting."
+    ].join("\n");
+  }
+
+  if (input.mode === "ACTION_ITEMS") {
+    return [
+      "Suggested action items from authorized LETW sources:",
+      "",
+      ...selectedSources.map((source, index) => `- Review ${source.title} [S${index + 1}] and assign a responsible person if follow-up is required.`),
+      "",
+      "These are suggestions only. No record has been changed."
+    ].join("\n");
+  }
+
+  if (input.mode === "REPORT") {
+    return [
+      "Permission-aware LETW report:",
+      "",
+      `Request: ${input.question}`,
+      "",
+      "Authorized source summary:",
+      sourceList,
+      "",
+      "Conclusion: use the source links below to confirm details before decisions are made."
+    ].join("\n");
+  }
+
+  if (input.mode === "TRANSLATE") {
+    return [
+      "Translation requires a configured OpenAI or Claude key for high-quality output.",
+      "",
+      "For now, here is the authorized content selected for translation:",
+      sourceList
+    ].join("\n");
+  }
+
+  return [
+    "Permission-aware answer from authorized LETW information:",
+    "",
+    sourceList,
+    "",
+    "I only used records your account is allowed to access. If the answer is incomplete, the information may not exist yet or may be outside your permission boundary."
+  ].join("\n");
+}
+
 async function canUseOrganizationAgent(userId: string, organizationUnitId: string) {
   const leadershipAccess = await getOrganizationUnitAccess(userId);
   if (leadershipAccess.isAdmin || leadershipAccess.visibleUnitIds.has(organizationUnitId)) return true;
@@ -92,10 +157,6 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid assistant request.");
     }
-    if (!isAiTextConfigured()) {
-      throw new ApiError(503, "The LETW AI Assistant is not configured yet.");
-    }
-
     const { question, mode } = parsed.data;
     const agent = parsed.data.agentId
       ? await prisma.workspaceAiAgent.findFirst({
@@ -208,35 +269,29 @@ export async function POST(request: Request) {
         status: "PROCESSING"
       }
     });
-    let answer = "";
-    let providerModel = "";
+    let answer = localAssistantFallback({ question, mode, sources: authorizedSources });
+    let providerModel = "local-fallback";
+    let auditStatus = isAiTextConfigured() ? "COMPLETED" : "LOCAL_FALLBACK";
+    let errorMessage: string | undefined;
 
-    try {
-      const generated = await generateAiText({
-        instructions,
-        input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(authorizedSources)}`,
-        openAiModel,
-        anthropicModel,
-        maxTokens: 2200
-      });
-      answer = generated.text;
-      providerModel = `${generated.provider}:${generated.model}`;
-    } catch (serviceError) {
-      await prisma.aiAssistantAudit.update({
-        where: { id: audit.id },
-        data: {
-          status: "FAILED",
-          errorMessage: serviceError instanceof Error ? serviceError.message : "AI service connection failed."
+    if (isAiTextConfigured()) {
+      try {
+        const generated = await generateAiText({
+          instructions,
+          input: `USER REQUEST:\n${question}\n\nAUTHORIZED LETW SOURCES:\n${sourceContext(authorizedSources)}`,
+          openAiModel,
+          anthropicModel,
+          maxTokens: 2200
+        });
+        if (generated.text) {
+          answer = generated.text;
+          providerModel = `${generated.provider}:${generated.model}`;
         }
-      });
-      throw new ApiError(502, "The LETW AI Assistant could not connect to the AI service.");
-    }
-    if (!answer) {
-      await prisma.aiAssistantAudit.update({
-        where: { id: audit.id },
-        data: { status: "FAILED", errorMessage: "The AI service returned an empty answer." }
-      });
-      throw new ApiError(502, "The LETW AI Assistant returned an empty answer.");
+      } catch (serviceError) {
+        auditStatus = "FAILED_WITH_LOCAL_FALLBACK";
+        providerModel = "local-fallback";
+        errorMessage = serviceError instanceof Error ? serviceError.message : "AI service connection failed.";
+      }
     }
 
     await prisma.$transaction([
@@ -251,7 +306,7 @@ export async function POST(request: Request) {
       }),
       prisma.aiAssistantAudit.update({
         where: { id: audit.id },
-        data: { status: "COMPLETED", model: providerModel }
+        data: { status: auditStatus, model: providerModel, errorMessage }
       }),
       prisma.aiAssistantThread.update({
         where: { id: thread.id },

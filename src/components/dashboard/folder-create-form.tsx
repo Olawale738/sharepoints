@@ -23,7 +23,8 @@ export function FolderCreateForm({ workspaceId, parentId, disabled }: FolderCrea
     setError("");
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const response = await fetch(`/api/workspaces/${workspaceId}/folders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,7 +42,7 @@ export function FolderCreateForm({ workspaceId, parentId, disabled }: FolderCrea
       return;
     }
 
-    event.currentTarget.reset();
+    form.reset();
     router.refresh();
   }
 
@@ -56,4 +57,3 @@ export function FolderCreateForm({ workspaceId, parentId, disabled }: FolderCrea
     </form>
   );
 }
-

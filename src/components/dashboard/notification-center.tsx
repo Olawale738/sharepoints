@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Bell, CheckCheck, Loader2, Settings } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,21 @@ type NotificationItem = {
   createdAt: string;
 };
 
+function notificationHref(value?: string | null) {
+  const href = value?.trim();
+  if (!href) return "/dashboard";
+  if (href.startsWith("/")) return href;
+  try {
+    const url = new URL(href);
+    if (url.protocol === "https:" || url.protocol === "http:") return url.toString();
+  } catch {
+    // Invalid notification links fall back to the dashboard.
+  }
+  return "/dashboard";
+}
+
 export function NotificationCenter() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -30,35 +45,38 @@ export function NotificationCenter() {
 
   async function loadNotifications() {
     setLoading(true);
-    const response = await fetch("/api/notifications");
-    setLoading(false);
+    try {
+      const response = await fetch("/api/notifications");
 
-    if (!response.ok) {
-      return;
-    }
-
-    const data = (await response.json()) as {
-      notifications: NotificationItem[];
-      unreadCount: number;
-      preference?: { browserEnabled?: boolean };
-      userId: string;
-    };
-    setNotifications(data.notifications);
-    setUnreadCount(data.unreadCount);
-    setBrowserEnabled(Boolean(data.preference?.browserEnabled));
-    setUserId(data.userId);
-
-    if (
-      data.unreadCount &&
-      data.preference?.browserEnabled &&
-      typeof Notification !== "undefined" &&
-      Notification.permission === "granted"
-    ) {
-      const latest = data.notifications.find((notification) => !notification.readAt);
-
-      if (latest) {
-        new Notification(latest.title, { body: latest.body ?? "Open LETW to view the update.", icon: "/letw-logo.png" });
+      if (!response.ok) {
+        return;
       }
+
+      const data = (await response.json()) as {
+        notifications: NotificationItem[];
+        unreadCount: number;
+        preference?: { browserEnabled?: boolean };
+        userId: string;
+      };
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+      setBrowserEnabled(Boolean(data.preference?.browserEnabled));
+      setUserId(data.userId);
+
+      if (
+        data.unreadCount &&
+        data.preference?.browserEnabled &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      ) {
+        const latest = data.notifications.find((notification) => !notification.readAt);
+
+        if (latest) {
+          new Notification(latest.title, { body: latest.body ?? "Open LETW to view the update.", icon: "/letw-logo.png" });
+        }
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -77,6 +95,34 @@ export function NotificationCenter() {
     });
     setNotifications((current) => current.map((notification) => ({ ...notification, readAt: new Date().toISOString() })));
     setUnreadCount(0);
+  }
+
+  async function openNotification(notification: NotificationItem) {
+    const href = notificationHref(notification.href);
+    setOpen(false);
+    if (!notification.readAt) {
+      setNotifications((current) =>
+        current.map((item) => (item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item))
+      );
+      setUnreadCount((current) => Math.max(0, current - 1));
+      void fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "READ", id: notification.id })
+      }).catch(() => null);
+    }
+
+    if (href.startsWith("/")) {
+      router.push(href);
+      return;
+    }
+
+    try {
+      const url = new URL(href);
+      window.location.assign(url.toString());
+    } catch {
+      router.push("/dashboard");
+    }
   }
 
   async function enableBrowserNotifications() {
@@ -146,8 +192,12 @@ export function NotificationCenter() {
                   <p className="mt-1 text-[11px] text-ink/40">{new Date(notification.createdAt).toLocaleString()}</p>
                 </div>
               );
+              const href = notificationHref(notification.href);
               return notification.href ? (
-                <Link key={notification.id} href={notification.href} onClick={() => setOpen(false)}>
+                <Link key={notification.id} href={href} onClick={(event) => {
+                  event.preventDefault();
+                  void openNotification(notification);
+                }}>
                   {content}
                 </Link>
               ) : (
