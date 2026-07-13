@@ -65,6 +65,18 @@ export const updateWorkspaceMemberSchema = z.object({
   role: z.enum(["ADMIN", "LEADER", "MODERATOR", "USER"])
 });
 
+export const createAccessRequestSchema = z.object({
+  targetType: z.enum(["WORKSPACE", "FILE"]),
+  targetId: z.string().cuid(),
+  requestedRole: z.enum(["VIEWER", "USER", "EDITOR"]).default("VIEWER"),
+  reason: z.string().trim().max(1000).optional().or(z.literal(""))
+});
+
+export const reviewAccessRequestSchema = z.object({
+  action: z.enum(["APPROVE", "REJECT", "CANCEL"]),
+  decisionReason: z.string().trim().max(1000).optional().or(z.literal(""))
+});
+
 export const updateWorkspaceRolePermissionSchema = z.object({
   role: z.enum(["LEADER", "MODERATOR"]),
   canUploadFiles: z.boolean(),

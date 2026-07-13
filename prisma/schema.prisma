@@ -360,6 +360,18 @@ enum AccessDecision {
   NEEDS_REVIEW
 }
 
+enum AccessRequestTargetType {
+  WORKSPACE
+  FILE
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 enum VisitorJourneyType {
   VISITOR
   NEW_CONVERT
@@ -880,6 +892,10 @@ model User {
   fileComments               FileComment[]
   filesCheckedOut            File[]                       @relation("FileCheckedOutBy")
   filesClassified            File[]                       @relation("FileClassifiedBy")
+  accessRequests             AccessRequest[]              @relation("AccessRequestRequester")
+  accessRequestReviews       AccessRequest[]              @relation("AccessRequestReviewer")
+  fileAccessGrants           FileAccessGrant[]            @relation("FileAccessGrantUser")
+  fileAccessGrantsIssued     FileAccessGrant[]            @relation("FileAccessGrantIssuer")
   wikiPagesAuthored          WikiPage[]                   @relation("WikiPageAuthor")
   wikiPagesUpdated           WikiPage[]                   @relation("WikiPageUpdater")
   formsCreated               WorkspaceForm[]              @relation("FormCreator")
@@ -1016,6 +1032,7 @@ model Workspace {
   createdBy           User                        @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members             WorkspaceMember[]
   rolePermissions     WorkspaceRolePermission[]
+  accessRequests      AccessRequest[]
   departmentAccesses  WorkspaceDepartmentAccess[]
   announcements       WorkspaceAnnouncement[]
   tasks               WorkspaceTask[]
@@ -1476,6 +1493,8 @@ model File {
   checkedOutBy         User?           @relation("FileCheckedOutBy", fields: [checkedOutById], references: [id], onDelete: SetNull)
   classifiedBy         User?           @relation("FileClassifiedBy", fields: [classifiedById], references: [id], onDelete: SetNull)
   chatMessages         ChatMessage[]   @relation("MessageAttachment")
+  accessRequests       AccessRequest[]
+  accessGrants         FileAccessGrant[]
   versions             FileVersion[]
   comments             FileComment[]
   shareLinks           FileShareLink[]
@@ -1496,6 +1515,53 @@ model File {
   @@index([shareRestricted])
   @@index([aiRestricted])
   @@index([classifiedById])
+}
+
+model AccessRequest {
+  id             String                  @id @default(cuid())
+  requesterId    String
+  reviewerId     String?
+  workspaceId    String
+  fileId         String?
+  targetType     AccessRequestTargetType
+  targetId       String
+  requestedRole  WorkspaceRole           @default(VIEWER)
+  status         AccessRequestStatus     @default(PENDING)
+  reason         String?                 @db.Text
+  decisionReason String?                 @db.Text
+  decidedAt      DateTime?
+  requester      User                    @relation("AccessRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  reviewer       User?                   @relation("AccessRequestReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  workspace      Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  file           File?                   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@index([workspaceId, status, createdAt])
+  @@index([requesterId, status, createdAt])
+  @@index([targetType, targetId, status])
+  @@index([fileId, status])
+  @@index([reviewerId, decidedAt])
+}
+
+model FileAccessGrant {
+  id          String    @id @default(cuid())
+  fileId      String
+  userId      String
+  grantedById String
+  accessLevel String    @default("VIEW")
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  file        File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  user        User      @relation("FileAccessGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy   User      @relation("FileAccessGrantIssuer", fields: [grantedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([fileId, userId])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([fileId, revokedAt])
+  @@index([grantedById, createdAt])
 }
 
 model FileVersion {

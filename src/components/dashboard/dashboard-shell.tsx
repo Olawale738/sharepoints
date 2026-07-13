@@ -12,6 +12,7 @@ import {
   DoorOpen,
   FileLock2,
   HeartHandshake,
+  KeyRound,
   Newspaper,
   RadioTower,
   ShieldCheck,
@@ -189,6 +190,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               >
                 <BadgeCheck className="h-4 w-4" />
                 <span className="hidden 2xl:inline">Member card</span>
+              </Link>
+              <Link
+                aria-label="Access requests"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/access-requests"
+              >
+                <KeyRound className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Requests</span>
               </Link>
               {canOpenAdminCenter ? (
                 <Link

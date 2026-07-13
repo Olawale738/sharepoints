@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   Globe2,
   IdCard,
+  KeyRound,
   MessageCircle
 } from "lucide-react";
 
@@ -414,6 +415,12 @@ export default async function AdminControlCenterPage() {
           label: "Access review",
           detail: "Review workspace roles, share links, AI agents, old devices, and sensitive access.",
           icon: ShieldAlert
+        },
+        {
+          href: "/dashboard/access-requests",
+          label: "Access requests",
+          detail: "Approve or reject member requests for private workspaces and restricted files.",
+          icon: KeyRound
         },
         {
           href: "/dashboard/admin/authority-flow",

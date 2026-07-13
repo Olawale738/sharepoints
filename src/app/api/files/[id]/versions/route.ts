@@ -21,6 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const file = await prisma.file.findUnique({
       where: { id },
       select: {
+        id: true,
         workspaceId: true,
         uploadedById: true,
         approvalStatus: true,

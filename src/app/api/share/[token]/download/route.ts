@@ -20,6 +20,15 @@ function redirectToLogin(request: Request) {
   return Response.redirect(loginUrl, 302);
 }
 
+function redirectToAccessRequest(request: Request, fileId: string) {
+  const url = new URL(request.url);
+  const requestUrl = new URL("/dashboard/request-access", url.origin);
+  requestUrl.searchParams.set("targetType", "FILE");
+  requestUrl.searchParams.set("targetId", fileId);
+
+  return Response.redirect(requestUrl, 302);
+}
+
 export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await auth();
@@ -34,6 +43,7 @@ export async function GET(request: Request, context: RouteContext) {
       include: {
         file: {
           select: {
+            id: true,
             workspaceId: true,
             uploadedById: true,
             approvalStatus: true,
@@ -56,8 +66,16 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(410, "Share link has expired.");
     }
 
-    await requireWorkspaceMembership(session.user.id, shareLink.file.workspaceId);
-    await ensureCanDownloadFile(session.user.id, shareLink.file);
+    try {
+      await requireWorkspaceMembership(session.user.id, shareLink.file.workspaceId);
+      await ensureCanDownloadFile(session.user.id, shareLink.file);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        return redirectToAccessRequest(request, shareLink.file.id);
+      }
+
+      throw error;
+    }
 
     return getDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
   } catch (error) {

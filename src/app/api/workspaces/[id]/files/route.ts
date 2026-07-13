@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }
     }
 
+    const now = new Date();
     const files = await prisma.file.findMany({
       where: (await canApproveWorkspaceContent(user.id, id))
         ? {
@@ -53,10 +54,33 @@ export async function GET(request: NextRequest, context: RouteContext) {
             folderId: folderId || null,
             deletedAt: null,
             AND: [
-              { OR: [{ approvalStatus: "APPROVED" }, { uploadedById: user.id }] },
+              {
+                OR: [
+                  { approvalStatus: "APPROVED" },
+                  { uploadedById: user.id },
+                  {
+                    accessGrants: {
+                      some: {
+                        userId: user.id,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                      }
+                    }
+                  }
+                ]
+              },
               {
                 OR: [
                   { uploadedById: user.id },
+                  {
+                    accessGrants: {
+                      some: {
+                        userId: user.id,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                      }
+                    }
+                  },
                   {
                     dlpRestricted: false,
                     sensitivityLabel: { notIn: restrictedFileLabels }

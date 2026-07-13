@@ -1,5 +1,6 @@
 import { ApprovalStatus, WorkspaceRole } from "@prisma/client";
 
+import { hasActiveFileGrant } from "@/lib/access-requests";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -106,6 +107,7 @@ export async function createApprovalRequestIfNeeded(input: {
 }
 
 export async function ensureCanSeeFile(userId: string, file: {
+  id?: string | null;
   workspaceId: string;
   uploadedById: string;
   approvalStatus: ApprovalStatus;
@@ -114,15 +116,16 @@ export async function ensureCanSeeFile(userId: string, file: {
 }) {
   const isUploader = file.uploadedById === userId;
   const canApprove = await canApproveWorkspaceContent(userId, file.workspaceId);
+  const hasFileGrant = file.id ? await hasActiveFileGrant(userId, file.id) : false;
   const restricted =
     Boolean(file.dlpRestricted) ||
     (file.sensitivityLabel ? restrictedSensitivityLabels.has(file.sensitivityLabel) : false);
 
-  if (restricted && !isUploader && !canApprove) {
+  if (restricted && !isUploader && !canApprove && !hasFileGrant) {
     throw new ApiError(403, "This document is restricted to authorized leaders or administrators.");
   }
 
-  if (file.approvalStatus === ApprovalStatus.APPROVED || isUploader) {
+  if (file.approvalStatus === ApprovalStatus.APPROVED || isUploader || hasFileGrant) {
     return;
   }
 
@@ -134,6 +137,7 @@ export async function ensureCanSeeFile(userId: string, file: {
 }
 
 export async function ensureCanDownloadFile(userId: string, file: {
+  id?: string | null;
   workspaceId: string;
   uploadedById: string;
   approvalStatus: ApprovalStatus;
@@ -142,13 +146,15 @@ export async function ensureCanDownloadFile(userId: string, file: {
   downloadRestricted?: boolean | null;
 }) {
   await ensureCanSeeFile(userId, file);
+  const hasFileGrant = file.id ? await hasActiveFileGrant(userId, file.id) : false;
 
-  if (file.downloadRestricted && file.uploadedById !== userId && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
+  if (file.downloadRestricted && file.uploadedById !== userId && !hasFileGrant && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
     throw new ApiError(403, "Downloads are restricted for this document.");
   }
 }
 
 export async function ensureCanShareFile(userId: string, file: {
+  id?: string | null;
   workspaceId: string;
   uploadedById: string;
   approvalStatus: ApprovalStatus;
@@ -157,8 +163,9 @@ export async function ensureCanShareFile(userId: string, file: {
   shareRestricted?: boolean | null;
 }) {
   await ensureCanSeeFile(userId, file);
+  const hasFileGrant = file.id ? await hasActiveFileGrant(userId, file.id) : false;
 
-  if (file.shareRestricted && file.uploadedById !== userId && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
+  if (file.shareRestricted && file.uploadedById !== userId && !hasFileGrant && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
     throw new ApiError(403, "Share links are restricted for this document.");
   }
 }

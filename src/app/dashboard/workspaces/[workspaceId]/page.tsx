@@ -20,6 +20,7 @@ import { KnowledgeBasePanel } from "@/components/dashboard/knowledge-base-panel"
 import { MeetingsPanel } from "@/components/dashboard/meetings-panel";
 import { MembersPanel } from "@/components/dashboard/members-panel";
 import { RolePermissionsPanel } from "@/components/dashboard/role-permissions-panel";
+import { RequestAccessPanel } from "@/components/dashboard/request-access-panel";
 import { TasksPanel } from "@/components/dashboard/tasks-panel";
 import { WorkspaceDepartmentAccessPanel } from "@/components/dashboard/workspace-department-access-panel";
 import { WorkspaceDangerZone } from "@/components/dashboard/workspace-danger-zone";
@@ -109,16 +110,40 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
   }
 
   if (!membership) {
-    if (!isGlobalAdmin) {
-      notFound();
-    }
-
     const workspace = await prisma.workspace.findFirst({
       where: { id: workspaceId, deletedAt: null }
     });
 
     if (!workspace) {
       notFound();
+    }
+
+    if (!isGlobalAdmin) {
+      const existingRequest = await prisma.accessRequest.findFirst({
+        where: {
+          requesterId: session.user.id,
+          targetType: "WORKSPACE",
+          targetId: workspace.id
+        },
+        select: {
+          status: true
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+
+      return (
+        <div className="mx-auto max-w-3xl">
+          <RequestAccessPanel
+            targetType="WORKSPACE"
+            targetId={workspace.id}
+            title={`Request access to ${workspace.name}`}
+            description="You are signed in, but this workspace is private. Send a request and a workspace admin, leader, or approved moderator can review it."
+            existingStatus={existingRequest?.status ?? null}
+          />
+        </div>
+      );
     }
 
     membership = {
@@ -143,6 +168,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
     ? defaultPermissionsForRole(WorkspaceRole.ADMIN)
     : await getRolePermissions(workspaceId, membership.role);
   const canApproveContent = await canApproveWorkspaceContent(session.user.id, workspaceId);
+  const now = new Date();
 
   const [folders, files, members, activities, announcements, tasks, meetings, approvals, departments, departmentAccess] = await Promise.all([
     prisma.folder.findMany({
@@ -167,10 +193,33 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
             folderId,
             deletedAt: null,
             AND: [
-              { OR: [{ approvalStatus: "APPROVED" }, { uploadedById: session.user.id }] },
+              {
+                OR: [
+                  { approvalStatus: "APPROVED" },
+                  { uploadedById: session.user.id },
+                  {
+                    accessGrants: {
+                      some: {
+                        userId: session.user.id,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                      }
+                    }
+                  }
+                ]
+              },
               {
                 OR: [
                   { uploadedById: session.user.id },
+                  {
+                    accessGrants: {
+                      some: {
+                        userId: session.user.id,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                      }
+                    }
+                  },
                   {
                     dlpRestricted: false,
                     sensitivityLabel: { notIn: restrictedFileLabels }

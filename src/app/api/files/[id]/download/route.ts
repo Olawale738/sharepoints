@@ -20,6 +20,15 @@ function redirectToLogin(request: Request) {
   return Response.redirect(loginUrl, 302);
 }
 
+function redirectToAccessRequest(request: Request, fileId: string) {
+  const url = new URL(request.url);
+  const requestUrl = new URL("/dashboard/request-access", url.origin);
+  requestUrl.searchParams.set("targetType", "FILE");
+  requestUrl.searchParams.set("targetId", fileId);
+
+  return Response.redirect(requestUrl, 302);
+}
+
 export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await auth();
@@ -37,8 +46,16 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(404, "File not found.");
     }
 
-    await requireWorkspaceMembership(session.user.id, file.workspaceId);
-    await ensureCanDownloadFile(session.user.id, file);
+    try {
+      await requireWorkspaceMembership(session.user.id, file.workspaceId);
+      await ensureCanDownloadFile(session.user.id, file);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        return redirectToAccessRequest(request, file.id);
+      }
+
+      throw error;
+    }
 
     if (file.scanStatus === "INFECTED") {
       throw new ApiError(423, "This document was blocked by security screening.");
