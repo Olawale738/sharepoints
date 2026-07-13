@@ -879,6 +879,7 @@ model User {
   fileVersions               FileVersion[]                @relation("FileVersionUploader")
   fileComments               FileComment[]
   filesCheckedOut            File[]                       @relation("FileCheckedOutBy")
+  filesClassified            File[]                       @relation("FileClassifiedBy")
   wikiPagesAuthored          WikiPage[]                   @relation("WikiPageAuthor")
   wikiPagesUpdated           WikiPage[]                   @relation("WikiPageUpdater")
   formsCreated               WorkspaceForm[]              @relation("FormCreator")
@@ -1160,6 +1161,12 @@ model WorkspaceRolePermission {
   canManagePresidentialActions Boolean       @default(false)
   canManageMediaArchive        Boolean       @default(false)
   canUseExecutiveSecretary     Boolean       @default(false)
+  canApproveContent            Boolean       @default(false)
+  canClassifyDocuments         Boolean       @default(false)
+  canViewPresidentDesk         Boolean       @default(false)
+  canManageOfficialRegistry    Boolean       @default(false)
+  canViewBranchCompliance      Boolean       @default(false)
+  canRunSuperAdminRecovery     Boolean       @default(false)
   workspace                    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt                    DateTime      @default(now())
   updatedAt                    DateTime      @updatedAt
@@ -1454,6 +1461,12 @@ model File {
   scanDetails          String?
   dlpRestricted        Boolean         @default(false)
   dlpClassification    String?
+  sensitivityLabel     String          @default("INTERNAL")
+  downloadRestricted   Boolean         @default(false)
+  shareRestricted      Boolean         @default(false)
+  aiRestricted         Boolean         @default(false)
+  classifiedById       String?
+  classifiedAt         DateTime?
   deletedAt            DateTime?
   deletedById          String?
   restoreUntil         DateTime?
@@ -1461,6 +1474,7 @@ model File {
   folder               Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
   uploadedBy           User            @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Restrict)
   checkedOutBy         User?           @relation("FileCheckedOutBy", fields: [checkedOutById], references: [id], onDelete: SetNull)
+  classifiedBy         User?           @relation("FileClassifiedBy", fields: [classifiedById], references: [id], onDelete: SetNull)
   chatMessages         ChatMessage[]   @relation("MessageAttachment")
   versions             FileVersion[]
   comments             FileComment[]
@@ -1477,6 +1491,11 @@ model File {
   @@index([legalHold])
   @@index([deletedAt, restoreUntil])
   @@index([dlpRestricted])
+  @@index([sensitivityLabel])
+  @@index([downloadRestricted])
+  @@index([shareRestricted])
+  @@index([aiRestricted])
+  @@index([classifiedById])
 }
 
 model FileVersion {

@@ -25,6 +25,10 @@ type DocumentHistory = {
   checkedOutAt?: string | null;
   legalHold?: boolean;
   retentionUntil?: string | null;
+  sensitivityLabel?: string | null;
+  downloadRestricted?: boolean;
+  shareRestricted?: boolean;
+  aiRestricted?: boolean;
   checkedOutBy?: { name?: string | null; email?: string | null } | null;
   versions: Array<{
     id: string;
@@ -43,17 +47,30 @@ type DocumentHistory = {
   }>;
 };
 
+const sensitivityOptions = [
+  { value: "PUBLIC", label: "Public approved" },
+  { value: "INTERNAL", label: "Internal" },
+  { value: "LEADERSHIP_ONLY", label: "Leadership only" },
+  { value: "PASTORAL_CONFIDENTIAL", label: "Pastoral confidential" },
+  { value: "FINANCE_CONFIDENTIAL", label: "Finance confidential" },
+  { value: "BOARD_ONLY", label: "Board only" },
+  { value: "SAFEGUARDING_RESTRICTED", label: "Safeguarding restricted" },
+  { value: "LEGAL_HOLD", label: "Legal hold" }
+];
+
 export function DocumentHistoryDialog({
   fileId,
   fileName,
   canUpload,
   canManageGovernance,
+  canClassifyDocuments,
   onClose
 }: {
   fileId: string;
   fileName: string;
   canUpload: boolean;
   canManageGovernance: boolean;
+  canClassifyDocuments: boolean;
   onClose: () => void;
 }) {
   const [history, setHistory] = useState<DocumentHistory | null>(null);
@@ -96,7 +113,7 @@ export function DocumentHistoryDialog({
   }
 
   async function governance(
-    action: "CHECK_OUT" | "CHECK_IN" | "SET_LEGAL_HOLD" | "SET_RETENTION",
+    action: "CHECK_OUT" | "CHECK_IN" | "SET_LEGAL_HOLD" | "SET_RETENTION" | "SET_CLASSIFICATION",
     extra: Record<string, unknown> = {}
   ) {
     setBusy(true);
@@ -203,48 +220,120 @@ export function DocumentHistoryDialog({
               </form>
             ) : null}
 
-            {canManageGovernance ? (
+            {canManageGovernance || canClassifyDocuments ? (
               <div className="grid gap-3 rounded-md border border-ink/10 p-3 md:grid-cols-2">
-                <div>
-                  <div className="mb-2 flex items-center gap-2">
-                    <ShieldAlert className="h-4 w-4 text-moss" />
-                    <p className="text-sm font-semibold">Legal hold</p>
-                  </div>
-                  <p className="mb-3 text-xs text-ink/50">
-                    A legal hold prevents this document and its versions from being deleted.
-                  </p>
-                  <Button
-                    variant={history.legalHold ? "danger" : "secondary"}
-                    disabled={busy}
-                    onClick={() => governance("SET_LEGAL_HOLD", { legalHold: !history.legalHold })}
-                  >
-                    {history.legalHold ? "Remove legal hold" : "Apply legal hold"}
-                  </Button>
-                </div>
-                <form
+                {canManageGovernance ? (
+                  <>
+                    <div>
+                      <div className="mb-2 flex items-center gap-2">
+                        <ShieldAlert className="h-4 w-4 text-moss" />
+                        <p className="text-sm font-semibold">Legal hold</p>
+                      </div>
+                      <p className="mb-3 text-xs text-ink/50">
+                        A legal hold prevents this document and its versions from being deleted.
+                      </p>
+                      <Button
+                        variant={history.legalHold ? "danger" : "secondary"}
+                        disabled={busy}
+                        onClick={() => governance("SET_LEGAL_HOLD", { legalHold: !history.legalHold })}
+                      >
+                        {history.legalHold ? "Remove legal hold" : "Apply legal hold"}
+                      </Button>
+                    </div>
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const formData = new FormData(event.currentTarget);
+                        void governance("SET_RETENTION", {
+                          retentionUntil: String(formData.get("retentionUntil") ?? "") || null
+                        });
+                      }}
+                    >
+                      <p className="mb-2 text-sm font-semibold">Retention date</p>
+                      <p className="mb-3 text-xs text-ink/50">
+                        The document cannot be deleted before this date.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          defaultValue={history.retentionUntil?.slice(0, 10) ?? ""}
+                          name="retentionUntil"
+                          type="date"
+                        />
+                        <Button type="submit" variant="secondary" disabled={busy}>
+                          Save
+                        </Button>
+                      </div>
+                    </form>
+                  </>
+                ) : null}
+                {canClassifyDocuments ? (
+                  <form
+                    className="md:col-span-2"
                   onSubmit={(event) => {
                     event.preventDefault();
                     const formData = new FormData(event.currentTarget);
-                    void governance("SET_RETENTION", {
-                      retentionUntil: String(formData.get("retentionUntil") ?? "") || null
+                    void governance("SET_CLASSIFICATION", {
+                      sensitivityLabel: String(formData.get("sensitivityLabel") ?? "INTERNAL"),
+                      downloadRestricted: formData.get("downloadRestricted") === "on",
+                      shareRestricted: formData.get("shareRestricted") === "on",
+                      aiRestricted: formData.get("aiRestricted") === "on"
                     });
                   }}
                 >
-                  <p className="mb-2 text-sm font-semibold">Retention date</p>
-                  <p className="mb-3 text-xs text-ink/50">
-                    The document cannot be deleted before this date.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      defaultValue={history.retentionUntil?.slice(0, 10) ?? ""}
-                      name="retentionUntil"
-                      type="date"
-                    />
-                    <Button type="submit" variant="secondary" disabled={busy}>
-                      Save
-                    </Button>
+                  <div className="mb-3 flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-moss" />
+                    <p className="text-sm font-semibold">Document classification</p>
                   </div>
-                </form>
+                  <div className="grid gap-3 md:grid-cols-[1fr_1.4fr_auto] md:items-end">
+                    <label className="text-xs font-medium uppercase tracking-wide text-ink/55">
+                      Sensitivity
+                      <select
+                        className="mt-1 h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm font-normal normal-case text-ink outline-none focus:border-moss"
+                        defaultValue={history.sensitivityLabel ?? "INTERNAL"}
+                        name="sensitivityLabel"
+                      >
+                        {sensitivityOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="grid gap-2 text-sm sm:grid-cols-3">
+                      <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+                        <input
+                          className="h-4 w-4 accent-moss"
+                          defaultChecked={history.downloadRestricted}
+                          name="downloadRestricted"
+                          type="checkbox"
+                        />
+                        Restrict download
+                      </label>
+                      <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+                        <input
+                          className="h-4 w-4 accent-moss"
+                          defaultChecked={history.shareRestricted}
+                          name="shareRestricted"
+                          type="checkbox"
+                        />
+                        Restrict sharing
+                      </label>
+                      <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-white px-3 py-2">
+                        <input
+                          className="h-4 w-4 accent-moss"
+                          defaultChecked={history.aiRestricted}
+                          name="aiRestricted"
+                          type="checkbox"
+                        />
+                        Exclude from AI
+                      </label>
+                    </div>
+                  <Button type="submit" variant="secondary" disabled={busy}>
+                    Save label
+                  </Button>
+                </div>
+                  </form>
+                ) : null}
               </div>
             ) : null}
 

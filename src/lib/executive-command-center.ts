@@ -52,6 +52,7 @@ export async function getExecutiveCommandAccess(userId: string) {
     canManageDigitalSignatures,
     canManageEvidenceVault,
     canViewExecutiveBriefing,
+    canViewPresidentDesk,
     canManagePresidentialActions,
     canManageMediaArchive,
     canUseExecutiveSecretary
@@ -61,6 +62,7 @@ export async function getExecutiveCommandAccess(userId: string) {
     hasAnyWorkspacePermission(userId, "canManageDigitalSignatures"),
     hasAnyWorkspacePermission(userId, "canManageEvidenceVault"),
     hasAnyWorkspacePermission(userId, "canViewExecutiveBriefing"),
+    hasAnyWorkspacePermission(userId, "canViewPresidentDesk"),
     hasAnyWorkspacePermission(userId, "canManagePresidentialActions"),
     hasAnyWorkspacePermission(userId, "canManageMediaArchive"),
     hasAnyWorkspacePermission(userId, "canUseExecutiveSecretary")
@@ -71,7 +73,8 @@ export async function getExecutiveCommandAccess(userId: string) {
     canUseWhatsAppCommandBot,
     canManageDigitalSignatures,
     canManageEvidenceVault,
-    canViewExecutiveBriefing,
+    canViewExecutiveBriefing: canViewExecutiveBriefing || canViewPresidentDesk,
+    canViewPresidentDesk,
     canManagePresidentialActions,
     canManageMediaArchive,
     canUseExecutiveSecretary

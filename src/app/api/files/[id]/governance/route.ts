@@ -1,6 +1,7 @@
+import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { hasWorkspaceAdminAccess, requireWorkspaceMembership } from "@/lib/rbac";
+import { hasWorkspaceAdminAccess, requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { fileGovernanceSchema } from "@/lib/validators";
 
 type RouteContext = {
@@ -53,6 +54,38 @@ export async function PATCH(request: Request, context: RouteContext) {
           checkedOutAt: null
         }
       });
+      return ok({ file: updated });
+    }
+
+    if (parsed.data.action === "SET_CLASSIFICATION") {
+      await requireWorkspacePermission(user.id, file.workspaceId, "canClassifyDocuments");
+      const sensitivityLabel = parsed.data.sensitivityLabel ?? file.sensitivityLabel;
+      const updated = await prisma.file.update({
+        where: { id },
+        data: {
+          sensitivityLabel,
+          downloadRestricted: parsed.data.downloadRestricted ?? file.downloadRestricted,
+          shareRestricted: parsed.data.shareRestricted ?? file.shareRestricted,
+          aiRestricted: parsed.data.aiRestricted ?? file.aiRestricted,
+          legalHold: sensitivityLabel === "LEGAL_HOLD" ? true : file.legalHold,
+          classifiedById: user.id,
+          classifiedAt: new Date()
+        }
+      });
+
+      await logActivity({
+        userId: user.id,
+        workspaceId: file.workspaceId,
+        action: "file.classified",
+        targetId: file.id,
+        metadata: {
+          sensitivityLabel: updated.sensitivityLabel,
+          downloadRestricted: updated.downloadRestricted,
+          shareRestricted: updated.shareRestricted,
+          aiRestricted: updated.aiRestricted
+        }
+      });
+
       return ok({ file: updated });
     }
 

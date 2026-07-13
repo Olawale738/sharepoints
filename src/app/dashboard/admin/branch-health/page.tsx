@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, AlertTriangle, Building2, CheckCircle2, Gauge, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, Building2, CheckCircle2, Gauge, ShieldAlert, TrendingUp } from "lucide-react";
 
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
 import { getBranchHealthScores } from "@/lib/branch-health";
-import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
+import { hasAnyWorkspacePermission } from "@/lib/rbac";
 import { formatDate } from "@/lib/utils";
 
 function scoreTone(score: number) {
@@ -22,14 +22,15 @@ function barWidth(value: number, max: number) {
 export default async function BranchHealthPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!(await hasAnyWorkspaceAdminRole(session.user.id))) redirect("/dashboard");
+  if (!(await hasAnyWorkspacePermission(session.user.id, "canViewBranchCompliance"))) redirect("/dashboard");
 
   const health = await getBranchHealthScores();
   const cards = [
     { label: "Average score", value: health.overview.averageScore, detail: "Across active units", icon: Gauge },
     { label: "Excellent", value: health.overview.excellent, detail: "85 and above", icon: CheckCircle2 },
     { label: "Healthy", value: health.overview.healthy, detail: "70 to 84", icon: TrendingUp },
-    { label: "Needs action", value: health.overview.urgent, detail: "Below 40", icon: AlertTriangle }
+    { label: "Needs action", value: health.overview.urgent, detail: "Below 40", icon: AlertTriangle },
+    { label: "Compliance gaps", value: health.overview.complianceGaps, detail: "Missing governance items", icon: ShieldAlert }
   ];
 
   return (
@@ -59,7 +60,7 @@ export default async function BranchHealthPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -103,6 +104,25 @@ export default async function BranchHealthPage() {
                   <div className="h-full rounded-full bg-moss" style={{ width: `${item.score}%` }} />
                 </div>
                 <p className="mt-2 text-sm text-ink/60">Score: <span className="font-semibold text-ink">{item.score}/100</span></p>
+                <div className="mt-3 rounded-md border border-ink/10 bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-ink">Compliance readiness</p>
+                    <Badge className={item.compliance.score >= 80 ? "bg-mint" : item.compliance.score >= 60 ? "bg-wheat" : "bg-clay/10 text-clay"}>
+                      {item.compliance.score}%
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-ink/50">
+                    {item.compliance.passed}/{item.compliance.total} checks passed
+                  </p>
+                  <div className="mt-3 grid gap-2 md:grid-cols-2">
+                    {item.compliance.checks.slice(0, 6).map((check) => (
+                      <div className="flex items-start gap-2 rounded-md bg-paper px-2 py-2 text-xs" key={check.key}>
+                        <span className={check.passed ? "mt-0.5 h-2 w-2 rounded-full bg-moss" : "mt-0.5 h-2 w-2 rounded-full bg-clay"} />
+                        <span className={check.passed ? "text-ink/65" : "font-medium text-clay"}>{check.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-md bg-paper p-3">

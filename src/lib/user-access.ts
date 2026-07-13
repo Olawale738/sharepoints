@@ -2,6 +2,7 @@ import { WorkspaceRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { isProtectedAdminEmail } from "@/lib/protected-admin";
 
 export function userAccessStatus(user: {
   suspendedAt?: Date | null;
@@ -92,6 +93,7 @@ export async function requireCanManageUser(
         id: targetUserId
       },
       select: {
+        email: true,
         suspendedAt: true,
         accessRevokedAt: true,
         deletedAt: true
@@ -109,6 +111,10 @@ export async function requireCanManageUser(
 
   const isTargetActive = targetUser ? userAccessStatus(targetUser) === "ACTIVE" : false;
   const destructiveAdminAction = action === "SUSPEND" || action === "REVOKE" || action === "DELETE";
+
+  if (destructiveAdminAction && isProtectedAdminEmail(targetUser?.email)) {
+    throw new ApiError(409, "This protected administrator cannot be suspended, revoked, or deleted.");
+  }
 
   if (destructiveAdminAction && isTargetActive && targetAdminMemberships.length > 0 && activeAdminUsers.length <= 1) {
     throw new ApiError(409, "You must keep at least one active admin account.");

@@ -35,10 +35,12 @@ import { ClearAiAuditButton } from "@/components/dashboard/clear-ai-audit-button
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
 import { ClearOrganizationActivityButton } from "@/components/dashboard/clear-organization-activity-button";
 import { SecurityCenterPanel } from "@/components/dashboard/security-center-panel";
+import { SuperAdminRecoveryPanel } from "@/components/dashboard/super-admin-recovery-panel";
 import { Badge } from "@/components/ui/badge";
 import { normalizeEmail } from "@/lib/email-policy";
 import { getAdminVisibleWorkspaceIds } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
+import { getProtectedAdminStatuses, isProtectedAdminEmail, superAdminRecoveryConfigured } from "@/lib/protected-admin";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 import { userAccessStatus } from "@/lib/user-access";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -67,6 +69,7 @@ export default async function AdminControlCenterPage() {
     meetings,
     activities,
     aiAudits,
+    protectedAdminStatuses,
     rolePermissionCount,
     activeShareLinkCount
   ] = await Promise.all([
@@ -253,6 +256,7 @@ export default async function AdminControlCenterPage() {
       },
       take: 30
     }),
+    getProtectedAdminStatuses(),
     prisma.workspaceRolePermission.count(),
     prisma.fileShareLink.count({
       where: {
@@ -347,9 +351,15 @@ export default async function AdminControlCenterPage() {
         },
         {
           href: "/dashboard/admin/branch-health",
-          label: "Branch health score",
-          detail: "Score every country, branch, church, and ministry by members, attendance, projects, care, and governance.",
+          label: "Branch compliance",
+          detail: "Score every country, branch, church, and ministry by members, attendance, compliance, care, and governance.",
           icon: Gauge
+        },
+        {
+          href: "/dashboard/admin/president-desk",
+          label: "President approval desk",
+          detail: "Central approval queue for files, meetings, tasks, announcements, and executive matters.",
+          icon: Crown
         },
         {
           href: "/dashboard/admin/enterprise",
@@ -404,6 +414,12 @@ export default async function AdminControlCenterPage() {
           label: "Access review",
           detail: "Review workspace roles, share links, AI agents, old devices, and sensitive access.",
           icon: ShieldAlert
+        },
+        {
+          href: "/dashboard/admin/authority-flow",
+          label: "Authority flow",
+          detail: "See how approvals move from requester to leader, admin, and president-level review.",
+          icon: Workflow
         },
         {
           href: "/dashboard/admin/permission-simulator",
@@ -576,6 +592,7 @@ export default async function AdminControlCenterPage() {
               accessRevokedAt: user.accessRevokedAt?.toISOString() ?? null,
               deletedAt: user.deletedAt?.toISOString() ?? null,
               isAdmin: user.workspaceMemberships.some((membership) => membership.role === "ADMIN"),
+              protectedAdmin: isProtectedAdminEmail(user.email),
               status: userAccessStatus(user),
               _count: user._count
             }))}
@@ -632,6 +649,22 @@ export default async function AdminControlCenterPage() {
         </div>
 
         <div className="space-y-6">
+          <SuperAdminRecoveryPanel
+            configured={superAdminRecoveryConfigured()}
+            protectedAdmins={protectedAdminStatuses.map((item) => ({
+              ...item,
+              user: item.user
+                ? {
+                    ...item.user,
+                    suspendedAt: item.user.suspendedAt?.toISOString() ?? null,
+                    accessRevokedAt: item.user.accessRevokedAt?.toISOString() ?? null,
+                    deletedAt: item.user.deletedAt?.toISOString() ?? null,
+                    updatedAt: item.user.updatedAt.toISOString()
+                  }
+                : null
+            }))}
+          />
+
           <CompanyInvitationsPanel
             invitations={invitations.map((invitation) => ({
               id: invitation.id,

@@ -3,6 +3,7 @@ import { SecurityEventType } from "@prisma/client";
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
+import { isProtectedAdminEmail } from "@/lib/protected-admin";
 import { logSecurityEvent } from "@/lib/security";
 import {
   requireCanManageUser,
@@ -161,6 +162,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       user: {
         ...userItem,
         isAdmin: workspaceMemberships.some((membership) => membership.role === "ADMIN"),
+        protectedAdmin: isProtectedAdminEmail(user.email),
         status: userAccessStatus(user)
       }
     });

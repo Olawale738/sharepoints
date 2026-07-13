@@ -29,6 +29,11 @@ type FileRow = {
   legalHold?: boolean;
   retentionUntil?: string | null;
   scanStatus?: "PENDING" | "CLEAN" | "INFECTED" | "SKIPPED";
+  sensitivityLabel?: string | null;
+  downloadRestricted?: boolean;
+  shareRestricted?: boolean;
+  aiRestricted?: boolean;
+  dlpRestricted?: boolean;
   uploadedBy: {
     name?: string | null;
     email?: string | null;
@@ -49,6 +54,7 @@ type FileTableProps = {
   canCreateShareLinks: boolean;
   canUploadFiles: boolean;
   canManageGovernance: boolean;
+  canClassifyDocuments: boolean;
 };
 
 export function FileTable({
@@ -58,7 +64,8 @@ export function FileTable({
   canDeleteFiles,
   canCreateShareLinks,
   canUploadFiles,
-  canManageGovernance
+  canManageGovernance,
+  canClassifyDocuments
 }: FileTableProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState("");
@@ -169,6 +176,12 @@ export function FileTable({
                 {file.scanStatus === "CLEAN" ? <ShieldCheck className="h-4 w-4 text-moss" aria-label="Security screened" /> : null}
                 {file.checkedOutById ? <Lock className="h-4 w-4 text-clay" aria-label="Checked out" /> : null}
                 {file.legalHold ? <Badge className="bg-wheat">legal hold</Badge> : null}
+                {file.sensitivityLabel && file.sensitivityLabel !== "INTERNAL" ? (
+                  <Badge className="bg-paper">{file.sensitivityLabel.toLowerCase().replaceAll("_", " ")}</Badge>
+                ) : null}
+                {file.downloadRestricted || file.shareRestricted || file.aiRestricted || file.dlpRestricted ? (
+                  <Badge className="bg-clay/10 text-clay">restricted</Badge>
+                ) : null}
               </div>
               <p className="truncate text-xs text-ink/50">{file.uploadedBy.name ?? file.uploadedBy.email}</p>
               {file.rejectedReason ? <p className="mt-1 text-xs text-clay">{file.rejectedReason}</p> : null}
@@ -240,6 +253,7 @@ export function FileTable({
           fileName={historyFile.fileName}
           canUpload={canUploadFiles}
           canManageGovernance={canManageGovernance}
+          canClassifyDocuments={canClassifyDocuments}
           onClose={() => setHistoryFile(null)}
         />
       ) : null}

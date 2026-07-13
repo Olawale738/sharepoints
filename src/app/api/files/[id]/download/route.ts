@@ -1,8 +1,8 @@
 import { auth } from "@/auth";
 import { ApiError, handleRouteError } from "@/lib/api";
-import { ensureCanSeeFile } from "@/lib/governance";
+import { ensureCanDownloadFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
-import { hasWorkspaceAdminAccess, requireWorkspaceMembership } from "@/lib/rbac";
+import { requireWorkspaceMembership } from "@/lib/rbac";
 import { getDownloadResponse } from "@/lib/storage";
 
 type RouteContext = {
@@ -38,13 +38,10 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     await requireWorkspaceMembership(session.user.id, file.workspaceId);
-    await ensureCanSeeFile(session.user.id, file);
+    await ensureCanDownloadFile(session.user.id, file);
 
     if (file.scanStatus === "INFECTED") {
       throw new ApiError(423, "This document was blocked by security screening.");
-    }
-    if (file.dlpRestricted && !(await hasWorkspaceAdminAccess(session.user.id, file.workspaceId))) {
-      throw new ApiError(403, "Download restricted by the organization data-loss prevention policy.");
     }
 
     return getDownloadResponse(file.storageKey, file.fileName, file.fileType);

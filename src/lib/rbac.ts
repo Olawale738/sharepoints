@@ -26,7 +26,13 @@ export const permissionKeys = [
   "canClearReportLogs",
   "canManagePresidentialActions",
   "canManageMediaArchive",
-  "canUseExecutiveSecretary"
+  "canUseExecutiveSecretary",
+  "canApproveContent",
+  "canClassifyDocuments",
+  "canViewPresidentDesk",
+  "canManageOfficialRegistry",
+  "canViewBranchCompliance",
+  "canRunSuperAdminRecovery"
 ] as const;
 
 export type WorkspacePermissionKey = (typeof permissionKeys)[number];
@@ -55,7 +61,13 @@ export const allWorkspacePermissions: WorkspacePermissions = {
   canClearReportLogs: true,
   canManagePresidentialActions: true,
   canManageMediaArchive: true,
-  canUseExecutiveSecretary: true
+  canUseExecutiveSecretary: true,
+  canApproveContent: true,
+  canClassifyDocuments: true,
+  canViewPresidentDesk: true,
+  canManageOfficialRegistry: true,
+  canViewBranchCompliance: true,
+  canRunSuperAdminRecovery: true
 };
 
 export function defaultPermissionsForRole(role: WorkspaceRole | string): WorkspacePermissions {
@@ -86,7 +98,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canClearReportLogs: false,
       canManagePresidentialActions: false,
       canManageMediaArchive: false,
-      canUseExecutiveSecretary: false
+      canUseExecutiveSecretary: false,
+      canApproveContent: true,
+      canClassifyDocuments: false,
+      canViewPresidentDesk: false,
+      canManageOfficialRegistry: false,
+      canViewBranchCompliance: false,
+      canRunSuperAdminRecovery: false
     };
   }
 
@@ -113,7 +131,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
       canClearReportLogs: false,
       canManagePresidentialActions: false,
       canManageMediaArchive: false,
-      canUseExecutiveSecretary: false
+      canUseExecutiveSecretary: false,
+      canApproveContent: false,
+      canClassifyDocuments: false,
+      canViewPresidentDesk: false,
+      canManageOfficialRegistry: false,
+      canViewBranchCompliance: false,
+      canRunSuperAdminRecovery: false
     };
   }
 
@@ -139,7 +163,13 @@ export function defaultPermissionsForRole(role: WorkspaceRole | string): Workspa
     canClearReportLogs: false,
     canManagePresidentialActions: false,
     canManageMediaArchive: false,
-    canUseExecutiveSecretary: false
+    canUseExecutiveSecretary: false,
+    canApproveContent: false,
+    canClassifyDocuments: false,
+    canViewPresidentDesk: false,
+    canManageOfficialRegistry: false,
+    canViewBranchCompliance: false,
+    canRunSuperAdminRecovery: false
   };
 }
 
@@ -319,7 +349,13 @@ export async function getRolePermissions(workspaceId: string, role: WorkspaceRol
     canClearReportLogs: saved.canClearReportLogs,
     canManagePresidentialActions: saved.canManagePresidentialActions,
     canManageMediaArchive: saved.canManageMediaArchive,
-    canUseExecutiveSecretary: saved.canUseExecutiveSecretary
+    canUseExecutiveSecretary: saved.canUseExecutiveSecretary,
+    canApproveContent: saved.canApproveContent,
+    canClassifyDocuments: saved.canClassifyDocuments,
+    canViewPresidentDesk: saved.canViewPresidentDesk,
+    canManageOfficialRegistry: saved.canManageOfficialRegistry,
+    canViewBranchCompliance: saved.canViewBranchCompliance,
+    canRunSuperAdminRecovery: saved.canRunSuperAdminRecovery
   };
 }
 

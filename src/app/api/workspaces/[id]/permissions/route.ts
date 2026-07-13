@@ -13,32 +13,39 @@ type RouteContext = {
 type SavedRolePermissions = Partial<ReturnType<typeof defaultPermissionsForRole>>;
 
 function serializeRolePermissions(role: WorkspaceRole, saved?: SavedRolePermissions) {
+  const defaults = defaultPermissionsForRole(role);
+
   return {
     role,
-    ...defaultPermissionsForRole(role),
-    canUploadFiles: saved?.canUploadFiles ?? defaultPermissionsForRole(role).canUploadFiles,
-    canDeleteFiles: saved?.canDeleteFiles ?? defaultPermissionsForRole(role).canDeleteFiles,
-    canCreateFolders: saved?.canCreateFolders ?? defaultPermissionsForRole(role).canCreateFolders,
-    canCreateChannels: saved?.canCreateChannels ?? defaultPermissionsForRole(role).canCreateChannels,
-    canSendMessages: saved?.canSendMessages ?? defaultPermissionsForRole(role).canSendMessages,
-    canManageMembers: saved?.canManageMembers ?? defaultPermissionsForRole(role).canManageMembers,
-    canManageIntegrations: saved?.canManageIntegrations ?? defaultPermissionsForRole(role).canManageIntegrations,
-    canViewActivity: saved?.canViewActivity ?? defaultPermissionsForRole(role).canViewActivity,
-    canClearActivity: saved?.canClearActivity ?? defaultPermissionsForRole(role).canClearActivity,
-    canCreateAnnouncements:
-      saved?.canCreateAnnouncements ?? defaultPermissionsForRole(role).canCreateAnnouncements,
-    canManageTasks: saved?.canManageTasks ?? defaultPermissionsForRole(role).canManageTasks,
-    canScheduleMeetings: saved?.canScheduleMeetings ?? defaultPermissionsForRole(role).canScheduleMeetings,
-    canCreateShareLinks: saved?.canCreateShareLinks ?? defaultPermissionsForRole(role).canCreateShareLinks,
-    canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaultPermissionsForRole(role).canUseWhatsAppCommandBot,
-    canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaultPermissionsForRole(role).canManageDigitalSignatures,
-    canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaultPermissionsForRole(role).canManageEvidenceVault,
-    canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaultPermissionsForRole(role).canViewExecutiveBriefing,
-    canDeleteReports: saved?.canDeleteReports ?? defaultPermissionsForRole(role).canDeleteReports,
-    canClearReportLogs: saved?.canClearReportLogs ?? defaultPermissionsForRole(role).canClearReportLogs,
-    canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaultPermissionsForRole(role).canManagePresidentialActions,
-    canManageMediaArchive: saved?.canManageMediaArchive ?? defaultPermissionsForRole(role).canManageMediaArchive,
-    canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaultPermissionsForRole(role).canUseExecutiveSecretary
+    ...defaults,
+    canUploadFiles: saved?.canUploadFiles ?? defaults.canUploadFiles,
+    canDeleteFiles: saved?.canDeleteFiles ?? defaults.canDeleteFiles,
+    canCreateFolders: saved?.canCreateFolders ?? defaults.canCreateFolders,
+    canCreateChannels: saved?.canCreateChannels ?? defaults.canCreateChannels,
+    canSendMessages: saved?.canSendMessages ?? defaults.canSendMessages,
+    canManageMembers: saved?.canManageMembers ?? defaults.canManageMembers,
+    canManageIntegrations: saved?.canManageIntegrations ?? defaults.canManageIntegrations,
+    canViewActivity: saved?.canViewActivity ?? defaults.canViewActivity,
+    canClearActivity: saved?.canClearActivity ?? defaults.canClearActivity,
+    canCreateAnnouncements: saved?.canCreateAnnouncements ?? defaults.canCreateAnnouncements,
+    canManageTasks: saved?.canManageTasks ?? defaults.canManageTasks,
+    canScheduleMeetings: saved?.canScheduleMeetings ?? defaults.canScheduleMeetings,
+    canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks,
+    canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaults.canUseWhatsAppCommandBot,
+    canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaults.canManageDigitalSignatures,
+    canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
+    canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
+    canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
+    canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs,
+    canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaults.canManagePresidentialActions,
+    canManageMediaArchive: saved?.canManageMediaArchive ?? defaults.canManageMediaArchive,
+    canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaults.canUseExecutiveSecretary,
+    canApproveContent: saved?.canApproveContent ?? defaults.canApproveContent,
+    canClassifyDocuments: saved?.canClassifyDocuments ?? defaults.canClassifyDocuments,
+    canViewPresidentDesk: saved?.canViewPresidentDesk ?? defaults.canViewPresidentDesk,
+    canManageOfficialRegistry: saved?.canManageOfficialRegistry ?? defaults.canManageOfficialRegistry,
+    canViewBranchCompliance: saved?.canViewBranchCompliance ?? defaults.canViewBranchCompliance,
+    canRunSuperAdminRecovery: saved?.canRunSuperAdminRecovery ?? defaults.canRunSuperAdminRecovery
   };
 }
 

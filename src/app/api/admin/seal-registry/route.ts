@@ -10,8 +10,9 @@ import { z } from "zod";
 
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { officialSealRegistrySummary } from "@/lib/official-registry";
 import { prisma } from "@/lib/prisma";
-import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
+import { hasAnyWorkspacePermission } from "@/lib/rbac";
 
 export const runtime = "nodejs";
 
@@ -21,12 +22,48 @@ const registryActionSchema = z.object({
   action: z.enum(["REVOKE", "REISSUE"])
 });
 
+async function requireRegistryAccess(userId: string) {
+  if (!(await hasAnyWorkspacePermission(userId, "canManageOfficialRegistry"))) {
+    throw new ApiError(403, "Only authorized administrators can control official seals.");
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const actor = await requireUser();
+    await requireRegistryAccess(actor.id);
+
+    const url = new URL(request.url);
+    const query = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
+    const kind = url.searchParams.get("kind")?.trim().toUpperCase() ?? "ALL";
+    const active = url.searchParams.get("active");
+    const records = await officialSealRegistrySummary();
+    const filtered = records.filter((record) => {
+      const matchesKind = kind === "ALL" || record.kind === kind;
+      const matchesActive = active === null || active === "" ? true : record.active === (active === "true");
+      const haystack = [
+        record.title,
+        record.kind,
+        record.status ?? "",
+        record.sealNumber ?? "",
+        record.ownerName ?? "",
+        record.message
+      ]
+        .join(" ")
+        .toLowerCase();
+      return matchesKind && matchesActive && (!query || haystack.includes(query));
+    });
+
+    return ok({ records: filtered });
+  } catch (error) {
+    return handleRouteError(error);
+  }
+}
+
 export async function PATCH(request: Request) {
   try {
     const actor = await requireUser();
-    if (!(await hasAnyWorkspaceAdminRole(actor.id))) {
-      throw new ApiError(403, "Only administrators can control official seals.");
-    }
+    await requireRegistryAccess(actor.id);
 
     const parsed = registryActionSchema.safeParse(await request.json());
     if (!parsed.success) {

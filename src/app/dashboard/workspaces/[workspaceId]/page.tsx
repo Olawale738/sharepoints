@@ -38,6 +38,15 @@ type WorkspacePageProps = {
   searchParams: Promise<{ folder?: string }>;
 };
 
+const restrictedFileLabels = [
+  "LEADERSHIP_ONLY",
+  "PASTORAL_CONFIDENTIAL",
+  "FINANCE_CONFIDENTIAL",
+  "BOARD_ONLY",
+  "LEGAL_HOLD",
+  "SAFEGUARDING_RESTRICTED"
+];
+
 async function getFolderTrail(folderId: string | null, workspaceId: string) {
   if (!folderId) {
     return [];
@@ -157,7 +166,18 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
             workspaceId,
             folderId,
             deletedAt: null,
-            OR: [{ approvalStatus: "APPROVED" }, { uploadedById: session.user.id }]
+            AND: [
+              { OR: [{ approvalStatus: "APPROVED" }, { uploadedById: session.user.id }] },
+              {
+                OR: [
+                  { uploadedById: session.user.id },
+                  {
+                    dlpRestricted: false,
+                    sensitivityLabel: { notIn: restrictedFileLabels }
+                  }
+                ]
+              }
+            ]
           },
       include: {
         uploadedBy: {
@@ -461,15 +481,21 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       canCreateShareLinks: saved?.canCreateShareLinks ?? defaults.canCreateShareLinks,
       canUseWhatsAppCommandBot: saved?.canUseWhatsAppCommandBot ?? defaults.canUseWhatsAppCommandBot,
       canManageDigitalSignatures: saved?.canManageDigitalSignatures ?? defaults.canManageDigitalSignatures,
-        canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
-        canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
-        canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
-        canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs,
-        canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaults.canManagePresidentialActions,
-        canManageMediaArchive: saved?.canManageMediaArchive ?? defaults.canManageMediaArchive,
-        canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaults.canUseExecutiveSecretary
-      };
-    });
+      canManageEvidenceVault: saved?.canManageEvidenceVault ?? defaults.canManageEvidenceVault,
+      canViewExecutiveBriefing: saved?.canViewExecutiveBriefing ?? defaults.canViewExecutiveBriefing,
+      canDeleteReports: saved?.canDeleteReports ?? defaults.canDeleteReports,
+      canClearReportLogs: saved?.canClearReportLogs ?? defaults.canClearReportLogs,
+      canManagePresidentialActions: saved?.canManagePresidentialActions ?? defaults.canManagePresidentialActions,
+      canManageMediaArchive: saved?.canManageMediaArchive ?? defaults.canManageMediaArchive,
+      canUseExecutiveSecretary: saved?.canUseExecutiveSecretary ?? defaults.canUseExecutiveSecretary,
+      canApproveContent: saved?.canApproveContent ?? defaults.canApproveContent,
+      canClassifyDocuments: saved?.canClassifyDocuments ?? defaults.canClassifyDocuments,
+      canViewPresidentDesk: saved?.canViewPresidentDesk ?? defaults.canViewPresidentDesk,
+      canManageOfficialRegistry: saved?.canManageOfficialRegistry ?? defaults.canManageOfficialRegistry,
+      canViewBranchCompliance: saved?.canViewBranchCompliance ?? defaults.canViewBranchCompliance,
+      canRunSuperAdminRecovery: saved?.canRunSuperAdminRecovery ?? defaults.canRunSuperAdminRecovery
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -618,12 +644,18 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               legalHold: file.legalHold,
               retentionUntil: file.retentionUntil?.toISOString() ?? null,
               scanStatus: file.scanStatus,
+              sensitivityLabel: file.sensitivityLabel,
+              downloadRestricted: file.downloadRestricted,
+              shareRestricted: file.shareRestricted,
+              aiRestricted: file.aiRestricted,
+              dlpRestricted: file.dlpRestricted,
               uploadedBy: file.uploadedBy
             }))}
             canDeleteFiles={permissions.canDeleteFiles}
             canCreateShareLinks={permissions.canCreateShareLinks}
             canUploadFiles={permissions.canUploadFiles}
             canManageGovernance={hasAdminAccess}
+            canClassifyDocuments={permissions.canClassifyDocuments}
           />
 
           <KnowledgeBasePanel

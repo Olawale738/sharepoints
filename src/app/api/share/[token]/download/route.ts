@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { ApiError, handleRouteError } from "@/lib/api";
-import { ensureCanSeeFile } from "@/lib/governance";
+import { ensureCanDownloadFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
 import { getDownloadResponse } from "@/lib/storage";
@@ -37,6 +37,9 @@ export async function GET(request: Request, context: RouteContext) {
             workspaceId: true,
             uploadedById: true,
             approvalStatus: true,
+            sensitivityLabel: true,
+            dlpRestricted: true,
+            downloadRestricted: true,
             storageKey: true,
             fileName: true,
             fileType: true
@@ -54,7 +57,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     await requireWorkspaceMembership(session.user.id, shareLink.file.workspaceId);
-    await ensureCanSeeFile(session.user.id, shareLink.file);
+    await ensureCanDownloadFile(session.user.id, shareLink.file);
 
     return getDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
   } catch (error) {

@@ -17,6 +17,7 @@ type AdminUser = {
   accessRevokedAt?: string | null;
   deletedAt?: string | null;
   isAdmin: boolean;
+  protectedAdmin?: boolean;
   status: "ACTIVE" | "SUSPENDED" | "REVOKED" | "DELETED";
   _count: {
     workspaceMemberships: number;
@@ -66,7 +67,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
         user.name ?? "",
         user.email ?? "",
         user.status,
-        user.isAdmin ? "admin protected" : "",
+        user.protectedAdmin ? "protected president super admin" : user.isAdmin ? "admin" : "",
         `${user._count.workspaceMemberships} workspaces`,
         `${user._count.uploadedFiles} files`
       ]
@@ -142,7 +143,10 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
           const isCurrentUser = currentUserId === user.id;
           const isDeleted = user.status === "DELETED";
           const canRestore = user.status === "SUSPENDED" || user.status === "REVOKED";
-          const showRevoke = !isDeleted && !user.isAdmin;
+          const protectedAdmin = Boolean(user.protectedAdmin);
+          const showRevoke = !isDeleted && !protectedAdmin && !user.isAdmin;
+          const showSuspend = user.status === "ACTIVE" && !protectedAdmin;
+          const showDelete = !isDeleted && !protectedAdmin;
 
           return (
             <div key={user.id} className="px-4 py-4">
@@ -151,7 +155,8 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate font-medium text-ink">{user.name ?? user.email ?? "Unnamed user"}</p>
                     <Badge className={statusClassName[user.status]}>{user.status.toLowerCase()}</Badge>
-                    {user.isAdmin ? <Badge className="bg-moss text-white">admin protected</Badge> : null}
+                    {user.isAdmin ? <Badge className="bg-moss text-white">admin</Badge> : null}
+                    {protectedAdmin ? <Badge className="bg-ink text-white">protected president</Badge> : null}
                     {isCurrentUser ? <Badge className="bg-wheat">you</Badge> : null}
                   </div>
                   <p className="mt-1 truncate text-sm text-ink/55">{user.email ?? "No email"}</p>
@@ -173,7 +178,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                       Restore
                     </Button>
                   ) : null}
-                  {user.status === "ACTIVE" ? (
+                  {showSuspend ? (
                     <Button
                       className="h-9"
                       variant="secondary"
@@ -195,7 +200,7 @@ export function AdminUsersPanel({ currentUserId, users: initialUsers }: AdminUse
                       Revoke
                     </Button>
                   ) : null}
-                  {!isDeleted ? (
+                  {showDelete ? (
                     <Button
                       className="h-9"
                       variant="danger"

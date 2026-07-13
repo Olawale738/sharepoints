@@ -1,12 +1,22 @@
 import { type NextRequest } from "next/server";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { canApproveWorkspaceContent } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
+
+const restrictedFileLabels = [
+  "LEADERSHIP_ONLY",
+  "PASTORAL_CONFIDENTIAL",
+  "FINANCE_CONFIDENTIAL",
+  "BOARD_ONLY",
+  "LEGAL_HOLD",
+  "SAFEGUARDING_RESTRICTED"
+];
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -32,11 +42,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const files = await prisma.file.findMany({
-      where: {
-        workspaceId: id,
-        folderId: folderId || null,
-        deletedAt: null
-      },
+      where: (await canApproveWorkspaceContent(user.id, id))
+        ? {
+            workspaceId: id,
+            folderId: folderId || null,
+            deletedAt: null
+          }
+        : {
+            workspaceId: id,
+            folderId: folderId || null,
+            deletedAt: null,
+            AND: [
+              { OR: [{ approvalStatus: "APPROVED" }, { uploadedById: user.id }] },
+              {
+                OR: [
+                  { uploadedById: user.id },
+                  {
+                    dlpRestricted: false,
+                    sensitivityLabel: { notIn: restrictedFileLabels }
+                  }
+                ]
+              }
+            ]
+          },
       include: {
         uploadedBy: {
           select: {

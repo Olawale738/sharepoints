@@ -240,6 +240,16 @@ export async function collectAuthorizedAiSources(input: {
         approvalStatus: ApprovalStatus.APPROVED,
         deletedAt: null,
         dlpRestricted: false,
+        aiRestricted: false,
+        sensitivityLabel: {
+          notIn: [
+            "PASTORAL_CONFIDENTIAL",
+            "FINANCE_CONFIDENTIAL",
+            "BOARD_ONLY",
+            "LEGAL_HOLD",
+            "SAFEGUARDING_RESTRICTED"
+          ]
+        },
         scanStatus: { not: FileScanStatus.INFECTED }
       },
       include: { workspace: { select: { name: true } } },

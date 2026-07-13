@@ -88,7 +88,13 @@ export const updateWorkspaceRolePermissionSchema = z.object({
   canClearReportLogs: z.boolean(),
   canManagePresidentialActions: z.boolean(),
   canManageMediaArchive: z.boolean(),
-  canUseExecutiveSecretary: z.boolean()
+  canUseExecutiveSecretary: z.boolean(),
+  canApproveContent: z.boolean(),
+  canClassifyDocuments: z.boolean(),
+  canViewPresidentDesk: z.boolean(),
+  canManageOfficialRegistry: z.boolean(),
+  canViewBranchCompliance: z.boolean(),
+  canRunSuperAdminRecovery: z.boolean()
 });
 
 export const updateProfileSchema = z.object({
@@ -313,9 +319,24 @@ export const submitWorkspaceFormSchema = z.object({
 });
 
 export const fileGovernanceSchema = z.object({
-  action: z.enum(["CHECK_OUT", "CHECK_IN", "SET_RETENTION", "SET_LEGAL_HOLD"]),
+  action: z.enum(["CHECK_OUT", "CHECK_IN", "SET_RETENTION", "SET_LEGAL_HOLD", "SET_CLASSIFICATION"]),
   retentionUntil: z.string().datetime().optional().nullable().or(z.literal("")),
-  legalHold: z.boolean().optional()
+  legalHold: z.boolean().optional(),
+  sensitivityLabel: z
+    .enum([
+      "PUBLIC",
+      "INTERNAL",
+      "LEADERSHIP_ONLY",
+      "PASTORAL_CONFIDENTIAL",
+      "FINANCE_CONFIDENTIAL",
+      "BOARD_ONLY",
+      "LEGAL_HOLD",
+      "SAFEGUARDING_RESTRICTED"
+    ])
+    .optional(),
+  downloadRestricted: z.boolean().optional(),
+  shareRestricted: z.boolean().optional(),
+  aiRestricted: z.boolean().optional()
 });
 
 export const fileCommentSchema = z.object({

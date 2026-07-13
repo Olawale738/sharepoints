@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { scanUploadedFile } from "@/lib/file-security";
+import { ensureCanSeeFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
@@ -21,6 +22,13 @@ export async function GET(_request: Request, context: RouteContext) {
       where: { id },
       select: {
         workspaceId: true,
+        uploadedById: true,
+        approvalStatus: true,
+        sensitivityLabel: true,
+        downloadRestricted: true,
+        shareRestricted: true,
+        aiRestricted: true,
+        dlpRestricted: true,
         currentVersionNumber: true,
         checkedOutById: true,
         checkedOutAt: true,
@@ -54,6 +62,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     await requireWorkspaceMembership(user.id, file.workspaceId);
+    await ensureCanSeeFile(user.id, file);
     return ok({ file });
   } catch (error) {
     return handleRouteError(error);

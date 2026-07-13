@@ -30,6 +30,12 @@ type RolePermission = {
   canManagePresidentialActions: boolean;
   canManageMediaArchive: boolean;
   canUseExecutiveSecretary: boolean;
+  canApproveContent: boolean;
+  canClassifyDocuments: boolean;
+  canViewPresidentDesk: boolean;
+  canManageOfficialRegistry: boolean;
+  canViewBranchCompliance: boolean;
+  canRunSuperAdminRecovery: boolean;
 };
 
 type PermissionKey = Exclude<keyof RolePermission, "role">;
@@ -61,7 +67,13 @@ const permissionLabels: Array<{ key: PermissionKey; label: string }> = [
   { key: "canClearReportLogs", label: "Clear report activity logs" },
   { key: "canManagePresidentialActions", label: "Manage presidential action desk" },
   { key: "canManageMediaArchive", label: "Manage secure media archive" },
-  { key: "canUseExecutiveSecretary", label: "Use AI executive secretary" }
+  { key: "canUseExecutiveSecretary", label: "Use AI executive secretary" },
+  { key: "canApproveContent", label: "Approve files, meetings, tasks, and announcements" },
+  { key: "canClassifyDocuments", label: "Classify and restrict documents" },
+  { key: "canViewPresidentDesk", label: "View president approval desk" },
+  { key: "canManageOfficialRegistry", label: "Manage official seal registry" },
+  { key: "canViewBranchCompliance", label: "View branch compliance dashboard" },
+  { key: "canRunSuperAdminRecovery", label: "Run protected admin recovery" }
 ];
 
 export function RolePermissionsPanel({ workspaceId, permissions: initialPermissions }: RolePermissionsPanelProps) {

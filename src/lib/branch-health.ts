@@ -31,7 +31,20 @@ export type BranchHealthScore = Awaited<ReturnType<typeof getBranchHealthScores>
 export async function getBranchHealthScores() {
   const now = new Date();
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 86_400_000);
-  const [units, leaders, profiles, workspaces, projects, attendanceSessions, counsellingCases, safeguardingCases, transfers, expiryItems] =
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 86_400_000);
+  const [
+    units,
+    leaders,
+    profiles,
+    workspaces,
+    projects,
+    attendanceSessions,
+    counsellingCases,
+    safeguardingCases,
+    transfers,
+    expiryItems,
+    monthlyReports
+  ] =
     await Promise.all([
       prisma.organizationUnit.findMany({
         where: { active: true },
@@ -90,6 +103,14 @@ export async function getBranchHealthScores() {
       prisma.documentExpiryItem.findMany({
         select: { id: true, status: true, reviewDueAt: true, expiresAt: true, workspaceId: true },
         take: 3000
+      }),
+      prisma.monthlyMinistryReport.findMany({
+        where: {
+          createdAt: { gte: sixtyDaysAgo },
+          status: { in: ["GENERATED", "FINAL"] }
+        },
+        select: { id: true, organizationUnitId: true, workspaceId: true, createdAt: true, finalizedAt: true, status: true },
+        take: 3000
       })
     ]);
   const recentSessionIds = attendanceSessions
@@ -126,6 +147,7 @@ export async function getBranchHealthScores() {
   const highRiskCasesByUnit = new Map<string, number>();
   const pendingTransfersByUnit = new Map<string, number>();
   const renewalRisksByUnit = new Map<string, number>();
+  const recentReportsByUnit = new Map<string, number>();
 
   for (const leader of leaders) {
     add(leadersByUnit, leader.unitId);
@@ -177,6 +199,10 @@ export async function getBranchHealthScores() {
       add(renewalRisksByUnit, unitId);
     }
   }
+  for (const report of monthlyReports) {
+    const unitId = report.organizationUnitId ?? (report.workspaceId ? workspaceUnitById.get(report.workspaceId) : null);
+    add(recentReportsByUnit, unitId);
+  }
 
   const scores = units.map((unit) => {
     const target = memberTarget(unit.type);
@@ -198,6 +224,7 @@ export async function getBranchHealthScores() {
     const highRiskCases = highRiskCasesByUnit.get(unit.id) ?? 0;
     const pendingTransfers = pendingTransfersByUnit.get(unit.id) ?? 0;
     const renewalRisks = renewalRisksByUnit.get(unit.id) ?? 0;
+    const recentReports = recentReportsByUnit.get(unit.id) ?? 0;
 
     const membershipScore = clampScore((activeMembers / target) * 15 + (completeProfiles / Math.max(1, memberCount)) * 5, 20);
     const leadershipScore = clampScore((leaderCount ? 10 : 0) + (creatorCount ? 5 : 0), 15);
@@ -205,7 +232,7 @@ export async function getBranchHealthScores() {
     const attendanceScore = clampScore(recentSessionCount * 4 + Math.min(7, recentAttendanceCount / 8), 15);
     const projectScore = clampScore((projectCount ? 7 : 4) + completedProjectCount * 3 + Math.max(0, projectCount - completedProjectCount) * 2 - overdueProjectCount * 4, 15);
     const careScore = clampScore(10 - highRiskCases * 3 - Math.max(0, openCareCases - 4), 10);
-    const governanceScore = clampScore(10 - pendingTransfers * 2 - renewalRisks * 2, 10);
+    const governanceScore = clampScore(10 - pendingTransfers * 2 - renewalRisks * 2 + (recentReports ? 2 : -2), 10);
     const score =
       membershipScore +
       leadershipScore +
@@ -223,6 +250,24 @@ export async function getBranchHealthScores() {
     if (pendingTransfers) recommendations.push("Review pending branch transfer requests.");
     if (renewalRisks) recommendations.push("Renew expired or review-due documents.");
     if (highRiskCases) recommendations.push("Review high-risk care or safeguarding cases with approved leaders.");
+    if (!recentReports) recommendations.push("Generate or finalize a recent monthly report pack.");
+
+    const complianceChecks = [
+      { key: "leader", label: "Accountable leader assigned", passed: leaderCount > 0 },
+      { key: "workspace", label: "Workspace connected", passed: workspaceCount > 0 },
+      { key: "members", label: "Active member profiles linked", passed: activeMembers > 0 },
+      {
+        key: "profiles",
+        label: "Member profiles contain phone, position, and member number",
+        passed: memberCount > 0 && completeProfiles / Math.max(1, memberCount) >= 0.6
+      },
+      { key: "attendance", label: "Recent QR attendance captured", passed: recentSessionCount > 0 && recentAttendanceCount > 0 },
+      { key: "report", label: "Recent monthly report available", passed: recentReports > 0 },
+      { key: "documents", label: "No expired or review-due documents", passed: renewalRisks === 0 },
+      { key: "care", label: "No high-risk unresolved care/safeguarding cases", passed: highRiskCases === 0 },
+      { key: "transfers", label: "No pending branch transfers", passed: pendingTransfers === 0 }
+    ];
+    const compliancePassed = complianceChecks.filter((check) => check.passed).length;
 
     return {
       unit,
@@ -256,7 +301,15 @@ export async function getBranchHealthScores() {
         openCareCases,
         highRiskCases,
         pendingTransfers,
-        renewalRisks
+        renewalRisks,
+        recentReports
+      },
+      compliance: {
+        passed: compliancePassed,
+        total: complianceChecks.length,
+        score: Math.round((compliancePassed / complianceChecks.length) * 100),
+        checks: complianceChecks,
+        missingItems: complianceChecks.filter((check) => !check.passed).map((check) => check.label)
       },
       recommendations
     };
@@ -271,7 +324,8 @@ export async function getBranchHealthScores() {
       excellent: scores.filter((item) => item.score >= 85).length,
       healthy: scores.filter((item) => item.score >= 70 && item.score < 85).length,
       watch: scores.filter((item) => item.score >= 40 && item.score < 70).length,
-      urgent: scores.filter((item) => item.score < 40).length
+      urgent: scores.filter((item) => item.score < 40).length,
+      complianceGaps: scores.reduce((total, item) => total + item.compliance.missingItems.length, 0)
     }
   };
 }

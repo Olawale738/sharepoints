@@ -3,9 +3,27 @@ import { ApprovalStatus, WorkspaceRole } from "@prisma/client";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { getWorkspaceMembership, hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
+import { getRolePermissions, getWorkspaceMembership, hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
 
-export type ApprovalTargetType = "FILE" | "ANNOUNCEMENT" | "TASK" | "MEETING";
+export type ApprovalTargetType =
+  | "FILE"
+  | "ANNOUNCEMENT"
+  | "TASK"
+  | "MEETING"
+  | "FORM_RESPONSE"
+  | "OFFICIAL_LETTER"
+  | "MONTHLY_REPORT"
+  | "LEADERSHIP_HANDOVER"
+  | "PRESIDENTIAL_ACTION";
+
+const restrictedSensitivityLabels = new Set([
+  "LEADERSHIP_ONLY",
+  "PASTORAL_CONFIDENTIAL",
+  "FINANCE_CONFIDENTIAL",
+  "BOARD_ONLY",
+  "LEGAL_HOLD",
+  "SAFEGUARDING_RESTRICTED"
+]);
 
 export async function canApproveWorkspaceContent(userId: string, workspaceId: string) {
   if (await hasWorkspaceAdminAccess(userId, workspaceId)) {
@@ -13,7 +31,10 @@ export async function canApproveWorkspaceContent(userId: string, workspaceId: st
   }
 
   const membership = await getWorkspaceMembership(userId, workspaceId);
-  return membership?.role === WorkspaceRole.LEADER;
+  if (!membership) return false;
+
+  const permissions = await getRolePermissions(workspaceId, membership.role);
+  return permissions.canApproveContent;
 }
 
 export async function initialApprovalStatus(userId: string, workspaceId: string) {
@@ -58,13 +79,20 @@ export async function createApprovalRequestIfNeeded(input: {
   const reviewers = await prisma.workspaceMember.findMany({
     where: {
       workspaceId: input.workspaceId,
-      role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER] },
+      role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR] },
       userId: { not: input.requesterId }
     },
     select: { userId: true }
   });
+  const authorizedReviewers = [];
+  for (const reviewer of reviewers) {
+    if (await canApproveWorkspaceContent(reviewer.userId, input.workspaceId)) {
+      authorizedReviewers.push(reviewer.userId);
+    }
+  }
+
   await notifyUsers(
-    reviewers.map((reviewer) => reviewer.userId),
+    authorizedReviewers,
     {
       workspaceId: input.workspaceId,
       type: "APPROVAL_REQUIRED",
@@ -81,16 +109,58 @@ export async function ensureCanSeeFile(userId: string, file: {
   workspaceId: string;
   uploadedById: string;
   approvalStatus: ApprovalStatus;
+  sensitivityLabel?: string | null;
+  dlpRestricted?: boolean | null;
 }) {
-  if (file.approvalStatus === ApprovalStatus.APPROVED || file.uploadedById === userId) {
+  const isUploader = file.uploadedById === userId;
+  const canApprove = await canApproveWorkspaceContent(userId, file.workspaceId);
+  const restricted =
+    Boolean(file.dlpRestricted) ||
+    (file.sensitivityLabel ? restrictedSensitivityLabels.has(file.sensitivityLabel) : false);
+
+  if (restricted && !isUploader && !canApprove) {
+    throw new ApiError(403, "This document is restricted to authorized leaders or administrators.");
+  }
+
+  if (file.approvalStatus === ApprovalStatus.APPROVED || isUploader) {
     return;
   }
 
-  if (await canApproveWorkspaceContent(userId, file.workspaceId)) {
+  if (canApprove) {
     return;
   }
 
   throw new ApiError(403, "This file is waiting for approval.");
+}
+
+export async function ensureCanDownloadFile(userId: string, file: {
+  workspaceId: string;
+  uploadedById: string;
+  approvalStatus: ApprovalStatus;
+  sensitivityLabel?: string | null;
+  dlpRestricted?: boolean | null;
+  downloadRestricted?: boolean | null;
+}) {
+  await ensureCanSeeFile(userId, file);
+
+  if (file.downloadRestricted && file.uploadedById !== userId && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
+    throw new ApiError(403, "Downloads are restricted for this document.");
+  }
+}
+
+export async function ensureCanShareFile(userId: string, file: {
+  workspaceId: string;
+  uploadedById: string;
+  approvalStatus: ApprovalStatus;
+  sensitivityLabel?: string | null;
+  dlpRestricted?: boolean | null;
+  shareRestricted?: boolean | null;
+}) {
+  await ensureCanSeeFile(userId, file);
+
+  if (file.shareRestricted && file.uploadedById !== userId && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
+    throw new ApiError(403, "Share links are restricted for this document.");
+  }
 }
 
 export async function applyApprovalDecision(input: {
@@ -110,7 +180,7 @@ export async function applyApprovalDecision(input: {
   }
 
   if (!(await canApproveWorkspaceContent(input.reviewerId, request.workspaceId))) {
-    throw new ApiError(403, "Only admins and leaders can approve content.");
+    throw new ApiError(403, "Your role does not have approval authority for this workspace.");
   }
 
   const now = new Date();
