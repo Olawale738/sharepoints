@@ -179,6 +179,12 @@ function drawFooter(input: {
   page.drawText(`Page ${pageNumber}`, { x: pageSize[0] - 88, y: 62, size: 8, font: fonts.bold, color: navy });
 }
 
+function drawOfficialFrame(page: PDFPage, navy: PdfColor, gold: PdfColor) {
+  page.drawRectangle({ x: 28, y: 30, width: pageSize[0] - 56, height: pageSize[1] - 60, borderColor: navy, borderWidth: 1.05 });
+  page.drawRectangle({ x: 34, y: 36, width: pageSize[0] - 68, height: pageSize[1] - 72, borderColor: gold, borderWidth: 0.45 });
+  page.drawLine({ start: { x: 42, y: 722 }, end: { x: pageSize[0] - 42, y: 722 }, thickness: 0.55, color: gold });
+}
+
 function drawSeal(input: {
   page: PDFPage;
   logo: PDFImage;
@@ -308,6 +314,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     let page = pdf.addPage(pageSize);
     drawHeader({ page, logo, fonts, letterNumber: letter.letterNumber, status: letter.status, navy, gold, white });
     drawFooter({ page, fonts, pageNumber, navy, gold, muted });
+    drawOfficialFrame(page, navy, gold);
     page.drawImage(logo, { x: 178, y: 267, width: 238, height: 238, opacity: 0.035 });
 
     const addPage = () => {
@@ -315,6 +322,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       page = pdf.addPage(pageSize);
       drawHeader({ page, logo, fonts, letterNumber: letter.letterNumber, status: letter.status, navy, gold, white });
       drawFooter({ page, fonts, pageNumber, navy, gold, muted });
+      drawOfficialFrame(page, navy, gold);
       page.drawImage(logo, { x: 178, y: 267, width: 238, height: 238, opacity: 0.035 });
       return bodyTop;
     };
@@ -334,7 +342,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     ].filter(Boolean);
 
     page.drawText("OFFICIAL LETW LETTER", { x: marginX, y: 698, size: 10, font: fonts.bold, color: gold });
-    drawFittedText(page, letter.title, marginX, 671, 310, fonts.serif, 22, navy);
+    drawFittedText(page, letter.title, marginX, 671, 310, fonts.serif, 24, navy);
 
     page.drawRectangle({ x: 388, y: 624, width: 153, height: 80, color: light, borderColor: gold, borderWidth: 0.7 });
     page.drawText("DATE", { x: 404, y: 682, size: 6.8, font: fonts.bold, color: blue });
@@ -367,7 +375,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     page.drawText(`Dear ${letter.recipientName},`, { x: marginX, y, size: 10.8, font: fonts.bold, color: ink });
     y -= 27;
 
-    const bodyParagraphs = wrapParagraphsByWidth(letter.body, fonts.sans, 10.8, contentWidth);
+    const bodyFontSize = 11.2;
+    const bodyParagraphs = wrapParagraphsByWidth(letter.body, fonts.sans, bodyFontSize, contentWidth);
     for (const paragraph of bodyParagraphs) {
       const visibleLines = paragraph.filter(Boolean);
       if (!visibleLines.length) {
@@ -380,11 +389,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         const line = visibleLines[index];
         const isLastLine = index === visibleLines.length - 1;
         if (isLastLine) {
-          page.drawText(line, { x: marginX, y, size: 10.8, font: fonts.sans, color: ink });
+          page.drawText(line, { x: marginX, y, size: bodyFontSize, font: fonts.sans, color: ink });
         } else {
-          drawJustifiedLine(page, line, marginX, y, contentWidth, fonts.sans, 10.8, ink);
+          drawJustifiedLine(page, line, marginX, y, contentWidth, fonts.sans, bodyFontSize, ink);
         }
-        y -= 16.5;
+        y -= 17.2;
       }
       y -= 7;
     }
@@ -396,8 +405,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     y -= 10;
     for (const line of closingLines) {
       if (y < bodyBottom + 38) y = addPage();
-      page.drawText(line, { x: marginX, y, size: 9.3, font: fonts.sans, color: muted });
-      y -= 14;
+      page.drawText(line, { x: marginX, y, size: 9.8, font: fonts.sans, color: muted });
+      y -= 14.5;
     }
 
     if (y < signatureBlockTop + 20) y = addPage();

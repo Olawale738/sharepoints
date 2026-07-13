@@ -9,6 +9,7 @@ import {
   Files,
   FolderPlus,
   Gauge,
+  HeartHandshake,
   MessageSquareText,
   ShieldCheck,
   Sparkles,
@@ -802,11 +803,25 @@ export default async function DashboardPage() {
       icon: Sprout
     },
     {
+      title: "Global Prayer Wall",
+      detail: "Create branch, country, ministry, workspace, private, and pastoral prayer requests with restricted access.",
+      action: "Open prayer wall",
+      href: "/dashboard/prayer-wall",
+      icon: HeartHandshake
+    },
+    {
       title: "Access Control Center",
       detail: "Use LETW Digital ID QR codes for doors, entrances, desks, resources, scanner logs, and future NFC/RFID hardware.",
       action: "Open access control",
       href: "/dashboard/access-control",
       icon: DoorOpen
+    },
+    {
+      title: "Authenticity scanner",
+      detail: "Verify LETW letters, certificates, reports, handovers, receipts, signatures, and digital IDs from one public scanner.",
+      action: "Open scanner",
+      href: "/verify",
+      icon: ShieldCheck
     }
   ];
 

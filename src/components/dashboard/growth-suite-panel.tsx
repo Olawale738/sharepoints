@@ -29,7 +29,19 @@ type GrowthData = {
   isAdmin: boolean;
   programs: Array<{ id: string; title: string; category: string; level: string; status: string; durationMinutes?: number | null }>;
   enrollments: Array<{ id: string; programId: string; userId: string; status: string; progress: number; dueAt?: string | null; certificateNumber?: string | null }>;
-  prayerRequests: Array<{ id: string; title: string; priority: string; status: string; visibility: string; createdById: string; assignedToId?: string | null; createdAt: string }>;
+  prayerRequests: Array<{
+    id: string;
+    title: string;
+    details: string;
+    priority: string;
+    status: string;
+    visibility: string;
+    workspaceId?: string | null;
+    organizationUnitId?: string | null;
+    createdById: string;
+    assignedToId?: string | null;
+    createdAt: string;
+  }>;
   prayerNotes: Array<{ id: string; prayerRequestId: string; authorId: string; body: string; createdAt: string }>;
   maintenanceTickets: Array<{ id: string; title: string; category: string; priority: string; status: string; assignedToId?: string | null; dueAt?: string | null; createdAt: string }>;
   campaigns: Array<{ id: string; title: string; campaignType: string; status: string; goalCount?: number | null; currentCount: number; ownerId?: string | null; startsAt?: string | null }>;
@@ -278,6 +290,7 @@ export function GrowthSuitePanel() {
                 {["PRIVATE", "PASTORAL", "WORKSPACE"].map((item) => <option key={item}>{item}</option>)}
               </select>
               <Select name="workspaceId" label="Optional workspace" options={data.workspaces.map((item) => [item.id, item.name])} />
+              <Select name="organizationUnitId" label="Country, branch, church, or ministry scope" options={data.units.map((item) => [item.id, `${item.type.toLowerCase()}: ${item.name}`])} />
               {data.isAdmin ? <Select name="assignedToId" label="Assign to" options={data.users.map((item) => [item.id, item.name ?? item.email ?? "Member"])} /> : null}
               <Textarea className="md:col-span-2" name="details" placeholder="Details for prayer, pastoral care, or follow-up" required />
             </>
@@ -409,7 +422,11 @@ export function GrowthSuitePanel() {
         <Panel title="Prayer and care requests" icon={<HeartHandshake className="h-4 w-4" />} loading={loading} empty={!data.prayerRequests.length}>
           {data.prayerRequests.map((request) => (
             <Item key={request.id} title={request.title} subtitle={`${titleCase(request.priority)} - ${titleCase(request.status)} - ${titleCase(request.visibility)}`}>
+              <p className="mt-2 rounded-md bg-mint/35 px-3 py-2 text-xs leading-5 text-ink/70">{request.details}</p>
               <p className="mt-1 text-xs text-ink/45">Assigned to {usersById.get(request.assignedToId ?? "") ?? "not assigned"}</p>
+              <p className="mt-1 text-xs text-ink/45">
+                Scope: {data.workspaces.find((workspace) => workspace.id === request.workspaceId)?.name ?? data.units.find((unit) => unit.id === request.organizationUnitId)?.name ?? "Private / LETW"}
+              </p>
               <div className="mt-2 space-y-1">
                 {data.prayerNotes.filter((note) => note.prayerRequestId === request.id).slice(0, 3).map((note) => (
                   <p className="rounded-md bg-paper px-3 py-2 text-xs" key={note.id}>{note.body}</p>

@@ -61,6 +61,7 @@ export function AdminNotificationBroadcastPanel({
   const [body, setBody] = useState("");
   const [href, setHref] = useState("/dashboard");
   const [priority, setPriority] = useState("NORMAL");
+  const [emergency, setEmergency] = useState(false);
   const [email, setEmail] = useState(true);
   const [whatsapp, setWhatsapp] = useState(false);
   const [whatsappMode, setWhatsappMode] = useState("TEXT");
@@ -73,6 +74,7 @@ export function AdminNotificationBroadcastPanel({
 
   const audienceHelp = useMemo(() => {
     if (audienceType === "ALL") return "Every active invited @letw.org member.";
+    if (audienceType === "LEADERSHIP") return "Admins, leaders, moderators, and assigned church-network leaders. Optionally limit by workspace or unit.";
     if (audienceType === "UNIT") return "Members whose profile is assigned to the selected country, region, branch, church, or ministry.";
     if (audienceType === "WORKSPACE") return "Only members invited into the selected workspace.";
     if (audienceType === "ROLE") return "Members with the selected role. Select a workspace to limit the role search.";
@@ -118,6 +120,7 @@ export function AdminNotificationBroadcastPanel({
         body,
         href,
         priority,
+        emergency,
         whatsappMode,
         whatsappTemplateName: whatsappTemplateName || null,
         whatsappTemplateLanguage: whatsappTemplateLanguage || null,
@@ -135,6 +138,7 @@ export function AdminNotificationBroadcastPanel({
     setResult(payload);
     setTitle("");
     setBody("");
+    setEmergency(false);
   }
 
   return (
@@ -150,6 +154,7 @@ export function AdminNotificationBroadcastPanel({
                 onChange={(event) => setAudienceType(event.target.value)}
               >
                 <option value="ALL">All active members</option>
+                <option value="LEADERSHIP">Emergency leadership audience</option>
                 <option value="UNIT">Country / region / branch / ministry</option>
                 <option value="WORKSPACE">Workspace members</option>
                 <option value="ROLE">Role group</option>
@@ -163,7 +168,7 @@ export function AdminNotificationBroadcastPanel({
                 value={priority}
                 onChange={(event) => setPriority(event.target.value)}
               >
-                {priorities.map((item) => (
+              {priorities.map((item) => (
                   <option key={item} value={item}>
                     {item.toLowerCase()}
                   </option>
@@ -172,11 +177,11 @@ export function AdminNotificationBroadcastPanel({
             </label>
           </div>
 
-          {audienceType === "UNIT" ? (
+          {audienceType === "UNIT" || audienceType === "LEADERSHIP" ? (
             <label className="space-y-2 text-sm font-medium text-ink">
-              Organization unit
-              <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" value={unitId} onChange={(event) => setUnitId(event.target.value)} required>
-                <option value="">Choose unit</option>
+              Organization unit {audienceType === "LEADERSHIP" ? "(optional)" : ""}
+              <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" value={unitId} onChange={(event) => setUnitId(event.target.value)} required={audienceType === "UNIT"}>
+                <option value="">All / choose unit</option>
                 {units.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.name} {unit.detail ? `- ${unit.detail}` : ""}
@@ -186,9 +191,9 @@ export function AdminNotificationBroadcastPanel({
             </label>
           ) : null}
 
-          {audienceType === "WORKSPACE" || audienceType === "ROLE" ? (
+          {audienceType === "WORKSPACE" || audienceType === "ROLE" || audienceType === "LEADERSHIP" ? (
             <label className="space-y-2 text-sm font-medium text-ink">
-              Workspace {audienceType === "ROLE" ? "(optional)" : ""}
+              Workspace {audienceType === "ROLE" || audienceType === "LEADERSHIP" ? "(optional)" : ""}
               <select
                 className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm"
                 value={workspaceId}
@@ -233,9 +238,27 @@ export function AdminNotificationBroadcastPanel({
 
           <div className="rounded-md border border-ink/10 bg-paper px-3 py-2 text-xs leading-5 text-ink/60">{audienceHelp}</div>
 
+          <label className="flex items-start gap-3 rounded-md border border-clay/20 bg-clay/10 p-3 text-sm">
+            <input
+              checked={emergency}
+              className="mt-1"
+              onChange={(event) => {
+                setEmergency(event.target.checked);
+                if (event.target.checked) setPriority("URGENT");
+              }}
+              type="checkbox"
+            />
+            <span>
+              <span className="block font-semibold text-clay">Emergency leadership broadcast</span>
+              <span className="mt-1 block text-xs leading-5 text-ink/60">
+                Marks the message urgent, bypasses quiet hours, sends immediate email when enabled, and records emergency audit metadata.
+              </span>
+            </span>
+          </label>
+
           <label className="space-y-2 text-sm font-medium text-ink">
             Message title
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Example: Prayer meeting starts at 7 PM" required />
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={emergency ? "Example: Lagos leaders emergency instruction" : "Example: Prayer meeting starts at 7 PM"} required />
           </label>
           <label className="space-y-2 text-sm font-medium text-ink">
             Message body

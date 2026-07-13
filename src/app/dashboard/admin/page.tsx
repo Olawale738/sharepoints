@@ -376,6 +376,12 @@ export default async function AdminControlCenterPage() {
           icon: IdCard
         },
         {
+          href: "/dashboard/admin/seal-registry",
+          label: "Seal registry",
+          detail: "Verify official letters, certificates, reports, handovers, IDs, receipts, and signatures.",
+          icon: ShieldCheck
+        },
+        {
           href: "/dashboard/certificates",
           label: "Certificates",
           detail: "Generate baptism, membership, training, ordination, and service certificates.",

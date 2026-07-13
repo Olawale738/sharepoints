@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import QRCode from "qrcode";
 import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
@@ -83,7 +84,44 @@ function drawFooter(page: PDFPage, fonts: FontSet, pageNumber: number, navy: Pdf
   page.drawText(`Page ${pageNumber}`, { x: pageSize[0] - 86, y: 47, size: 8, font: fonts.bold, color: navy });
 }
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+function drawVerificationPanel(input: {
+  page: PDFPage;
+  qr: PDFImage;
+  fonts: FontSet;
+  code: string;
+  x: number;
+  y: number;
+  width: number;
+  navy: PdfColor;
+  blue: PdfColor;
+  gold: PdfColor;
+  light: PdfColor;
+  white: PdfColor;
+}) {
+  const { page, qr, fonts, code, x, y, width, navy, blue, gold, light, white } = input;
+  page.drawRectangle({ x, y, width, height: 104, color: white, borderColor: rgb(0.78, 0.84, 0.92), borderWidth: 0.7 });
+  page.drawRectangle({ x, y: y + 98, width, height: 6, color: navy });
+  page.drawRectangle({ x: x + width - 112, y: y + 14, width: 82, height: 82, color: light, borderColor: gold, borderWidth: 0.9 });
+  page.drawImage(qr, { x: x + width - 104, y: y + 22, width: 66, height: 66 });
+  page.drawText("OFFICIAL SEAL REGISTRY", { x: x + 16, y: y + 72, size: 8.3, font: fonts.bold, color: gold });
+  page.drawText("Scan this QR code to confirm the live LETW registry status before accepting this handover.", {
+    x: x + 16,
+    y: y + 52,
+    size: 8.7,
+    font: fonts.sans,
+    color: navy
+  });
+  page.drawText("Cancelled or superseded handovers must not be relied upon as current leadership authority.", {
+    x: x + 16,
+    y: y + 36,
+    size: 7.5,
+    font: fonts.sans,
+    color: blue
+  });
+  drawFittedText(page, code, x + 16, y + 18, width - 150, fonts.bold, 9.1, navy);
+}
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
     const { id } = await context.params;
@@ -103,6 +141,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     const names = new Map(users.map((row) => [row.id, row.name ?? row.email ?? "Unknown leader"]));
     const scope = unit ? `${unit.name} - ${unit.type.toLowerCase()}${unit.countryCode ? ` (${unit.countryCode})` : ""}` : workspace?.name ?? "Global LETW";
     const handoverCode = `LETW-HO-${handover.createdAt.getUTCFullYear()}-${handover.id.slice(-6).toUpperCase()}`;
+    const origin = new URL(request.url).origin;
+    const verifyUrl = `${origin}/verify/handover/${handover.id}`;
 
     const pdf = await PDFDocument.create();
     const fonts: FontSet = {
@@ -112,6 +152,13 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       script: await pdf.embedFont(StandardFonts.TimesRomanItalic)
     };
     const logo = await pdf.embedPng(await readFile(path.join(process.cwd(), "public", "letw-logo.png")));
+    const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+      width: 420,
+      margin: 2,
+      errorCorrectionLevel: "H",
+      color: { dark: "#0b1b3d", light: "#ffffff" }
+    });
+    const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
     const navy = rgb(0.043, 0.106, 0.239);
     const blue = rgb(0.039, 0.239, 0.514);
     const gold = rgb(0.831, 0.686, 0.216);
@@ -219,6 +266,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       page.drawText("Date:", { x: Number(x), y: y - 88, size: 7.3, font: fonts.sans, color: muted });
     });
     page.drawImage(logo, { x: 274, y: y - 87, width: 44, height: 44, opacity: 0.85 });
+    y -= 124;
+
+    ensureSpace(128);
+    drawVerificationPanel({ page, qr, fonts, code: handoverCode, x: marginX, y: y - 104, width: contentWidth, navy, blue, gold, light, white });
 
     const pdfBytes = await pdf.save();
     return new Response(Buffer.from(pdfBytes), {

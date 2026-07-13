@@ -34,7 +34,7 @@ export default async function AdminNotificationsPage() {
       take: 1000
     }),
     prisma.notification.findMany({
-      where: { type: "ADMIN_BROADCAST" },
+      where: { type: { in: ["ADMIN_BROADCAST", "EMERGENCY_BROADCAST"] } },
       include: { user: { select: { name: true, email: true } } },
       orderBy: { createdAt: "desc" },
       take: 25

@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import QRCode from "qrcode";
 import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
@@ -133,7 +134,44 @@ function drawMetricCard(input: {
   drawFittedText(page, label, x + 10, y + 12, width - 20, fonts.sans, 7.5, blue);
 }
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+function drawVerificationPanel(input: {
+  page: PDFPage;
+  qr: PDFImage;
+  fonts: FontSet;
+  code: string;
+  x: number;
+  y: number;
+  width: number;
+  navy: PdfColor;
+  blue: PdfColor;
+  gold: PdfColor;
+  light: PdfColor;
+  white: PdfColor;
+}) {
+  const { page, qr, fonts, code, x, y, width, navy, blue, gold, light, white } = input;
+  page.drawRectangle({ x, y, width, height: 104, color: white, borderColor: rgb(0.78, 0.84, 0.92), borderWidth: 0.7 });
+  page.drawRectangle({ x, y: y + 98, width, height: 6, color: navy });
+  page.drawRectangle({ x: x + width - 112, y: y + 14, width: 82, height: 82, color: light, borderColor: gold, borderWidth: 0.9 });
+  page.drawImage(qr, { x: x + width - 104, y: y + 22, width: 66, height: 66 });
+  page.drawText("OFFICIAL SEAL REGISTRY", { x: x + 16, y: y + 72, size: 8.3, font: fonts.bold, color: gold });
+  page.drawText("Scan this QR code to confirm the live LETW registry status before accepting this report.", {
+    x: x + 16,
+    y: y + 52,
+    size: 8.7,
+    font: fonts.sans,
+    color: navy
+  });
+  page.drawText("Valid statuses are controlled from LETW SharePoint and may change after printing.", {
+    x: x + 16,
+    y: y + 36,
+    size: 7.5,
+    font: fonts.sans,
+    color: blue
+  });
+  drawFittedText(page, code, x + 16, y + 18, width - 150, fonts.bold, 9.1, navy);
+}
+
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
     const { id } = await context.params;
@@ -175,6 +213,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
         (unit ? `${unit.name} - ${unit.type.toLowerCase()}${unit.countryCode ? ` (${unit.countryCode})` : ""}` : workspace?.name ?? "LETW organization")
     );
     const reportCode = `LETW-RPT-${report.year}-${String(report.month).padStart(2, "0")}-${report.id.slice(-6).toUpperCase()}`;
+    const origin = new URL(request.url).origin;
+    const verifyUrl = `${origin}/verify/report/${report.id}`;
+    const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
+      width: 420,
+      margin: 2,
+      errorCorrectionLevel: "H",
+      color: { dark: "#0b1b3d", light: "#ffffff" }
+    });
+    const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
 
     let pageNumber = 1;
     let page = pdf.addPage(pageSize);
@@ -318,6 +365,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     page.drawText("Reviewed by", { x: marginX + 181, y: y - 48, size: 7, font: fonts.sans, color: muted });
     page.drawLine({ start: { x: marginX + 324, y: y - 34 }, end: { x: marginX + 474, y: y - 34 }, thickness: 0.6, color: navy });
     page.drawText("Date", { x: marginX + 388, y: y - 48, size: 7, font: fonts.sans, color: muted });
+    y -= 84;
+
+    ensureSpace(128);
+    drawVerificationPanel({ page, qr, fonts, code: reportCode, x: marginX, y: y - 104, width: contentWidth, navy, blue, gold, light, white });
 
     const pdfBytes = await pdf.save();
     return new Response(Buffer.from(pdfBytes), {

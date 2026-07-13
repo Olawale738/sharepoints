@@ -12,7 +12,7 @@ import { getWhatsAppConfig, normalizeWhatsAppPhone, sendWhatsAppMessage } from "
 export const runtime = "nodejs";
 
 const broadcastSchema = z.object({
-  audienceType: z.enum(["ALL", "UNIT", "WORKSPACE", "ROLE", "USER"]),
+  audienceType: z.enum(["ALL", "LEADERSHIP", "UNIT", "WORKSPACE", "ROLE", "USER"]),
   unitId: z.string().cuid().optional().nullable(),
   workspaceId: z.string().cuid().optional().nullable(),
   role: z.nativeEnum(WorkspaceRole).optional().nullable(),
@@ -21,6 +21,7 @@ const broadcastSchema = z.object({
   body: z.string().trim().min(1).max(4000),
   href: z.string().trim().max(300).optional().nullable(),
   priority: z.nativeEnum(NotificationPriority).optional().default(NotificationPriority.NORMAL),
+  emergency: z.boolean().optional().default(false),
   whatsappMode: z.enum(["TEXT", "TEMPLATE"]).optional().default("TEXT"),
   whatsappTemplateName: z.string().trim().max(120).optional().nullable(),
   whatsappTemplateLanguage: z.string().trim().min(2).max(12).optional().nullable(),
@@ -59,6 +60,38 @@ async function getRecipients(data: z.infer<typeof broadcastSchema>) {
       select: userSelect,
       take: 5000
     });
+  }
+
+  if (data.audienceType === "LEADERSHIP") {
+    const [workspaceLeaders, unitLeaderRows] = await Promise.all([
+      prisma.workspaceMember.findMany({
+        where: {
+          role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR] },
+          ...(data.workspaceId ? { workspaceId: data.workspaceId } : {}),
+          user: activeWhere,
+          workspace: { deletedAt: null }
+        },
+        select: { user: { select: userSelect } },
+        take: 5000
+      }),
+      prisma.organizationUnitLeader.findMany({
+        where: {
+          ...(data.unitId ? { unitId: data.unitId } : {})
+        },
+        select: { userId: true },
+        take: 5000
+      })
+    ]);
+    const unitLeaderIds = [...new Set(unitLeaderRows.map((leader) => leader.userId))];
+    const unitLeaders = unitLeaderIds.length
+      ? await prisma.user.findMany({
+          where: { ...activeWhere, id: { in: unitLeaderIds } },
+          select: userSelect,
+          take: 5000
+        })
+      : [];
+
+    return [...workspaceLeaders.map((member) => member.user), ...unitLeaders];
   }
 
   if (data.audienceType === "UNIT") {
@@ -154,15 +187,20 @@ export async function POST(request: Request) {
       throw new ApiError(404, "No active LETW members matched this audience.");
     }
 
+    const priority = data.emergency ? NotificationPriority.URGENT : data.priority;
+    const notificationType = data.emergency ? "EMERGENCY_BROADCAST" : "ADMIN_BROADCAST";
+    const title = data.emergency && !data.title.toLowerCase().includes("emergency")
+      ? `Emergency: ${data.title}`
+      : data.title;
     const notifications = await notifyUsers(
       uniqueRecipients.map((recipient) => recipient.id),
       {
         workspaceId: data.workspaceId ?? null,
-        type: "ADMIN_BROADCAST",
-        title: data.title,
+        type: notificationType,
+        title,
         body: data.body,
         href: data.href || "/dashboard",
-        priority: data.priority
+        priority
       }
     );
     const notificationIds = notifications?.map((notification) => notification.id) ?? [];
@@ -183,7 +221,7 @@ export async function POST(request: Request) {
         }
         const result = await sendWhatsAppMessage({
           phone,
-          title: data.title,
+          title,
           body: data.body,
           href: data.href,
           mode: data.whatsappMode,
@@ -207,6 +245,7 @@ export async function POST(request: Request) {
       targetId: data.workspaceId ?? data.unitId ?? data.userId ?? undefined,
       metadata: {
         audienceType: data.audienceType,
+        emergency: data.emergency,
         recipientCount: uniqueRecipients.length,
         channels: data.channels,
         emailDelivery: delivery,

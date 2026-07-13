@@ -169,7 +169,7 @@ export async function deliverPendingNotifications(notificationIds?: string[]) {
         absoluteHref(notification.href)
       );
       let emailSent = false;
-      if (preference?.digest === "IMMEDIATE" && notification.user.email && !notification.emailSentAt) {
+      if ((notification.priority === "URGENT" || preference?.digest === "IMMEDIATE") && notification.user.email && !notification.emailSentAt) {
         emailSent = await sendEmail(
           notification.user.email,
           notification.title,

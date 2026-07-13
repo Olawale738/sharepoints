@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { WorkspaceRole } from "@prisma/client";
 import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
@@ -193,6 +194,32 @@ export async function GET() {
     const isAdmin = await hasAnyWorkspaceAdminRole(user.id);
     const workspaceIds = await workspaceIdsForUser(user.id);
     const workspaceScope = [{ workspaceId: null }, { workspaceId: { in: workspaceIds } }];
+    const leadershipAccess = isAdmin
+      ? true
+      : Boolean(
+          (await prisma.workspaceMember.findFirst({
+            where: {
+              userId: user.id,
+              role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR] },
+              workspace: { deletedAt: null }
+            },
+            select: { id: true }
+          })) ||
+            (await prisma.organizationUnitLeader.findFirst({
+              where: { userId: user.id },
+              select: { id: true }
+            }))
+        );
+    const visiblePrayerWhere = isAdmin
+      ? {}
+      : {
+          OR: [
+            { createdById: user.id },
+            { assignedToId: user.id },
+            { visibility: "WORKSPACE" as const, workspaceId: { in: workspaceIds } },
+            ...(leadershipAccess ? [{ visibility: "PASTORAL" as const }] : [])
+          ]
+        };
 
     const [
       programs,
@@ -220,15 +247,7 @@ export async function GET() {
         take: 400
       }),
       prisma.prayerRequest.findMany({
-        where: isAdmin
-          ? {}
-          : {
-              OR: [
-                { createdById: user.id },
-                { assignedToId: user.id },
-                { visibility: "WORKSPACE", workspaceId: { in: workspaceIds } }
-              ]
-            },
+        where: visiblePrayerWhere,
         orderBy: [{ status: "asc" }, { priority: "desc" }, { createdAt: "desc" }],
         take: 250
       }),
@@ -239,13 +258,7 @@ export async function GET() {
               prayerRequestId: {
                 in: (
                   await prisma.prayerRequest.findMany({
-                    where: {
-                      OR: [
-                        { createdById: user.id },
-                        { assignedToId: user.id },
-                        { visibility: "WORKSPACE", workspaceId: { in: workspaceIds } }
-                      ]
-                    },
+                    where: visiblePrayerWhere,
                     select: { id: true }
                   })
                 ).map((request) => request.id)
