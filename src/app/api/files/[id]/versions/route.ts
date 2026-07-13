@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { scanUploadedFile } from "@/lib/file-security";
-import { ensureCanSeeFile } from "@/lib/governance";
+import { ensureCanEditFile, ensureCanSeeFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
+import { requireWorkspaceMembership } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
 import { sanitizeFileName } from "@/lib/utils";
 
@@ -48,7 +48,13 @@ export async function GET(_request: Request, context: RouteContext) {
           take: 50
         },
         versions: {
-          include: {
+          select: {
+            id: true,
+            versionNumber: true,
+            fileName: true,
+            size: true,
+            changeNote: true,
+            createdAt: true,
             uploadedBy: {
               select: { name: true, email: true }
             }
@@ -82,7 +88,7 @@ export async function POST(request: Request, context: RouteContext) {
       throw new ApiError(404, "File not found.");
     }
 
-    await requireWorkspacePermission(user.id, existing.workspaceId, "canUploadFiles");
+    await ensureCanEditFile(user.id, existing);
 
     if (existing.checkedOutById && existing.checkedOutById !== user.id) {
       throw new ApiError(409, "This document is checked out by another member.");
@@ -142,9 +148,17 @@ export async function POST(request: Request, context: RouteContext) {
           }
         }
       },
-      include: {
+      select: {
+        id: true,
+        currentVersionNumber: true,
         versions: {
-          include: {
+          select: {
+            id: true,
+            versionNumber: true,
+            fileName: true,
+            size: true,
+            changeNote: true,
+            createdAt: true,
             uploadedBy: {
               select: { name: true, email: true }
             }

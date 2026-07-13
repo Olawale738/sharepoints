@@ -107,6 +107,7 @@ export async function POST(request: Request) {
         scanDetails: scan.details,
         dlpRestricted: dlp.action === "RESTRICT",
         dlpClassification: dlp.classification,
+        downloadRestricted: true,
         approvalStatus,
         approvedById: approvalStatus === "APPROVED" ? user.id : null,
         approvedAt: approvalStatus === "APPROVED" ? new Date() : null,
@@ -123,7 +124,24 @@ export async function POST(request: Request) {
           }
         }
       },
-      include: {
+      select: {
+        id: true,
+        workspaceId: true,
+        folderId: true,
+        uploadedById: true,
+        fileName: true,
+        fileType: true,
+        size: true,
+        scanStatus: true,
+        scanDetails: true,
+        dlpRestricted: true,
+        dlpClassification: true,
+        downloadRestricted: true,
+        approvalStatus: true,
+        approvedById: true,
+        approvedAt: true,
+        currentVersionNumber: true,
+        createdAt: true,
         uploadedBy: {
           select: {
             id: true,

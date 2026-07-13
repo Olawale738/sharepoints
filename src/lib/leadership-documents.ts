@@ -6,7 +6,13 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspacePermission, requireAnyWorkspacePermission } from "@/lib/rbac";
-import { deleteObject, getDownloadResponse, getInlineResponse, getMaxUploadBytes, uploadObject } from "@/lib/storage";
+import {
+  deleteObject,
+  getMaxUploadBytes,
+  getProtectedDownloadResponse,
+  getProtectedInlineResponse,
+  uploadObject
+} from "@/lib/storage";
 import { sanitizeFileName } from "@/lib/utils";
 
 export async function canViewLeadershipDocumentRoom(userId: string) {
@@ -37,7 +43,18 @@ export async function getLeadershipDocuments(userId: string) {
     where: {
       deletedAt: null
     },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      status: true,
+      fileName: true,
+      fileType: true,
+      size: true,
+      uploadedById: true,
+      createdAt: true,
+      updatedAt: true,
       uploadedBy: {
         select: {
           name: true,
@@ -89,7 +106,18 @@ export async function uploadLeadershipDocument(input: {
       size: input.file.size,
       uploadedById: input.userId
     },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      status: true,
+      fileName: true,
+      fileType: true,
+      size: true,
+      uploadedById: true,
+      createdAt: true,
+      updatedAt: true,
       uploadedBy: {
         select: {
           name: true,
@@ -142,12 +170,12 @@ export async function getLeadershipDocumentDownload(userId: string, id: string) 
     }
   });
 
-  return getDownloadResponse(document.storageKey, document.fileName, document.fileType);
+  return getProtectedDownloadResponse(document.storageKey, document.fileName, document.fileType);
 }
 
 export async function getLeadershipDocumentPreview(userId: string, id: string) {
   const document = await getLeadershipDocumentForAccess(userId, id);
-  return getInlineResponse(document.storageKey, document.fileName, document.fileType);
+  return getProtectedInlineResponse(document.storageKey, document.fileName, document.fileType);
 }
 
 export async function deleteLeadershipDocument(userId: string, id: string) {

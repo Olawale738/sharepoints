@@ -4,7 +4,7 @@ import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanDownloadFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
-import { getDownloadResponse } from "@/lib/storage";
+import { getProtectedDownloadResponse } from "@/lib/storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -64,7 +64,7 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(423, "This document was blocked by security screening.");
     }
 
-    return getDownloadResponse(file.storageKey, file.fileName, file.fileType);
+    return getProtectedDownloadResponse(file.storageKey, file.fileName, file.fileType);
   } catch (error) {
     return handleRouteError(error);
   }

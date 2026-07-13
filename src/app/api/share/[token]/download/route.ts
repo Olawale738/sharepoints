@@ -1,10 +1,10 @@
 import { auth } from "@/auth";
 import { hasActiveFileGrant } from "@/lib/access-requests";
 import { ApiError, handleRouteError } from "@/lib/api";
-import { ensureCanDownloadFile } from "@/lib/governance";
+import { ensureCanDownloadFile, ensureCanSeeFile, hasActiveFileDownloadGrant, isPresidentDocumentAuthority } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
-import { getDownloadResponse } from "@/lib/storage";
+import { getProtectedDownloadResponse, getProtectedInlineResponse } from "@/lib/storage";
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -53,7 +53,9 @@ export async function GET(request: Request, context: RouteContext) {
             downloadRestricted: true,
             storageKey: true,
             fileName: true,
-            fileType: true
+            fileType: true,
+            deletedAt: true,
+            scanStatus: true
           }
         }
       }
@@ -67,6 +69,10 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(410, "Share link has expired.");
     }
 
+    if (shareLink.file.deletedAt) {
+      throw new ApiError(404, "File not found.");
+    }
+
     try {
       await requireWorkspaceMembership(session.user.id, shareLink.file.workspaceId);
     } catch (error) {
@@ -78,9 +84,17 @@ export async function GET(request: Request, context: RouteContext) {
         throw error;
       }
     }
-    await ensureCanDownloadFile(session.user.id, shareLink.file);
+    if (shareLink.file.scanStatus === "INFECTED") {
+      throw new ApiError(423, "This document was blocked by security screening.");
+    }
 
-    return getDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+    if ((await isPresidentDocumentAuthority(session.user.id)) || (await hasActiveFileDownloadGrant(session.user.id, shareLink.file.id))) {
+      await ensureCanDownloadFile(session.user.id, shareLink.file);
+      return getProtectedDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+    }
+
+    await ensureCanSeeFile(session.user.id, shareLink.file);
+    return getProtectedInlineResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
   } catch (error) {
     return handleRouteError(error);
   }

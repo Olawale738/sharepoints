@@ -34,6 +34,7 @@ type FileRow = {
   shareRestricted?: boolean;
   aiRestricted?: boolean;
   dlpRestricted?: boolean;
+  canDownload?: boolean;
   uploadedBy: {
     name?: string | null;
     email?: string | null;
@@ -53,6 +54,7 @@ type FileTableProps = {
   canDeleteFiles: boolean;
   canCreateShareLinks: boolean;
   canUploadFiles: boolean;
+  canEditDocuments: boolean;
   canManageGovernance: boolean;
   canClassifyDocuments: boolean;
 };
@@ -64,6 +66,7 @@ export function FileTable({
   canDeleteFiles,
   canCreateShareLinks,
   canUploadFiles,
+  canEditDocuments,
   canManageGovernance,
   canClassifyDocuments
 }: FileTableProps) {
@@ -125,7 +128,7 @@ export function FileTable({
     }
 
     await copyText(data.shareLink.url);
-    setShareStatus("Member-only download link copied. It expires in 30 days.");
+    setShareStatus("Secure member-only reader link copied. It expires in 30 days.");
   }
 
   return (
@@ -206,22 +209,26 @@ export function FileTable({
             >
               <Eye className="h-4 w-4" />
             </Button>
-            <Button
-              aria-label={`Edit ${file.fileName}`}
-              className="h-9 w-9 px-0"
-              variant="secondary"
-              onClick={() => window.open(`/dashboard/files/${file.id}/edit`, "_blank", "noopener,noreferrer")}
-            >
-              <Edit3 className="h-4 w-4" />
-            </Button>
-            <Button
-              aria-label={`Download ${file.fileName}`}
-              className="h-9 w-9 px-0"
-              variant="secondary"
-              onClick={() => window.open(`/api/files/${file.id}/download`, "_blank", "noopener,noreferrer")}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
+            {canEditDocuments ? (
+              <Button
+                aria-label={`Edit ${file.fileName}`}
+                className="h-9 w-9 px-0"
+                variant="secondary"
+                onClick={() => window.open(`/dashboard/files/${file.id}/edit`, "_blank", "noopener,noreferrer")}
+              >
+                <Edit3 className="h-4 w-4" />
+              </Button>
+            ) : null}
+            {file.canDownload ? (
+              <Button
+                aria-label={`Download ${file.fileName}`}
+                className="h-9 w-9 px-0"
+                variant="secondary"
+                onClick={() => window.open(`/api/files/${file.id}/download`, "_blank", "noopener,noreferrer")}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            ) : null}
             {canCreateShareLinks ? (
               <Button
                 aria-label={`Create share link for ${file.fileName}`}
@@ -251,7 +258,7 @@ export function FileTable({
         <DocumentHistoryDialog
           fileId={historyFile.id}
           fileName={historyFile.fileName}
-          canUpload={canUploadFiles}
+          canUpload={canUploadFiles && canEditDocuments}
           canManageGovernance={canManageGovernance}
           canClassifyDocuments={canClassifyDocuments}
           onClose={() => setHistoryFile(null)}

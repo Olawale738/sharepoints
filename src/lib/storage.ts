@@ -189,6 +189,52 @@ export async function getObjectBuffer(key: string) {
   return Buffer.concat(chunks);
 }
 
+function protectedFileHeaders(input: {
+  bodyLength: number;
+  contentType: string;
+  disposition: "inline" | "attachment";
+  fileName: string;
+}) {
+  const safeFileName = input.fileName.replace(/"/g, "");
+
+  return {
+    "Content-Type": input.contentType || "application/octet-stream",
+    "Content-Length": String(input.bodyLength),
+    "Content-Disposition": `${input.disposition}; filename="${safeFileName}"`,
+    "Cache-Control": "private, no-store, no-cache, must-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
+    "X-Content-Type-Options": "nosniff",
+    "X-Robots-Tag": "noindex, nofollow, noarchive"
+  };
+}
+
+export async function getProtectedInlineResponse(key: string, fileName: string, contentType: string) {
+  const body = await getObjectBuffer(key);
+
+  return new Response(body, {
+    headers: protectedFileHeaders({
+      bodyLength: body.length,
+      contentType,
+      disposition: "inline",
+      fileName
+    })
+  });
+}
+
+export async function getProtectedDownloadResponse(key: string, fileName: string, contentType: string) {
+  const body = await getObjectBuffer(key);
+
+  return new Response(body, {
+    headers: protectedFileHeaders({
+      bodyLength: body.length,
+      contentType,
+      disposition: "attachment",
+      fileName
+    })
+  });
+}
+
 export async function getInlineResponse(key: string, fileName: string, contentType: string) {
   if (isS3Configured()) {
     return Response.redirect(await getInlineUrl(key, fileName, contentType), 302);

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { ensureCanEditFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
-import { requireWorkspacePermission } from "@/lib/rbac";
 import { getObjectBuffer, uploadObject } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -23,7 +23,12 @@ export async function POST(_request: Request, context: RouteContext) {
       include: {
         file: {
           select: {
+            id: true,
             workspaceId: true,
+            uploadedById: true,
+            approvalStatus: true,
+            sensitivityLabel: true,
+            dlpRestricted: true,
             currentVersionNumber: true,
             checkedOutById: true
           }
@@ -35,7 +40,7 @@ export async function POST(_request: Request, context: RouteContext) {
       throw new ApiError(404, "Version not found.");
     }
 
-    await requireWorkspacePermission(user.id, version.file.workspaceId, "canUploadFiles");
+    await ensureCanEditFile(user.id, version.file);
 
     if (version.file.checkedOutById && version.file.checkedOutById !== user.id) {
       throw new ApiError(409, "This document is checked out by another member.");
@@ -71,6 +76,14 @@ export async function POST(_request: Request, context: RouteContext) {
             uploadedById: user.id
           }
         }
+      },
+      select: {
+        id: true,
+        fileName: true,
+        fileType: true,
+        size: true,
+        currentVersionNumber: true,
+        updatedAt: true
       }
     });
 

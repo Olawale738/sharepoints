@@ -1,5 +1,6 @@
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { ensureCanEditFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { hasWorkspaceAdminAccess, requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { fileGovernanceSchema } from "@/lib/validators";
@@ -28,6 +29,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (parsed.data.action === "CHECK_OUT") {
+      await ensureCanEditFile(user.id, file);
+
       if (file.checkedOutById && file.checkedOutById !== user.id) {
         throw new ApiError(409, "This document is already checked out.");
       }

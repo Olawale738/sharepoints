@@ -4,7 +4,7 @@ import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanSeeFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
-import { getInlineResponse, getObjectBuffer } from "@/lib/storage";
+import { getObjectBuffer, getProtectedInlineResponse } from "@/lib/storage";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -113,12 +113,17 @@ export async function GET(request: Request, context: RouteContext) {
       return new Response(htmlPreview(file.fileName, result.value), {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
-          "Content-Security-Policy": "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline';"
+          "Content-Security-Policy": "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline';",
+          "Cache-Control": "private, no-store, no-cache, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+          "X-Content-Type-Options": "nosniff",
+          "X-Robots-Tag": "noindex, nofollow, noarchive"
         }
       });
     }
 
-    return getInlineResponse(file.storageKey, file.fileName, file.fileType);
+    return getProtectedInlineResponse(file.storageKey, file.fileName, file.fileType);
   } catch (error) {
     return handleRouteError(error);
   }

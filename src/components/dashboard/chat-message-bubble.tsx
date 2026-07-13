@@ -238,7 +238,9 @@ export function ChatMessageBubble({
               {!isDeleted && message.attachmentFile ? (
                 <a
                   className="mt-2 inline-flex items-center gap-2 rounded-md border border-ink/10 bg-white px-2 py-1 text-xs text-moss"
-                  href={`/api/files/${message.attachmentFile.id}/download`}
+                  href={`/api/files/${message.attachmentFile.id}/preview`}
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   <Paperclip className="h-3.5 w-3.5" />
                   {message.attachmentFile.fileName} ({formatBytes(message.attachmentFile.size)})

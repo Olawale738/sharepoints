@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
-import { ensureCanShareFile } from "@/lib/governance";
+import { ensureCanShareFile, isPresidentDocumentAuthority } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { createFileShareLinkSchema } from "@/lib/validators";
@@ -12,7 +12,7 @@ type RouteContext = {
 };
 
 function getShareUrl(request: Request, token: string) {
-  return `${new URL(request.url).origin}/api/share/${token}/download`;
+  return `${new URL(request.url).origin}/api/share/${token}/view`;
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -42,6 +42,9 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     await requireWorkspacePermission(user.id, file.workspaceId, "canCreateShareLinks");
+    if (!(await isPresidentDocumentAuthority(user.id))) {
+      throw new ApiError(403, "Only the president can create protected document links.");
+    }
     await ensureCanShareFile(user.id, file);
 
     const body = await request.json().catch(() => ({}));

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Clock3, Loader2, Send } from "lucide-react";
+import { Clock3, Loader2, Send, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,22 @@ type Grant = {
   grantedBy: { name: string | null; email: string | null };
 };
 
+type FileGrant = {
+  id: string;
+  accessLevel: string;
+  expiresAt: string | null;
+  file: { id: string; fileName: string; workspace: { name: string } };
+  user: { name: string | null; email: string | null };
+  grantedBy: { name: string | null; email: string | null };
+};
+
 type GrantData = {
   members: Option[];
   workspaces: Option[];
   files: Option[];
   grants: Grant[];
+  fileGrants: FileGrant[];
+  canManageDownloadGrants: boolean;
 };
 
 function optionLabel(option: Option) {
@@ -43,9 +54,11 @@ export function TemporaryAccessGrantPanel() {
   const [userId, setUserId] = useState("");
   const [targetId, setTargetId] = useState("");
   const [role, setRole] = useState("USER");
+  const [fileAccessLevel, setFileAccessLevel] = useState<"VIEW" | "DOWNLOAD">("VIEW");
   const [expiresInDays, setExpiresInDays] = useState("7");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [revokingId, setRevokingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -85,6 +98,7 @@ export function TemporaryAccessGrantPanel() {
         targetId,
         userId,
         role,
+        fileAccessLevel,
         expiresInDays: Number(expiresInDays),
         reason
       })
@@ -99,6 +113,23 @@ export function TemporaryAccessGrantPanel() {
 
     setMessage("Temporary access granted.");
     setReason("");
+    await load();
+  }
+
+  async function revokeFileGrant(grantId: string) {
+    setRevokingId(grantId);
+    setError("");
+    setMessage("");
+    const response = await fetch(`/api/access-requests/grants/${grantId}`, { method: "DELETE" });
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    setRevokingId("");
+
+    if (!response.ok) {
+      setError(payload?.error ?? "Document permission could not be removed.");
+      return;
+    }
+
+    setMessage("Document permission removed.");
     await load();
   }
 
@@ -156,6 +187,27 @@ export function TemporaryAccessGrantPanel() {
                 <option value="EDITOR">Editor</option>
               </select>
             </label>
+            {targetType === "FILE" ? (
+              <label className="space-y-2 text-sm font-medium text-ink">
+                Document permission
+                <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" value={fileAccessLevel} onChange={(event) => setFileAccessLevel(event.target.value as "VIEW" | "DOWNLOAD")}>
+                  <option value="VIEW">View/read only</option>
+                  <option value="DOWNLOAD" disabled={!data?.canManageDownloadGrants}>Download allowed by president</option>
+                </select>
+              </label>
+            ) : (
+              <label className="space-y-2 text-sm font-medium text-ink">
+                Expires after
+                <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
+                  <option value="1">1 day</option>
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </label>
+            )}
+          </div>
+
+          {targetType === "FILE" ? (
             <label className="space-y-2 text-sm font-medium text-ink">
               Expires after
               <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)}>
@@ -164,7 +216,7 @@ export function TemporaryAccessGrantPanel() {
                 <option value="30">30 days</option>
               </select>
             </label>
-          </div>
+          ) : null}
 
           <label className="space-y-2 text-sm font-medium text-ink">
             Reason
@@ -194,6 +246,33 @@ export function TemporaryAccessGrantPanel() {
                 </p>
               </div>
             ))}
+          </div>
+          <div className="mt-5 border-t border-ink/10 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">Active document permissions</p>
+              <Badge>{data?.fileGrants.length ?? 0}</Badge>
+            </div>
+            <div className="mt-3 space-y-3">
+              {(data?.fileGrants ?? []).length === 0 ? <p className="text-sm text-ink/55">No active document permissions.</p> : null}
+              {(data?.fileGrants ?? []).map((grant) => (
+                <div key={grant.id} className="rounded-md border border-ink/10 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{grant.user.name ?? grant.user.email}</p>
+                      <p className="mt-1 text-xs text-ink/55">
+                        {grant.file.fileName} - {grant.file.workspace.name} - {grant.accessLevel.toLowerCase()}
+                        {grant.expiresAt ? ` - expires ${formatDate(grant.expiresAt)}` : ""}
+                      </p>
+                    </div>
+                    {data?.canManageDownloadGrants ? (
+                      <Button className="h-8 px-2" variant="danger" disabled={revokingId === grant.id} onClick={() => revokeFileGrant(grant.id)}>
+                        {revokingId === grant.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </aside>
       </div>

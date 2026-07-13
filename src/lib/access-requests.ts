@@ -7,6 +7,7 @@ import {
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
+import { isPresidentDocumentAuthority } from "@/lib/governance";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import {
@@ -451,6 +452,7 @@ export async function grantTemporaryAccess(input: {
   targetType: "WORKSPACE" | "FILE";
   targetId: string;
   role?: "USER" | "EDITOR";
+  fileAccessLevel?: "VIEW" | "DOWNLOAD";
   expiresInDays: GrantDurationDays;
   reason?: string | null;
 }) {
@@ -540,6 +542,11 @@ export async function grantTemporaryAccess(input: {
   }
 
   await requireWorkspaceMemberManager(input.actorId, file.workspaceId);
+  const accessLevel = input.fileAccessLevel ?? "VIEW";
+  if (accessLevel === "DOWNLOAD" && !(await isPresidentDocumentAuthority(input.actorId))) {
+    throw new ApiError(403, "Only the president can grant document download permission.");
+  }
+
   const grant = await prisma.fileAccessGrant.upsert({
     where: {
       fileId_userId: {
@@ -551,10 +558,12 @@ export async function grantTemporaryAccess(input: {
       fileId: file.id,
       userId: input.userId,
       grantedById: input.actorId,
+      accessLevel,
       expiresAt
     },
     update: {
       grantedById: input.actorId,
+      accessLevel,
       expiresAt,
       revokedAt: null
     }
@@ -563,9 +572,9 @@ export async function grantTemporaryAccess(input: {
   await notifyUsers([input.userId], {
     workspaceId: file.workspaceId,
     type: "TEMPORARY_ACCESS_GRANTED",
-    title: "Temporary file access granted",
+    title: accessLevel === "DOWNLOAD" ? "Document download permission granted" : "Temporary file access granted",
     body: `${file.fileName} until ${expiresAt.toLocaleDateString("en-GB")}`,
-    href: `/api/files/${file.id}/preview`,
+    href: accessLevel === "DOWNLOAD" ? `/api/files/${file.id}/download` : `/api/files/${file.id}/preview`,
     priority: NotificationPriority.HIGH
   });
   await logActivity({
@@ -573,10 +582,59 @@ export async function grantTemporaryAccess(input: {
     workspaceId: file.workspaceId,
     action: activityActions.temporaryAccessGranted,
     targetId: grant.id,
-    metadata: { targetType: input.targetType, userId: input.userId, expiresAt: expiresAt.toISOString() }
+    metadata: { targetType: input.targetType, userId: input.userId, accessLevel, expiresAt: expiresAt.toISOString() }
   });
 
   return { grant, file };
+}
+
+export async function revokeFileAccessGrant(input: {
+  actorId: string;
+  grantId: string;
+}) {
+  if (!(await isPresidentDocumentAuthority(input.actorId))) {
+    throw new ApiError(403, "Only the president can revoke document download permissions.");
+  }
+
+  const grant = await prisma.fileAccessGrant.findUnique({
+    where: { id: input.grantId },
+    include: {
+      file: { select: { id: true, fileName: true, workspaceId: true } },
+      user: { select: { id: true, name: true, email: true } }
+    }
+  });
+
+  if (!grant || grant.revokedAt) {
+    throw new ApiError(404, "Document permission grant not found.");
+  }
+
+  const revoked = await prisma.fileAccessGrant.update({
+    where: { id: grant.id },
+    data: { revokedAt: new Date() }
+  });
+
+  await notifyUsers([grant.userId], {
+    workspaceId: grant.file.workspaceId,
+    type: "TEMPORARY_ACCESS_GRANTED",
+    title: "Document permission removed",
+    body: `${grant.file.fileName} ${grant.accessLevel.toLowerCase()} permission was removed.`,
+    href: `/api/files/${grant.file.id}/preview`,
+    priority: NotificationPriority.HIGH
+  });
+  await logActivity({
+    userId: input.actorId,
+    workspaceId: grant.file.workspaceId,
+    action: activityActions.temporaryAccessRevoked,
+    targetId: grant.id,
+    metadata: {
+      targetType: "FILE",
+      userId: grant.userId,
+      accessLevel: grant.accessLevel,
+      fileName: grant.file.fileName
+    }
+  });
+
+  return revoked;
 }
 
 export async function getAccessRequestsForUser(userId: string) {

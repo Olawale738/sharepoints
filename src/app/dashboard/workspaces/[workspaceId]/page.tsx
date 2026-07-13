@@ -28,7 +28,7 @@ import { WorkspacePresence } from "@/components/dashboard/workspace-presence";
 import { WorkflowBuilder } from "@/components/dashboard/workflow-builder";
 import { Badge } from "@/components/ui/badge";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
-import { canApproveWorkspaceContent } from "@/lib/governance";
+import { canApproveWorkspaceContent, isPresidentDocumentAuthority } from "@/lib/governance";
 import { meetingInclude, serializeMeeting } from "@/lib/meetings";
 import { prisma } from "@/lib/prisma";
 import { defaultPermissionsForRole, getRolePermissions, hasAnyWorkspaceAdminRole } from "@/lib/rbac";
@@ -190,6 +190,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
 
   await getOrCreateGeneralChannel(workspaceId, membership.workspace.createdById);
   const hasAdminAccess = isGlobalAdmin || membership.role === WorkspaceRole.ADMIN;
+  const canEditDocuments = await isPresidentDocumentAuthority(session.user.id);
   const permissions = hasAdminAccess
     ? defaultPermissionsForRole(WorkspaceRole.ADMIN)
     : await getRolePermissions(workspaceId, membership.role);
@@ -259,6 +260,17 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
           select: {
             name: true,
             email: true
+          }
+        },
+        accessGrants: {
+          where: {
+            userId: session.user.id,
+            accessLevel: "DOWNLOAD",
+            revokedAt: null,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+          },
+          select: {
+            id: true
           }
         }
       },
@@ -724,11 +736,13 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
               shareRestricted: file.shareRestricted,
               aiRestricted: file.aiRestricted,
               dlpRestricted: file.dlpRestricted,
+              canDownload: canEditDocuments || file.accessGrants.length > 0,
               uploadedBy: file.uploadedBy
             }))}
             canDeleteFiles={permissions.canDeleteFiles}
             canCreateShareLinks={permissions.canCreateShareLinks}
             canUploadFiles={permissions.canUploadFiles}
+            canEditDocuments={canEditDocuments}
             canManageGovernance={hasAdminAccess}
             canClassifyDocuments={permissions.canClassifyDocuments}
           />

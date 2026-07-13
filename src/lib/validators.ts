@@ -83,6 +83,7 @@ export const grantTemporaryAccessSchema = z.object({
   targetId: z.string().cuid(),
   userId: z.string().cuid(),
   role: z.enum(["USER", "EDITOR"]).optional().default("USER"),
+  fileAccessLevel: z.enum(["VIEW", "DOWNLOAD"]).optional().default("VIEW"),
   expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30)]),
   reason: z.string().trim().max(1000).optional().or(z.literal(""))
 });

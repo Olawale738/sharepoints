@@ -6,6 +6,20 @@ import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getRolePermissions, getWorkspaceMembership, hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function presidentDocumentAuthorityEmails() {
+  return Array.from(
+    new Set(
+      [process.env.PRESIDENT_ADMIN_EMAIL, process.env.SEED_ADMIN_EMAIL ?? "president@letw.org"]
+        .filter(Boolean)
+        .map((email) => normalizeEmail(String(email)))
+    )
+  );
+}
+
 export type ApprovalTargetType =
   | "FILE"
   | "ANNOUNCEMENT"
@@ -36,6 +50,49 @@ export async function canApproveWorkspaceContent(userId: string, workspaceId: st
 
   const permissions = await getRolePermissions(workspaceId, membership.role);
   return permissions.canApproveContent;
+}
+
+export async function hasElevatedFileAccess(userId: string, workspaceId: string) {
+  if (await hasAnyWorkspaceAdminRole(userId)) {
+    return true;
+  }
+
+  const membership = await getWorkspaceMembership(userId, workspaceId);
+
+  return membership?.role === WorkspaceRole.ADMIN || membership?.role === WorkspaceRole.LEADER;
+}
+
+export async function isPresidentDocumentAuthority(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true }
+  });
+
+  return Boolean(user?.email && presidentDocumentAuthorityEmails().includes(normalizeEmail(user.email)));
+}
+
+export async function hasActiveFileDownloadGrant(userId: string, fileId?: string | null) {
+  if (!fileId) return false;
+  const grant = await prisma.fileAccessGrant.findUnique({
+    where: {
+      fileId_userId: {
+        fileId,
+        userId
+      }
+    },
+    select: {
+      accessLevel: true,
+      revokedAt: true,
+      expiresAt: true
+    }
+  });
+
+  return Boolean(
+    grant &&
+      grant.accessLevel === "DOWNLOAD" &&
+      !grant.revokedAt &&
+      (!grant.expiresAt || grant.expiresAt > new Date())
+  );
 }
 
 export async function initialApprovalStatus(userId: string, workspaceId: string) {
@@ -146,10 +203,24 @@ export async function ensureCanDownloadFile(userId: string, file: {
   downloadRestricted?: boolean | null;
 }) {
   await ensureCanSeeFile(userId, file);
-  const hasFileGrant = file.id ? await hasActiveFileGrant(userId, file.id) : false;
 
-  if (file.downloadRestricted && file.uploadedById !== userId && !hasFileGrant && !(await canApproveWorkspaceContent(userId, file.workspaceId))) {
-    throw new ApiError(403, "Downloads are restricted for this document.");
+  if (!(await isPresidentDocumentAuthority(userId)) && !(await hasActiveFileDownloadGrant(userId, file.id))) {
+    throw new ApiError(403, "Only the president or members granted document download permission can download this document.");
+  }
+}
+
+export async function ensureCanEditFile(userId: string, file: {
+  id?: string | null;
+  workspaceId: string;
+  uploadedById: string;
+  approvalStatus: ApprovalStatus;
+  sensitivityLabel?: string | null;
+  dlpRestricted?: boolean | null;
+}) {
+  await ensureCanSeeFile(userId, file);
+
+  if (!(await isPresidentDocumentAuthority(userId))) {
+    throw new ApiError(403, "Only the president can edit this document.");
   }
 }
 
