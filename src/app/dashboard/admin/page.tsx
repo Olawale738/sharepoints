@@ -12,6 +12,7 @@ import {
   Crown,
   Database,
   FileClock,
+  FileLock2,
   Files,
   Gauge,
   ShieldCheck,
@@ -343,6 +344,12 @@ export default async function AdminControlCenterPage() {
           label: "Leadership governance",
           detail: "Decision tracker, monthly report packs, confidential vault, leadership handovers, and official letters.",
           icon: FileClock
+        },
+        {
+          href: "/dashboard/leadership-documents",
+          label: "Private leadership documents",
+          detail: "Top-level protected files outside normal workspaces with audited preview, download, and deletion.",
+          icon: FileLock2
         },
         {
           href: "/dashboard/admin/branches",

@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     redirect("/login");
   }
 
-  const [ownMemberships, currentUser, organizationLeadership] = await Promise.all([
+  const [ownMemberships, temporaryAccess, currentUser, organizationLeadership] = await Promise.all([
     prisma.workspaceMember.findMany({
     where: { userId: session.user.id, workspace: { deletedAt: null } },
     include: {
@@ -35,6 +35,29 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     orderBy: {
       joinedAt: "asc"
     }
+    }),
+    prisma.temporaryWorkspaceAccess.findMany({
+      where: {
+        userId: session.user.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        workspace: { deletedAt: null }
+      },
+      include: {
+        workspace: {
+          include: {
+            _count: {
+              select: {
+                files: true,
+                members: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        expiresAt: "asc"
+      }
     }),
     prisma.user.findUnique({
       where: { id: session.user.id },
@@ -71,6 +94,15 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       })
     : [];
 
+  const temporaryWorkspaceRows = temporaryAccess
+    .filter((grant) => !ownMemberships.some((membership) => membership.workspaceId === grant.workspaceId))
+    .map((grant) => ({
+      id: grant.workspace.id,
+      name: grant.workspace.name,
+      role: grant.role,
+      filesCount: grant.workspace._count.files,
+      membersCount: grant.workspace._count.members
+    }));
   const workspaces = isGlobalAdmin
     ? globalWorkspaces.map((workspace) => ({
         id: workspace.id,
@@ -85,7 +117,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         role: membership.role,
         filesCount: membership.workspace._count.files,
         membersCount: membership.workspace._count.members
-      }));
+      })).concat(temporaryWorkspaceRows);
   const canCreateWorkspace =
     isGlobalAdmin ||
     Boolean(organizationLeadership);

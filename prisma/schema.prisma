@@ -372,6 +372,27 @@ enum AccessRequestStatus {
   CANCELLED
 }
 
+enum NotificationDeliveryChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  WHATSAPP
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  BLOCKED
+  SKIPPED
+}
+
+enum LeadershipDocumentStatus {
+  ACTIVE
+  ARCHIVED
+  REVOKED
+}
+
 enum VisitorJourneyType {
   VISITOR
   NEW_CONVERT
@@ -880,6 +901,7 @@ model User {
   createdShareLinks          FileShareLink[]              @relation("CreatedShareLinks")
   securityEvents             SecurityEvent[]
   notifications              Notification[]
+  notificationDeliveryEvents NotificationDeliveryEvent[]
   notificationPreference     NotificationPreference?
   presence                   UserPresence?
   typingStates               ChatTypingState[]
@@ -894,8 +916,11 @@ model User {
   filesClassified            File[]                       @relation("FileClassifiedBy")
   accessRequests             AccessRequest[]              @relation("AccessRequestRequester")
   accessRequestReviews       AccessRequest[]              @relation("AccessRequestReviewer")
+  temporaryWorkspaceAccess   TemporaryWorkspaceAccess[]   @relation("TemporaryWorkspaceAccessUser")
+  temporaryAccessIssued      TemporaryWorkspaceAccess[]   @relation("TemporaryWorkspaceAccessIssuer")
   fileAccessGrants           FileAccessGrant[]            @relation("FileAccessGrantUser")
   fileAccessGrantsIssued     FileAccessGrant[]            @relation("FileAccessGrantIssuer")
+  leadershipDocuments        LeadershipDocument[]         @relation("LeadershipDocumentUploader")
   wikiPagesAuthored          WikiPage[]                   @relation("WikiPageAuthor")
   wikiPagesUpdated           WikiPage[]                   @relation("WikiPageUpdater")
   formsCreated               WorkspaceForm[]              @relation("FormCreator")
@@ -1031,6 +1056,7 @@ model Workspace {
   createdById         String
   createdBy           User                        @relation("WorkspaceCreator", fields: [createdById], references: [id], onDelete: Restrict)
   members             WorkspaceMember[]
+  temporaryAccessGrants TemporaryWorkspaceAccess[]
   rolePermissions     WorkspaceRolePermission[]
   accessRequests      AccessRequest[]
   departmentAccesses  WorkspaceDepartmentAccess[]
@@ -1544,6 +1570,27 @@ model AccessRequest {
   @@index([reviewerId, decidedAt])
 }
 
+model TemporaryWorkspaceAccess {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  grantedById String
+  role        WorkspaceRole @default(USER)
+  reason      String?       @db.Text
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation("TemporaryWorkspaceAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy   User          @relation("TemporaryWorkspaceAccessIssuer", fields: [grantedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([workspaceId, revokedAt, expiresAt])
+  @@index([grantedById, createdAt])
+}
+
 model FileAccessGrant {
   id          String    @id @default(cuid())
   fileId      String
@@ -1562,6 +1609,30 @@ model FileAccessGrant {
   @@index([userId, revokedAt, expiresAt])
   @@index([fileId, revokedAt])
   @@index([grantedById, createdAt])
+}
+
+model LeadershipDocument {
+  id           String                   @id @default(cuid())
+  title        String
+  description  String?                  @db.Text
+  category     String                   @default("EXECUTIVE")
+  status       LeadershipDocumentStatus @default(ACTIVE)
+  storageKey   String                   @unique
+  fileUrl      String
+  fileName     String
+  fileType     String
+  size         Int
+  uploadedById String
+  uploadedBy   User                     @relation("LeadershipDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  deletedAt    DateTime?
+  deletedById  String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+  @@index([uploadedById, createdAt])
+  @@index([deletedAt])
 }
 
 model FileVersion {
@@ -1883,12 +1954,36 @@ model Notification {
   pushSentAt  DateTime?
   user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace   Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveryEvents NotificationDeliveryEvent[]
   createdAt   DateTime             @default(now())
 
   @@index([userId, readAt, createdAt])
   @@index([workspaceId, createdAt])
   @@index([deliverAt, deliveredAt])
   @@index([priority, createdAt])
+}
+
+model NotificationDeliveryEvent {
+  id                String                     @id @default(cuid())
+  notificationId    String?
+  userId            String
+  channel           NotificationDeliveryChannel
+  status            NotificationDeliveryStatus @default(PENDING)
+  provider          String?
+  providerMessageId String?
+  error             String?                    @db.Text
+  blockedReason     String?                    @db.Text
+  attemptedAt       DateTime?
+  deliveredAt       DateTime?
+  notification      Notification?              @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  @@index([notificationId, channel, status])
+  @@index([userId, channel, status, createdAt])
+  @@index([channel, status, createdAt])
+  @@index([attemptedAt])
 }
 
 model NotificationPreference {

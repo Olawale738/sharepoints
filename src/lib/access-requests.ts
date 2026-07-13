@@ -22,11 +22,17 @@ type AccessRequestInput = {
   reason?: string | null;
 };
 
+type GrantDurationDays = 1 | 7 | 30;
+
 const workspaceGrantRoles = new Set<WorkspaceRole>([
   WorkspaceRole.VIEWER,
   WorkspaceRole.USER,
   WorkspaceRole.EDITOR
 ]);
+
+function accessExpiry(days?: GrantDurationDays | null) {
+  return days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
+}
 
 function accessRequestHref(requestId?: string) {
   return `/dashboard/access-requests${requestId ? `?request=${requestId}` : ""}`;
@@ -47,6 +53,21 @@ export async function hasActiveFileGrant(userId: string, fileId: string) {
   });
 
   return Boolean(grant && !grant.revokedAt && (!grant.expiresAt || grant.expiresAt > new Date()));
+}
+
+export async function getActiveTemporaryWorkspaceAccess(userId: string, workspaceId: string) {
+  return prisma.temporaryWorkspaceAccess.findFirst({
+    where: {
+      userId,
+      workspaceId,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+      workspace: { deletedAt: null }
+    },
+    include: {
+      workspace: true
+    }
+  });
 }
 
 export async function getAccessRequestReviewerIds(workspaceId: string, requesterId?: string) {
@@ -255,6 +276,7 @@ export async function reviewAccessRequest(input: {
   requestId: string;
   action: "APPROVE" | "REJECT" | "CANCEL";
   decisionReason?: string | null;
+  expiresInDays?: GrantDurationDays | null;
 }) {
   const request = await prisma.accessRequest.findUnique({
     where: { id: input.requestId },
@@ -297,6 +319,7 @@ export async function reviewAccessRequest(input: {
 
   const updated = await prisma.$transaction(async (tx) => {
     if (input.action === "APPROVE") {
+      const expiresAt = accessExpiry(input.expiresInDays);
       const existingMembership = await tx.workspaceMember.findUnique({
         where: {
           userId_workspaceId: {
@@ -306,7 +329,31 @@ export async function reviewAccessRequest(input: {
         },
         select: { role: true }
       });
-      if (!existingMembership) {
+      if (request.targetType === AccessRequestTargetType.WORKSPACE && !existingMembership && expiresAt) {
+        await tx.temporaryWorkspaceAccess.upsert({
+          where: {
+            workspaceId_userId: {
+              workspaceId: request.workspaceId,
+              userId: request.requesterId
+            }
+          },
+          create: {
+            workspaceId: request.workspaceId,
+            userId: request.requesterId,
+            grantedById: input.actorId,
+            role: request.requestedRole,
+            expiresAt,
+            reason: input.decisionReason?.trim() || null
+          },
+          update: {
+            grantedById: input.actorId,
+            role: request.requestedRole,
+            expiresAt,
+            revokedAt: null,
+            reason: input.decisionReason?.trim() || null
+          }
+        });
+      } else if (request.targetType === AccessRequestTargetType.WORKSPACE && !existingMembership) {
         await tx.workspaceMember.create({
           data: {
             userId: request.requesterId,
@@ -327,12 +374,13 @@ export async function reviewAccessRequest(input: {
           create: {
             fileId: request.fileId,
             userId: request.requesterId,
-            grantedById: input.actorId
+            grantedById: input.actorId,
+            expiresAt
           },
           update: {
             grantedById: input.actorId,
             revokedAt: null,
-            expiresAt: null
+            expiresAt
           }
         });
       }
@@ -389,11 +437,146 @@ export async function reviewAccessRequest(input: {
     metadata: {
       targetType: request.targetType,
       targetId: request.targetId,
-      requesterId: request.requesterId
+      requesterId: request.requesterId,
+      expiresInDays: input.expiresInDays ?? null
     }
   });
 
   return updated;
+}
+
+export async function grantTemporaryAccess(input: {
+  actorId: string;
+  userId: string;
+  targetType: "WORKSPACE" | "FILE";
+  targetId: string;
+  role?: "USER" | "EDITOR";
+  expiresInDays: GrantDurationDays;
+  reason?: string | null;
+}) {
+  const expiresAt = accessExpiry(input.expiresInDays);
+  if (!expiresAt) {
+    throw new ApiError(422, "Temporary access requires an expiry.");
+  }
+
+  const targetUser = await prisma.user.findFirst({
+    where: {
+      id: input.userId,
+      deletedAt: null,
+      suspendedAt: null,
+      accessRevokedAt: null,
+      email: { endsWith: "@letw.org" }
+    },
+    select: { id: true }
+  });
+  if (!targetUser) {
+    throw new ApiError(404, "Active invited LETW member not found.");
+  }
+
+  if (input.targetType === "WORKSPACE") {
+    const workspace = await prisma.workspace.findFirst({
+      where: { id: input.targetId, deletedAt: null },
+      select: { id: true, name: true }
+    });
+    if (!workspace) {
+      throw new ApiError(404, "Workspace not found.");
+    }
+
+    await requireWorkspaceMemberManager(input.actorId, workspace.id);
+    const grant = await prisma.temporaryWorkspaceAccess.upsert({
+      where: {
+        workspaceId_userId: {
+          workspaceId: workspace.id,
+          userId: input.userId
+        }
+      },
+      create: {
+        workspaceId: workspace.id,
+        userId: input.userId,
+        grantedById: input.actorId,
+        role: (input.role ?? "USER") as WorkspaceRole,
+        expiresAt,
+        reason: input.reason?.trim() || null
+      },
+      update: {
+        grantedById: input.actorId,
+        role: (input.role ?? "USER") as WorkspaceRole,
+        expiresAt,
+        revokedAt: null,
+        reason: input.reason?.trim() || null
+      }
+    });
+
+    await notifyUsers([input.userId], {
+      workspaceId: workspace.id,
+      type: "TEMPORARY_ACCESS_GRANTED",
+      title: "Temporary workspace access granted",
+      body: `${workspace.name} until ${expiresAt.toLocaleDateString("en-GB")}`,
+      href: `/dashboard/workspaces/${workspace.id}`,
+      priority: NotificationPriority.HIGH
+    });
+    await logActivity({
+      userId: input.actorId,
+      workspaceId: workspace.id,
+      action: activityActions.temporaryAccessGranted,
+      targetId: grant.id,
+      metadata: { targetType: input.targetType, userId: input.userId, expiresAt: expiresAt.toISOString() }
+    });
+
+    return { grant, workspace };
+  }
+
+  const file = await prisma.file.findFirst({
+    where: { id: input.targetId, deletedAt: null, workspace: { deletedAt: null } },
+    select: {
+      id: true,
+      fileName: true,
+      workspaceId: true,
+      workspace: { select: { id: true, name: true } }
+    }
+  });
+  if (!file) {
+    throw new ApiError(404, "File not found.");
+  }
+
+  await requireWorkspaceMemberManager(input.actorId, file.workspaceId);
+  const grant = await prisma.fileAccessGrant.upsert({
+    where: {
+      fileId_userId: {
+        fileId: file.id,
+        userId: input.userId
+      }
+    },
+    create: {
+      fileId: file.id,
+      userId: input.userId,
+      grantedById: input.actorId,
+      expiresAt
+    },
+    update: {
+      grantedById: input.actorId,
+      expiresAt,
+      revokedAt: null
+    }
+  });
+
+  await notifyUsers([input.userId], {
+    workspaceId: file.workspaceId,
+    type: "TEMPORARY_ACCESS_GRANTED",
+    title: "Temporary file access granted",
+    body: `${file.fileName} until ${expiresAt.toLocaleDateString("en-GB")}`,
+    href: `/api/files/${file.id}/preview`,
+    priority: NotificationPriority.HIGH
+  });
+  await logActivity({
+    userId: input.actorId,
+    workspaceId: file.workspaceId,
+    action: activityActions.temporaryAccessGranted,
+    targetId: grant.id,
+    metadata: { targetType: input.targetType, userId: input.userId, expiresAt: expiresAt.toISOString() }
+  });
+
+  return { grant, file };
 }
 
 export async function getAccessRequestsForUser(userId: string) {

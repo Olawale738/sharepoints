@@ -1,5 +1,7 @@
 import { getValidatedEmailFrom, hasEmailDeliveryConfig } from "@/lib/email-delivery";
+import { recordNotificationDeliveryEvent, recordNotificationDeliveryEvents } from "@/lib/notification-delivery-events";
 import { prisma } from "@/lib/prisma";
+import { NotificationDeliveryChannel, NotificationDeliveryStatus } from "@prisma/client";
 
 function escapeHtml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -40,9 +42,9 @@ function localSchedule(timeZone: string) {
 }
 
 async function sendEmail(to: string, title: string, body: string | null, href: string | null) {
-  if (!hasEmailDeliveryConfig()) return false;
+  if (!hasEmailDeliveryConfig()) return { sent: false, error: "Email delivery is not configured." };
   const from = getValidatedEmailFrom();
-  if (!from) return false;
+  if (!from) return { sent: false, error: "The configured email sender is invalid." };
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -58,7 +60,11 @@ async function sendEmail(to: string, title: string, body: string | null, href: s
       }`
     })
   });
-  return response.ok;
+  if (response.ok) {
+    return { sent: true, error: null };
+  }
+
+  return { sent: false, error: await response.text().catch(() => `Email request failed with HTTP ${response.status}.`) };
 }
 
 async function sendDigest(
@@ -96,7 +102,7 @@ async function sendDigest(
 }
 
 async function sendPush(tokens: string[], title: string, body: string | null, href: string | null) {
-  if (!tokens.length) return false;
+  if (!tokens.length) return { sent: false, error: "No enabled push subscriptions." };
   const response = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
     headers: {
@@ -115,7 +121,11 @@ async function sendPush(tokens: string[], title: string, body: string | null, hr
       }))
     )
   });
-  return response.ok;
+  if (response.ok) {
+    return { sent: true, error: null };
+  }
+
+  return { sent: false, error: await response.text().catch(() => `Push request failed with HTTP ${response.status}.`) };
 }
 
 export async function deliverPendingNotifications(notificationIds?: string[]) {
@@ -155,33 +165,111 @@ export async function deliverPendingNotifications(notificationIds?: string[]) {
     );
 
     for (const notification of userNotifications) {
-      if (quiet && notification.priority !== "URGENT") continue;
-      const subscriptions = preference?.pushEnabled && !notification.pushSentAt
-        ? await prisma.pushSubscription.findMany({
+      if (quiet && notification.priority !== "URGENT") {
+        await recordNotificationDeliveryEvents([
+          {
+            notificationId: notification.id,
+            userId: notification.userId,
+            channel: NotificationDeliveryChannel.PUSH,
+            status: NotificationDeliveryStatus.BLOCKED,
+            provider: "LETW_QUIET_HOURS",
+            blockedReason: "User quiet hours are active."
+          },
+          {
+            notificationId: notification.id,
+            userId: notification.userId,
+            channel: NotificationDeliveryChannel.EMAIL,
+            status: NotificationDeliveryStatus.BLOCKED,
+            provider: "LETW_QUIET_HOURS",
+            blockedReason: "User quiet hours are active."
+          }
+        ]);
+        continue;
+      }
+
+      let pushSent = false;
+      if (!notification.pushSentAt) {
+        if (!preference?.pushEnabled) {
+          await recordNotificationDeliveryEvent({
+            notificationId: notification.id,
+            userId: notification.userId,
+            channel: NotificationDeliveryChannel.PUSH,
+            status: NotificationDeliveryStatus.BLOCKED,
+            provider: "EXPO",
+            blockedReason: "Push notifications are disabled for this user."
+          });
+        } else {
+          const subscriptions = await prisma.pushSubscription.findMany({
             where: { userId: notification.userId, enabled: true },
             select: { endpoint: true }
-          })
-        : [];
-      await sendPush(
-        subscriptions.map((subscription) => subscription.endpoint),
-        notification.title,
-        notification.body,
-        absoluteHref(notification.href)
-      );
+          });
+          const pushResult = await sendPush(
+            subscriptions.map((subscription) => subscription.endpoint),
+            notification.title,
+            notification.body,
+            absoluteHref(notification.href)
+          );
+          pushSent = pushResult.sent;
+          await recordNotificationDeliveryEvent({
+            notificationId: notification.id,
+            userId: notification.userId,
+            channel: NotificationDeliveryChannel.PUSH,
+            status: pushResult.sent
+              ? NotificationDeliveryStatus.DELIVERED
+              : subscriptions.length
+                ? NotificationDeliveryStatus.FAILED
+                : NotificationDeliveryStatus.SKIPPED,
+            provider: "EXPO",
+            error: pushResult.error,
+            attemptedAt: new Date(),
+            deliveredAt: pushResult.sent ? new Date() : null
+          });
+        }
+      }
+
       let emailSent = false;
       if ((notification.priority === "URGENT" || preference?.digest === "IMMEDIATE") && notification.user.email && !notification.emailSentAt) {
-        emailSent = await sendEmail(
+        const emailResult = await sendEmail(
           notification.user.email,
           notification.title,
           notification.body,
           absoluteHref(notification.href)
         );
+        emailSent = emailResult.sent;
+        await recordNotificationDeliveryEvent({
+          notificationId: notification.id,
+          userId: notification.userId,
+          channel: NotificationDeliveryChannel.EMAIL,
+          status: emailResult.sent ? NotificationDeliveryStatus.DELIVERED : NotificationDeliveryStatus.FAILED,
+          provider: "RESEND",
+          error: emailResult.error,
+          attemptedAt: new Date(),
+          deliveredAt: emailResult.sent ? new Date() : null
+        });
+      } else if (!notification.emailSentAt && preference?.digest === "NEVER") {
+        await recordNotificationDeliveryEvent({
+          notificationId: notification.id,
+          userId: notification.userId,
+          channel: NotificationDeliveryChannel.EMAIL,
+          status: NotificationDeliveryStatus.BLOCKED,
+          provider: "RESEND",
+          blockedReason: "Email digest is disabled for this user."
+        });
+      } else if (!notification.emailSentAt) {
+        await recordNotificationDeliveryEvent({
+          notificationId: notification.id,
+          userId: notification.userId,
+          channel: NotificationDeliveryChannel.EMAIL,
+          status: NotificationDeliveryStatus.PENDING,
+          provider: "RESEND",
+          blockedReason: "Waiting for digest schedule or immediate email condition."
+        });
       }
       await prisma.notification.update({
         where: { id: notification.id },
         data: {
           deliveredAt: notification.deliveredAt ?? new Date(),
-          pushSentAt: notification.pushSentAt ?? new Date(),
+          pushSentAt: pushSent ? new Date() : notification.pushSentAt,
           emailSentAt:
             emailSent || preference?.digest === "NEVER" ? new Date() : notification.emailSentAt
         }
@@ -211,6 +299,17 @@ export async function deliverPendingNotifications(notificationIds?: string[]) {
           where: { id: { in: pendingDigest.map((notification) => notification.id) } },
           data: { emailSentAt: new Date() }
         });
+        await recordNotificationDeliveryEvents(
+          pendingDigest.map((notification) => ({
+            notificationId: notification.id,
+            userId: notification.userId,
+            channel: NotificationDeliveryChannel.EMAIL,
+            status: NotificationDeliveryStatus.DELIVERED,
+            provider: "RESEND_DIGEST",
+            attemptedAt: new Date(),
+            deliveredAt: new Date()
+          }))
+        );
       }
     }
   }

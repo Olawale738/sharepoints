@@ -3,6 +3,7 @@ import { KeyRound } from "lucide-react";
 
 import { auth } from "@/auth";
 import { AccessRequestsPanel } from "@/components/dashboard/access-requests-panel";
+import { TemporaryAccessGrantPanel } from "@/components/dashboard/temporary-access-grant-panel";
 import {
   getAccessRequestsForReview,
   getAccessRequestsForUser,
@@ -54,12 +55,15 @@ export default async function AccessRequestsPage() {
       </section>
 
       {reviewableWorkspaceIds.length ? (
-        <AccessRequestsPanel
-          title="Requests awaiting review"
-          description="Approve only requests that match the member's role, branch, ministry, and current assignment."
-          requests={reviewRequests.map(serializeRequest)}
-          reviewMode
-        />
+        <>
+          <TemporaryAccessGrantPanel />
+          <AccessRequestsPanel
+            title="Requests awaiting review"
+            description="Approve only requests that match the member's role, branch, ministry, and current assignment."
+            requests={reviewRequests.map(serializeRequest)}
+            reviewMode
+          />
+        </>
       ) : null}
 
       <AccessRequestsPanel

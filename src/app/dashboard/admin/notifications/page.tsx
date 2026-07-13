@@ -4,6 +4,7 @@ import { BellRing } from "lucide-react";
 
 import { auth } from "@/auth";
 import { AdminNotificationBroadcastPanel } from "@/components/dashboard/admin-notification-broadcast-panel";
+import { NotificationDeliveryMonitor } from "@/components/dashboard/notification-delivery-monitor";
 import { Badge } from "@/components/ui/badge";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
@@ -67,6 +68,8 @@ export default async function AdminNotificationsPage() {
         workspaces={workspaces.map((workspace) => ({ id: workspace.id, name: workspace.name }))}
         units={units.map((unit) => ({ id: unit.id, name: unit.name, detail: `${unit.type.toLowerCase()}${unit.code ? ` - ${unit.code}` : ""}` }))}
       />
+
+      <NotificationDeliveryMonitor />
 
       <section className="rounded-lg border border-ink/10 bg-white shadow-soft">
         <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-4 py-3">

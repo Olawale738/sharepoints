@@ -110,6 +110,32 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
   }
 
   if (!membership) {
+    const temporaryAccess = await prisma.temporaryWorkspaceAccess.findFirst({
+      where: {
+        userId: session.user.id,
+        workspaceId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        workspace: { deletedAt: null }
+      },
+      include: {
+        workspace: true
+      }
+    });
+
+    if (temporaryAccess) {
+      membership = {
+        id: temporaryAccess.id,
+        userId: session.user.id,
+        workspaceId: temporaryAccess.workspaceId,
+        role: temporaryAccess.role,
+        joinedAt: temporaryAccess.createdAt,
+        workspace: temporaryAccess.workspace
+      };
+    }
+  }
+
+  if (!membership) {
     const workspace = await prisma.workspace.findFirst({
       where: { id: workspaceId, deletedAt: null }
     });

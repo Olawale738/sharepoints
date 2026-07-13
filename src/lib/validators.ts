@@ -74,7 +74,17 @@ export const createAccessRequestSchema = z.object({
 
 export const reviewAccessRequestSchema = z.object({
   action: z.enum(["APPROVE", "REJECT", "CANCEL"]),
-  decisionReason: z.string().trim().max(1000).optional().or(z.literal(""))
+  decisionReason: z.string().trim().max(1000).optional().or(z.literal("")),
+  expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30)]).optional().nullable()
+});
+
+export const grantTemporaryAccessSchema = z.object({
+  targetType: z.enum(["WORKSPACE", "FILE"]),
+  targetId: z.string().cuid(),
+  userId: z.string().cuid(),
+  role: z.enum(["USER", "EDITOR"]).optional().default("USER"),
+  expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30)]),
+  reason: z.string().trim().max(1000).optional().or(z.literal(""))
 });
 
 export const updateWorkspaceRolePermissionSchema = z.object({

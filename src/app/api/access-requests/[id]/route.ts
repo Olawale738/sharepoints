@@ -20,7 +20,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       actorId: user.id,
       requestId: id,
       action: parsed.data.action,
-      decisionReason: parsed.data.decisionReason
+      decisionReason: parsed.data.decisionReason,
+      expiresInDays: parsed.data.expiresInDays
     });
 
     return ok({ request: reviewed });

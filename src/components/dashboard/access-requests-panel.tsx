@@ -61,6 +61,7 @@ export function AccessRequestsPanel({ title, description, requests, reviewMode =
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
+  const [grantDurations, setGrantDurations] = useState<Record<string, string>>({});
   const pendingCount = useMemo(() => rows.filter((request) => request.status === "PENDING").length, [rows]);
 
   async function reviewRequest(requestId: string, action: "APPROVE" | "REJECT" | "CANCEL") {
@@ -71,7 +72,8 @@ export function AccessRequestsPanel({ title, description, requests, reviewMode =
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         action,
-        decisionReason: decisionNotes[requestId] ?? ""
+        decisionReason: decisionNotes[requestId] ?? "",
+        expiresInDays: action === "APPROVE" && grantDurations[requestId] ? Number(grantDurations[requestId]) : null
       })
     });
     const body = (await response.json().catch(() => null)) as { request?: AccessRequestRow; error?: string } | null;
@@ -135,13 +137,30 @@ export function AccessRequestsPanel({ title, description, requests, reviewMode =
                 {request.status === "PENDING" ? (
                   <div className="w-full max-w-sm space-y-2">
                     {reviewMode ? (
-                      <Textarea
-                        value={decisionNotes[request.id] ?? ""}
-                        onChange={(event) =>
-                          setDecisionNotes((current) => ({ ...current, [request.id]: event.target.value }))
-                        }
-                        placeholder="Optional decision note"
-                      />
+                      <>
+                        <Textarea
+                          value={decisionNotes[request.id] ?? ""}
+                          onChange={(event) =>
+                            setDecisionNotes((current) => ({ ...current, [request.id]: event.target.value }))
+                          }
+                          placeholder="Optional decision note"
+                        />
+                        <label className="block text-xs font-medium text-ink/60">
+                          Access duration
+                          <select
+                            className="mt-1 h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm text-ink outline-none focus:border-moss focus:ring-2 focus:ring-moss/20"
+                            value={grantDurations[request.id] ?? ""}
+                            onChange={(event) =>
+                              setGrantDurations((current) => ({ ...current, [request.id]: event.target.value }))
+                            }
+                          >
+                            <option value="">Permanent access</option>
+                            <option value="1">Temporary: 1 day</option>
+                            <option value="7">Temporary: 7 days</option>
+                            <option value="30">Temporary: 30 days</option>
+                          </select>
+                        </label>
+                      </>
                     ) : null}
                     <div className="flex flex-wrap gap-2 lg:justify-end">
                       {reviewMode ? (

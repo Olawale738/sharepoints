@@ -195,6 +195,33 @@ export async function requireWorkspaceMembership(userId: string, workspaceId: st
   const membership = await getWorkspaceMembership(userId, workspaceId);
 
   if (!membership) {
+    const temporaryAccess = await prisma.temporaryWorkspaceAccess.findFirst({
+      where: {
+        userId,
+        workspaceId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        workspace: { deletedAt: null }
+      },
+      select: {
+        id: true,
+        userId: true,
+        workspaceId: true,
+        role: true,
+        createdAt: true
+      }
+    });
+
+    if (temporaryAccess) {
+      return {
+        id: temporaryAccess.id,
+        userId: temporaryAccess.userId,
+        workspaceId: temporaryAccess.workspaceId,
+        role: temporaryAccess.role,
+        joinedAt: temporaryAccess.createdAt
+      };
+    }
+
     if (await hasAnyWorkspaceAdminRole(userId)) {
       return {
         id: `global-admin-${workspaceId}`,

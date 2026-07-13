@@ -1,9 +1,10 @@
-import { NotificationPriority, WorkspaceRole } from "@prisma/client";
+import { NotificationDeliveryChannel, NotificationDeliveryStatus, NotificationPriority, WorkspaceRole } from "@prisma/client";
 import { z } from "zod";
 
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { deliverPendingNotifications } from "@/lib/notification-delivery";
+import { recordNotificationDeliveryEvent } from "@/lib/notification-delivery-events";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
@@ -204,6 +205,7 @@ export async function POST(request: Request) {
       }
     );
     const notificationIds = notifications?.map((notification) => notification.id) ?? [];
+    const notificationByUserId = new Map((notifications ?? []).map((notification) => [notification.userId, notification.id]));
     const delivery = data.channels.email
       ? await deliverPendingNotifications(notificationIds.slice(0, 500))
       : { delivered: 0, scanned: notificationIds.length };
@@ -217,6 +219,14 @@ export async function POST(request: Request) {
         const phone = normalizeWhatsAppPhone(recipient.memberProfile?.phone ?? recipient.memberProfile?.alternatePhone);
         if (!phone) {
           whatsAppSkipped += 1;
+          await recordNotificationDeliveryEvent({
+            notificationId: notificationByUserId.get(recipient.id),
+            userId: recipient.id,
+            channel: NotificationDeliveryChannel.WHATSAPP,
+            status: NotificationDeliveryStatus.SKIPPED,
+            provider: "WHATSAPP_CLOUD",
+            blockedReason: "No valid WhatsApp phone number is saved for this member."
+          });
           continue;
         }
         const result = await sendWhatsAppMessage({
@@ -227,6 +237,21 @@ export async function POST(request: Request) {
           mode: data.whatsappMode,
           templateName: data.whatsappTemplateName,
           templateLanguage: data.whatsappTemplateLanguage
+        });
+        await recordNotificationDeliveryEvent({
+          notificationId: notificationByUserId.get(recipient.id),
+          userId: recipient.id,
+          channel: NotificationDeliveryChannel.WHATSAPP,
+          status: result.sent
+            ? NotificationDeliveryStatus.DELIVERED
+            : result.skipped
+              ? NotificationDeliveryStatus.SKIPPED
+              : NotificationDeliveryStatus.FAILED,
+          provider: "WHATSAPP_CLOUD",
+          providerMessageId: result.messageId,
+          error: result.error,
+          attemptedAt: new Date(),
+          deliveredAt: result.sent ? new Date() : null
         });
         if (result.skipped) whatsAppSkipped += 1;
         else if (result.sent) whatsAppSent += 1;

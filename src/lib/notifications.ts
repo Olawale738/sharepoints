@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { NotificationPriority } from "@prisma/client";
+import { NotificationDeliveryChannel, NotificationDeliveryStatus, NotificationPriority } from "@prisma/client";
 import { publishRealtime } from "@/lib/realtime";
+import { recordNotificationDeliveryEvents, recordNotificationDeliveryEvent } from "@/lib/notification-delivery-events";
 
 type NotificationInput = {
   userId: string;
@@ -25,6 +26,14 @@ export async function createNotification(input: NotificationInput) {
       priority: input.priority ?? NotificationPriority.NORMAL,
       deliverAt: input.deliverAt ?? null
     }
+  });
+  await recordNotificationDeliveryEvent({
+    notificationId: notification.id,
+    userId: input.userId,
+    channel: NotificationDeliveryChannel.IN_APP,
+    status: NotificationDeliveryStatus.DELIVERED,
+    provider: "LETW_APP",
+    deliveredAt: new Date()
   });
   await publishRealtime("notifications", input.userId, "notification.created", notification);
   return notification;
@@ -52,6 +61,16 @@ export async function notifyUsers(userIds: string[], input: Omit<NotificationInp
         }
       })
     )
+  );
+  await recordNotificationDeliveryEvents(
+    notifications.map((notification) => ({
+      notificationId: notification.id,
+      userId: notification.userId,
+      channel: NotificationDeliveryChannel.IN_APP,
+      status: NotificationDeliveryStatus.DELIVERED,
+      provider: "LETW_APP",
+      deliveredAt: new Date()
+    }))
   );
   await Promise.all(
     uniqueUserIds.map((userId) =>

@@ -116,6 +116,8 @@ export const activityActions = {
   accessRequestApproved: "access_request.approved",
   accessRequestRejected: "access_request.rejected",
   accessRequestCancelled: "access_request.cancelled",
+  temporaryAccessGranted: "access.temporary_granted",
+  temporaryAccessRevoked: "access.temporary_revoked",
   qrEventCheckIn: "membership.qr_event_check_in",
   qrResourceAccess: "membership.qr_resource_access",
   qrEmergencyRollCall: "membership.qr_emergency_roll_call",
@@ -222,5 +224,8 @@ export const activityActions = {
   mediaArchiveUploaded: "media.archive_uploaded",
   mediaArchiveUpdated: "media.archive_updated",
   mediaArchiveDeleted: "media.archive_deleted",
+  leadershipDocumentUploaded: "leadership_room.document_uploaded",
+  leadershipDocumentDownloaded: "leadership_room.document_downloaded",
+  leadershipDocumentDeleted: "leadership_room.document_deleted",
   executiveSecretaryAsked: "executive.secretary_asked"
 } as const;

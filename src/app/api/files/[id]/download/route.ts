@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { hasActiveFileGrant } from "@/lib/access-requests";
 import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanDownloadFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
@@ -48,14 +49,16 @@ export async function GET(request: Request, context: RouteContext) {
 
     try {
       await requireWorkspaceMembership(session.user.id, file.workspaceId);
-      await ensureCanDownloadFile(session.user.id, file);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
+      if (error instanceof ApiError && error.status === 403 && !(await hasActiveFileGrant(session.user.id, file.id))) {
         return redirectToAccessRequest(request, file.id);
       }
 
-      throw error;
+      if (!(error instanceof ApiError && error.status === 403)) {
+        throw error;
+      }
     }
+    await ensureCanDownloadFile(session.user.id, file);
 
     if (file.scanStatus === "INFECTED") {
       throw new ApiError(423, "This document was blocked by security screening.");
