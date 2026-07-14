@@ -3,8 +3,8 @@ import { z } from "zod";
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { restoredCertificateData } from "@/lib/certificates";
+import { requireCertificateIssuer } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
-import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -17,7 +17,7 @@ const updateSchema = z.object({
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireAnyWorkspaceAdmin(actor.id, "Only administrators can manage certificates.");
+    await requireCertificateIssuer(actor.id);
     const { id } = await context.params;
     const parsed = updateSchema.safeParse(await request.json());
 
@@ -52,7 +52,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireAnyWorkspaceAdmin(actor.id, "Only administrators can delete certificates.");
+    await requireCertificateIssuer(actor.id);
     const { id } = await context.params;
     const certificate = await prisma.memberCertificationBadge.findUnique({
       where: { id }

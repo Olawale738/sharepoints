@@ -4,8 +4,9 @@ import { z } from "zod";
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
+import { getOfficialIssuanceAuthority, requireCertificateIssuer } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
-import { hasAnyWorkspaceAdminRole, requireAnyWorkspaceAdmin } from "@/lib/rbac";
+import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
 const certificateSchema = z.object({
   userId: z.string().cuid(),
@@ -26,10 +27,12 @@ export async function GET() {
   try {
     const user = await requireUser();
     const isAdmin = await hasAnyWorkspaceAdminRole(user.id);
+    const authority = await getOfficialIssuanceAuthority(user.id);
+    const canSeeRegistry = isAdmin || authority.canIssueCertificates;
     const certificateRows = await prisma.memberCertificationBadge.findMany({
-      where: isAdmin ? undefined : { userId: user.id },
+      where: canSeeRegistry ? undefined : { userId: user.id },
       orderBy: { issuedAt: "desc" },
-      take: isAdmin ? 500 : 50
+      take: canSeeRegistry ? 500 : 50
     });
     const certificateUsers = await prisma.user.findMany({
       where: {
@@ -64,7 +67,7 @@ export async function GET() {
           memberProfile: null
         }
       })),
-      canManage: isAdmin
+      canManage: authority.canIssueCertificates
     });
   } catch (error) {
     return handleRouteError(error);
@@ -74,7 +77,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireUser();
-    await requireAnyWorkspaceAdmin(actor.id, "Only administrators can issue certificates.");
+    await requireCertificateIssuer(actor.id);
     const parsed = certificateSchema.safeParse(await request.json());
 
     if (!parsed.success) {

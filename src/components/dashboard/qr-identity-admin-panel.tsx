@@ -67,6 +67,12 @@ type QrIdentityData = {
   bulkLogs: Array<{ id: string; action: string; count: number; createdAt: string }>;
   liveInside: Array<{ log: { id: string; createdAt: string; organizationId?: string | null; accessPointId: string }; user?: User | null }>;
   stats: Record<string, number>;
+  issuanceAuthority?: {
+    isPresident: boolean;
+    canIssueCertificates: boolean;
+    canIssueIdCards: boolean;
+    canIssueLetters: boolean;
+  };
 };
 
 const emptyData: QrIdentityData = {
@@ -79,7 +85,13 @@ const emptyData: QrIdentityData = {
   verifications: [],
   bulkLogs: [],
   liveInside: [],
-  stats: {}
+  stats: {},
+  issuanceAuthority: {
+    isPresident: false,
+    canIssueCertificates: false,
+    canIssueIdCards: false,
+    canIssueLetters: false
+  }
 };
 
 const statusClass: Record<string, string> = {
@@ -184,6 +196,8 @@ export function QrIdentityAdminPanel() {
     ["Suspicious scans", data.stats.suspiciousScans ?? 0, ShieldCheck],
     ["Inside now", data.stats.liveInside ?? 0, DoorOpen]
   ] as const;
+  const canIssueIdCards = Boolean(data.issuanceAuthority?.canIssueIdCards);
+  const canIssueCertificates = Boolean(data.issuanceAuthority?.canIssueCertificates);
 
   return (
     <div className="space-y-6">
@@ -211,10 +225,12 @@ export function QrIdentityAdminPanel() {
               {busy === "BULK_GENERATE_MEMBER_NUMBERS" ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}
               Generate member numbers
             </Button>
-            <Button variant="secondary" disabled={Boolean(busy)} onClick={() => void post("BULK_ISSUE_IDS", { onlyMissing: true, expiresAt: oneYearFromNowIso() }, "Issued missing IDs.")}>
-              {busy === "BULK_ISSUE_IDS" ? <Loader2 className="h-4 w-4 animate-spin" /> : <IdCard className="h-4 w-4" />}
-              Issue missing IDs
-            </Button>
+            {canIssueIdCards ? (
+              <Button variant="secondary" disabled={Boolean(busy)} onClick={() => void post("BULK_ISSUE_IDS", { onlyMissing: true, expiresAt: oneYearFromNowIso() }, "Issued missing IDs.")}>
+                {busy === "BULK_ISSUE_IDS" ? <Loader2 className="h-4 w-4 animate-spin" /> : <IdCard className="h-4 w-4" />}
+                Issue missing IDs
+              </Button>
+            ) : null}
             <a className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm font-medium hover:bg-mint/40" href="/api/admin/qr-identity?export=cards">
               <Download className="h-4 w-4" />Export CSV
             </a>
@@ -260,15 +276,15 @@ export function QrIdentityAdminPanel() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {row.card ? (
+                    {canIssueIdCards && row.card ? (
                       <>
                         <Button variant="secondary" onClick={() => void post("RENEW_CARD", { cardId: row.card?.id, expiresAt: oneYearFromNowIso(), rotateQr: false }, "Card renewed.")}><RefreshCcw className="h-4 w-4" />Renew</Button>
                         <Button variant="secondary" onClick={() => void post("ROTATE_QR", { cardId: row.card?.id, reason: "Admin QR rotation" }, "QR rotated.")}><KeyRound className="h-4 w-4" />Rotate QR</Button>
                         <Button variant="danger" onClick={() => void post("MARK_LOST", { cardId: row.card?.id, reason: "Reported lost by admin" }, "Card marked lost.")}><AlertTriangle className="h-4 w-4" />Lost</Button>
                       </>
-                    ) : (
+                    ) : canIssueIdCards ? (
                       <Button onClick={() => void post("BULK_REISSUE_IDS", { userIds: [row.user.id], expiresAt: oneYearFromNowIso() }, "ID issued.")}><IdCard className="h-4 w-4" />Issue ID</Button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -335,14 +351,18 @@ export function QrIdentityAdminPanel() {
         </Panel>
 
         <Panel title="Worker certification badge" icon={<BadgeCheck className="h-4 w-4 text-moss" />}>
-          <form className="space-y-3" onSubmit={(event) => void submitForm(event, "CREATE_CERTIFICATION_BADGE", "Certification badge created.")}>
-            <Select name="userId" label="Choose member" options={data.users.map((user) => [user.id, nameOf(user)])} required />
-            <Input name="title" placeholder="Badge title, e.g. Media Worker" required />
-            <Input name="issuer" placeholder="Issuer" />
-            <Input name="certificateNumber" placeholder="Certificate number" />
-            <Input name="expiresAt" type="datetime-local" />
-            <Button className="w-full" type="submit">Create badge</Button>
-          </form>
+          {canIssueCertificates ? (
+            <form className="space-y-3" onSubmit={(event) => void submitForm(event, "CREATE_CERTIFICATION_BADGE", "Certification badge created.")}>
+              <Select name="userId" label="Choose member" options={data.users.map((user) => [user.id, nameOf(user)])} required />
+              <Input name="title" placeholder="Badge title, e.g. Media Worker" required />
+              <Input name="issuer" placeholder="Issuer" />
+              <Input name="certificateNumber" placeholder="Certificate number" />
+              <Input name="expiresAt" type="datetime-local" />
+              <Button className="w-full" type="submit">Create badge</Button>
+            </form>
+          ) : (
+            <p className="text-sm text-ink/55">The president must grant certificate issuing authority before you can create worker certification badges.</p>
+          )}
         </Panel>
 
         <Panel title="Family and household link" icon={<UsersRound className="h-4 w-4 text-moss" />}>

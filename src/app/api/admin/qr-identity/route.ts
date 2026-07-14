@@ -17,6 +17,7 @@ import {
   renewCard,
   rotateCardQr
 } from "@/lib/qr-identity";
+import { getOfficialIssuanceAuthority, requireCertificateIssuer, requireIdCardIssuer } from "@/lib/official-issuance";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
 export const runtime = "nodejs";
@@ -242,7 +243,10 @@ export async function GET(request: Request) {
     const user = await requireUser();
     await requireAnyWorkspaceAdmin(user.id, "Only administrators can manage QR identity.");
     const url = new URL(request.url);
-    const dashboard = await cardsDashboard();
+    const [dashboard, issuanceAuthority] = await Promise.all([
+      cardsDashboard(),
+      getOfficialIssuanceAuthority(user.id)
+    ]);
 
     if (url.searchParams.get("export") === "cards") {
       const rows = [
@@ -287,7 +291,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return ok(dashboard);
+    return ok({ ...dashboard, issuanceAuthority });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -300,6 +304,9 @@ export async function POST(request: Request) {
     const parsed = actionSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid QR identity request.");
     const data = parsed.data;
+    const idCardIssuerActions = new Set(["BULK_ISSUE_IDS", "BULK_REISSUE_IDS", "MARK_LOST", "RENEW_CARD", "ROTATE_QR"]);
+    if (idCardIssuerActions.has(data.action)) await requireIdCardIssuer(actor.id);
+    if (data.action === "CREATE_CERTIFICATION_BADGE") await requireCertificateIssuer(actor.id);
     let result: unknown = null;
     let activityAction: string | null = null;
     let targetId: string | undefined;

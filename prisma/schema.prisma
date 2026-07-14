@@ -784,6 +784,35 @@ enum OfficialLetterStatus {
   ARCHIVED
 }
 
+enum OfficialIssuanceScope {
+  CERTIFICATE
+  ID_CARD
+  OFFICIAL_LETTER
+}
+
+enum PresidentialGovernanceControlType {
+  DOCUMENT_POLICY_ENGINE
+  PRESIDENTIAL_APPROVAL_LOCK
+  SENSITIVE_DOCUMENT_WATERMARKING
+  SCREENSHOT_PRINT_RESTRICTION
+  LEADERSHIP_ACCOUNTABILITY_SCORE
+  BRANCH_RISK_ALERT
+  SECURE_GUEST_REVIEW_ROOM
+  CONFIDENTIAL_REDACTION
+  MINISTER_CREDENTIAL_REGISTER
+  INCIDENT_RESPONSE_CENTER
+  OFFICIAL_CIRCULAR_SYSTEM
+  MEMBER_PRIVACY_CONSENT
+}
+
+enum PresidentialGovernanceControlStatus {
+  ACTIVE
+  PENDING_REVIEW
+  RESOLVED
+  ARCHIVED
+  REVOKED
+}
+
 enum DigitalSignatureStatus {
   REQUESTED
   SIGNED
@@ -935,6 +964,8 @@ model User {
   sanctionsReceived          MemberSanction[]             @relation("SanctionedMember")
   sanctionsIssued            MemberSanction[]             @relation("SanctionIssuer")
   sanctionsLifted            MemberSanction[]             @relation("SanctionLifter")
+  officialIssuanceGrant      OfficialIssuanceGrant?       @relation("OfficialIssuanceGrantUser")
+  officialIssuanceGrantsMade OfficialIssuanceGrant[]      @relation("OfficialIssuanceGrantIssuer")
 
   @@index([departmentId])
   @@index([category])
@@ -3207,6 +3238,53 @@ model OfficialLetter {
   @@index([recipientUserId, createdAt])
   @@index([organizationUnitId, status])
   @@index([workspaceId, status])
+}
+
+model OfficialIssuanceGrant {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  grantedById          String
+  canIssueCertificates Boolean   @default(false)
+  canIssueIdCards      Boolean   @default(false)
+  canIssueLetters      Boolean   @default(false)
+  reason               String?   @db.Text
+  expiresAt            DateTime?
+  revokedAt            DateTime?
+  revokedById          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation("OfficialIssuanceGrantUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy            User      @relation("OfficialIssuanceGrantIssuer", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@index([grantedById, createdAt])
+  @@index([revokedAt, expiresAt])
+}
+
+model PresidentialGovernanceRecord {
+  id                 String                              @id @default(cuid())
+  controlType        PresidentialGovernanceControlType
+  title              String
+  summary            String                              @db.Text
+  status             PresidentialGovernanceControlStatus @default(ACTIVE)
+  severity           String                              @default("NORMAL")
+  workspaceId        String?
+  organizationUnitId String?
+  subjectUserId      String?
+  ownerUserId        String?
+  dueAt              DateTime?
+  metadata           Json?
+  createdById        String
+  updatedById        String?
+  resolvedAt         DateTime?
+  createdAt          DateTime                            @default(now())
+  updatedAt          DateTime                            @updatedAt
+
+  @@index([controlType, status, createdAt])
+  @@index([workspaceId, controlType, status])
+  @@index([organizationUnitId, controlType, status])
+  @@index([subjectUserId, controlType, status])
+  @@index([ownerUserId, status, dueAt])
+  @@index([createdById, createdAt])
 }
 
 model TrainingProgram {

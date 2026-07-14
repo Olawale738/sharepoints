@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { CertificateGeneratorPanel } from "@/components/dashboard/certificate-generator-panel";
 import { Badge } from "@/components/ui/badge";
 import { certificateIsLive } from "@/lib/certificates";
+import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
@@ -15,7 +16,11 @@ export default async function CertificatesPage() {
     redirect("/login");
   }
 
-  const canManage = await hasAnyWorkspaceAdminRole(session.user.id);
+  const [isAdmin, authority] = await Promise.all([
+    hasAnyWorkspaceAdminRole(session.user.id),
+    getOfficialIssuanceAuthority(session.user.id)
+  ]);
+  const canManage = authority.canIssueCertificates;
   const [users, certificateRows] = await Promise.all([
     canManage
       ? prisma.user.findMany({
@@ -42,9 +47,9 @@ export default async function CertificatesPage() {
         })
       : [],
     prisma.memberCertificationBadge.findMany({
-      where: canManage ? undefined : { userId: session.user.id },
+      where: isAdmin ? undefined : { userId: session.user.id },
       orderBy: { issuedAt: "desc" },
-      take: canManage ? 500 : 100
+      take: isAdmin ? 500 : 100
     })
   ]);
   const certificateUsers = await prisma.user.findMany({

@@ -17,6 +17,7 @@ import {
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
+import { requireOfficialLetterIssuer } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireAnyWorkspacePermission } from "@/lib/rbac";
 import { getLeadershipWorkspaces, requireLeadershipAccess } from "@/lib/leadership-suite";
@@ -311,6 +312,7 @@ export async function createLeadershipDecision(actorId: string, input: {
   organizationUnitId?: string | null;
   dueAt?: string | null;
 }) {
+  await requireOfficialLetterIssuer(actorId);
   await requireLeadershipGovernanceScopeAccess(actorId, input);
   const decision = await prisma.leadershipDecision.create({
     data: {
@@ -875,6 +877,7 @@ export async function createOfficialLetter(actorId: string, input: {
 }
 
 export async function updateOfficialLetter(actorId: string, id: string, status: OfficialLetterStatus) {
+  await requireOfficialLetterIssuer(actorId);
   const existing = await prisma.officialLetter.findUnique({
     where: { id },
     select: { workspaceId: true, organizationUnitId: true, issuedById: true, recipientUserId: true }
@@ -897,6 +900,7 @@ export async function updateOfficialLetter(actorId: string, id: string, status: 
 }
 
 export async function deleteOfficialLetter(actorId: string, id: string) {
+  await requireOfficialLetterIssuer(actorId);
   const existing = await prisma.officialLetter.findUnique({
     where: { id },
     select: {

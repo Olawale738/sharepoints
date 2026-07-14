@@ -12,6 +12,7 @@ import {
   Crown,
   Database,
   FileClock,
+  FileSignature,
   FileLock2,
   Files,
   Gauge,
@@ -400,6 +401,12 @@ export default async function AdminControlCenterPage() {
           icon: ShieldCheck
         },
         {
+          href: "/dashboard/admin/official-issuance",
+          label: "Official issuer permissions",
+          detail: "President-only delegation for certificate, digital ID-card, and official letter issuing authority.",
+          icon: FileSignature
+        },
+        {
           href: "/dashboard/certificates",
           label: "Certificates",
           detail: "Generate baptism, membership, training, ordination, and service certificates.",
@@ -422,6 +429,12 @@ export default async function AdminControlCenterPage() {
           label: "Access review",
           detail: "Review workspace roles, share links, AI agents, old devices, and sensitive access.",
           icon: ShieldAlert
+        },
+        {
+          href: "/dashboard/admin/governance",
+          label: "Presidential governance",
+          detail: "Document policy, approval locks, watermarks, branch risk, redaction, credentials, incidents, circulars, and privacy consent.",
+          icon: ShieldCheck
         },
         {
           href: "/dashboard/access-requests",
