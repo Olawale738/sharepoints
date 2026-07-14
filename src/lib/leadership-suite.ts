@@ -3,6 +3,7 @@ import {
   ChurchEventType,
   FollowUpStatus,
   NotificationPriority,
+  PresidentialApprovalTargetType,
   Prisma,
   ServicePlanStatus,
   TaskStatus,
@@ -15,6 +16,7 @@ import {
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
+import { assertEmergencyLockdownAllows, maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
 
@@ -905,7 +907,16 @@ export async function issueGivingReceipt(actorId: string, input: {
   receivedAt: string;
   notes?: string | null;
 }) {
+  await assertEmergencyLockdownAllows("FINANCIAL_ACTION", actorId);
   await requireLeadershipAccess(actorId);
+  const pendingApproval = await maybeQueuePresidentialApproval({
+    requesterId: actorId,
+    targetType: PresidentialApprovalTargetType.FINANCIAL_APPROVAL,
+    title: `Giving receipt approval: ${input.fund}`,
+    summary: `Approve issuing a giving receipt for ${input.donorName}.`,
+    payload: input as Prisma.InputJsonObject
+  });
+  if (pendingApproval) return pendingApproval;
   const receipt = await prisma.givingReceipt.create({
     data: {
       userId: input.userId ?? null,
@@ -933,6 +944,7 @@ export async function issueGivingReceipt(actorId: string, input: {
 }
 
 export async function revokeGivingReceipt(actorId: string, id: string, status: "REVOKED" | "VOID" | "ACTIVE") {
+  await assertEmergencyLockdownAllows("FINANCIAL_ACTION", actorId);
   await requireLeadershipAccess(actorId);
   const receipt = await prisma.givingReceipt.update({
     where: { id },

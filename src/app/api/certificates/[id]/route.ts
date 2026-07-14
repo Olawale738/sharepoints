@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { PresidentialApprovalTargetType } from "@prisma/client";
 
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { restoredCertificateData } from "@/lib/certificates";
 import { requireCertificateIssuer } from "@/lib/official-issuance";
+import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 
 type RouteContext = {
@@ -27,6 +29,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const existing = await prisma.memberCertificationBadge.findUnique({ where: { id } });
     if (!existing) throw new ApiError(404, "Certificate not found.");
+    const pendingApproval = await maybeQueuePresidentialApproval({
+      requesterId: actor.id,
+      targetType: PresidentialApprovalTargetType.CERTIFICATE,
+      targetId: id,
+      title: `Certificate ${parsed.data.action.toLowerCase()} approval`,
+      summary: `Approve ${parsed.data.action.toLowerCase()} for ${existing.certificateNumber ?? existing.title}.`,
+      payload: { action: "UPDATE_STATUS", status: parsed.data.action === "REVOKE" ? "REVOKED" : "ACTIVE" }
+    });
+    if (pendingApproval) return ok({ pendingApproval }, { status: 202 });
 
     const certificate = await prisma.memberCertificationBadge.update({
       where: { id },
@@ -61,6 +72,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (!certificate) {
       throw new ApiError(404, "Certificate not found.");
     }
+    const pendingApproval = await maybeQueuePresidentialApproval({
+      requesterId: actor.id,
+      targetType: PresidentialApprovalTargetType.CERTIFICATE,
+      targetId: id,
+      title: "Certificate deletion approval",
+      summary: `Approve deleting ${certificate.certificateNumber ?? certificate.title}.`,
+      payload: { action: "DELETE" }
+    });
+    if (pendingApproval) return ok({ pendingApproval }, { status: 202 });
 
     await prisma.memberCertificationBadge.delete({
       where: { id }

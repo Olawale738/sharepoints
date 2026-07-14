@@ -167,13 +167,19 @@ export function QrIdentityAdminPanel() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...payload })
     });
-    const body = (await response.json().catch(() => null)) as { error?: string; result?: { count?: number } } | null;
+    const body = (await response.json().catch(() => null)) as { error?: string; result?: { count?: number; pendingApproval?: boolean } } | null;
     setBusy("");
     if (!response.ok) {
       setError(body?.error ?? "QR identity action failed.");
       return;
     }
-    setNotice(body?.result?.count !== undefined ? `${message} ${body.result.count} record(s) affected.` : message);
+    setNotice(
+      body?.result?.pendingApproval
+        ? "Request sent to the president for approval."
+        : body?.result?.count !== undefined
+          ? `${message} ${body.result.count} record(s) affected.`
+          : message
+    );
     await load();
   }
 

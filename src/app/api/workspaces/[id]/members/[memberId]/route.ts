@@ -1,7 +1,9 @@
 import { WorkspaceRole } from "@prisma/client";
+import { PresidentialApprovalTargetType } from "@prisma/client";
 
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { approvalWallRequires, assertEmergencyLockdownAllows, queuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMemberManager } from "@/lib/rbac";
 import { updateWorkspaceMemberSchema } from "@/lib/validators";
@@ -40,6 +42,7 @@ async function ensureNotLastAdmin(workspaceId: string, memberId: string) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
+    await assertEmergencyLockdownAllows("WORKSPACE_ACTION", user.id);
     const { id, memberId } = await context.params;
     const { isAdminAccess } = await requireWorkspaceMemberManager(user.id, id);
 
@@ -58,6 +61,20 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (!isAdminAccess && (target.role === WorkspaceRole.ADMIN || parsed.data.role === WorkspaceRole.ADMIN)) {
       throw new ApiError(403, "Only admins can change admin membership.");
+    }
+
+    const elevatedRoles = new Set<WorkspaceRole>([WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR]);
+    if (elevatedRoles.has(parsed.data.role) && (await approvalWallRequires(PresidentialApprovalTargetType.LEADERSHIP_APPOINTMENT, user.id))) {
+      const pendingApproval = await queuePresidentialApproval({
+        requesterId: user.id,
+        targetType: PresidentialApprovalTargetType.LEADERSHIP_APPOINTMENT,
+        targetId: memberId,
+        workspaceId: id,
+        title: `Leadership appointment approval: ${parsed.data.role.toLowerCase()}`,
+        summary: `Approve changing workspace member ${target.userId} from ${target.role} to ${parsed.data.role}.`,
+        payload: { memberId, workspaceId: id, userId: target.userId, role: parsed.data.role }
+      });
+      return ok({ pendingApproval }, { status: 202 });
     }
 
     const member = await prisma.workspaceMember.update({
@@ -92,6 +109,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
+    await assertEmergencyLockdownAllows("WORKSPACE_ACTION", user.id);
     const { id, memberId } = await context.params;
     const { isAdminAccess } = await requireWorkspaceMemberManager(user.id, id);
 

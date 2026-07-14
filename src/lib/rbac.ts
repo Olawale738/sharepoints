@@ -1,6 +1,7 @@
 import { MemberSanctionType, WorkspaceRole } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
+import { isPresidentAuthority } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { requireNoSanction } from "@/lib/sanctions";
 
@@ -187,10 +188,13 @@ export async function getWorkspaceMembership(userId: string, workspaceId: string
 export async function requireWorkspaceMembership(userId: string, workspaceId: string) {
   const workspace = await prisma.workspace.findFirst({
     where: { id: workspaceId, deletedAt: null },
-    select: { id: true }
+    select: { id: true, lockedAt: true, lockReason: true }
   });
   if (!workspace) {
     throw new ApiError(404, "Workspace not found.");
+  }
+  if (workspace.lockedAt && !(await isPresidentAuthority(userId))) {
+    throw new ApiError(423, workspace.lockReason || "This workspace has been locked by the LETW president.");
   }
   const membership = await getWorkspaceMembership(userId, workspaceId);
 

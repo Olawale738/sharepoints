@@ -813,6 +813,15 @@ enum PresidentialGovernanceControlStatus {
   REVOKED
 }
 
+enum PresidentialApprovalTargetType {
+  OFFICIAL_LETTER
+  CERTIFICATE
+  ID_CARD
+  LEADERSHIP_APPOINTMENT
+  SENSITIVE_FILE
+  FINANCIAL_APPROVAL
+}
+
 enum DigitalSignatureStatus {
   REQUESTED
   SIGNED
@@ -1110,6 +1119,9 @@ model Workspace {
   scopeType           OrganizationUnitType?
   audienceMode        WorkspaceAudienceMode       @default(WORKER_TEAM)
   memberDirectoryOpen Boolean                     @default(false)
+  lockedAt            DateTime?
+  lockedById          String?
+  lockReason          String?                     @db.Text
   deletedAt           DateTime?
   deletedById         String?
   restoreUntil        DateTime?
@@ -1121,6 +1133,7 @@ model Workspace {
   @@index([templateId])
   @@index([organizationUnitId, scopeType])
   @@index([audienceMode])
+  @@index([lockedAt])
 }
 
 model WorkspaceDepartmentAccess {
@@ -3285,6 +3298,64 @@ model PresidentialGovernanceRecord {
   @@index([subjectUserId, controlType, status])
   @@index([ownerUserId, status, dueAt])
   @@index([createdById, createdAt])
+}
+
+model PresidentApprovalWallPolicy {
+  id                            String   @id @default(cuid())
+  scope                         String   @unique @default("GLOBAL")
+  active                        Boolean  @default(true)
+  requireOfficialLetters        Boolean  @default(true)
+  requireCertificates           Boolean  @default(true)
+  requireIdCards                Boolean  @default(true)
+  requireLeadershipAppointments Boolean  @default(true)
+  requireSensitiveFiles         Boolean  @default(true)
+  requireFinancialApprovals     Boolean  @default(true)
+  updatedById                   String?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+}
+
+model PresidentEmergencyLockdown {
+  id                     String    @id @default(cuid())
+  scope                  String    @unique @default("GLOBAL")
+  active                 Boolean   @default(false)
+  lockDownloads          Boolean   @default(false)
+  lockNewLogins          Boolean   @default(false)
+  freezeDocumentChanges  Boolean   @default(false)
+  disableOfficialIssuing Boolean   @default(false)
+  lockWorkspaceActions   Boolean   @default(false)
+  lockFinancialActions   Boolean   @default(false)
+  reason                 String?   @db.Text
+  activatedById          String?
+  activatedAt            DateTime?
+  deactivatedById        String?
+  deactivatedAt          DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+model PresidentialApprovalItem {
+  id                 String                         @id @default(cuid())
+  targetType         PresidentialApprovalTargetType
+  targetId           String?
+  workspaceId        String?
+  organizationUnitId String?
+  requesterId        String
+  reviewerId         String?
+  title              String
+  summary            String                         @db.Text
+  status             ApprovalStatus                 @default(PENDING)
+  reason             String?
+  payload            Json?
+  reviewedAt         DateTime?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  @@index([targetType, status, createdAt])
+  @@index([workspaceId, status, createdAt])
+  @@index([organizationUnitId, status, createdAt])
+  @@index([requesterId, createdAt])
+  @@index([reviewerId, reviewedAt])
 }
 
 model TrainingProgram {

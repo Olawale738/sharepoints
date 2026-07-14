@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { PresidentialApprovalTargetType } from "@prisma/client";
 import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
@@ -18,6 +19,7 @@ import {
   rotateCardQr
 } from "@/lib/qr-identity";
 import { getOfficialIssuanceAuthority, requireCertificateIssuer, requireIdCardIssuer } from "@/lib/official-issuance";
+import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
 
 export const runtime = "nodejs";
@@ -335,6 +337,18 @@ export async function POST(request: Request) {
         data.action === "BULK_ISSUE_IDS" && data.onlyMissing
           ? users.filter((member) => !existingUserIds.has(member.id))
           : users;
+      const pendingApproval = await maybeQueuePresidentialApproval({
+        requesterId: actor.id,
+        targetType: PresidentialApprovalTargetType.ID_CARD,
+        title: `Digital ID approval: ${data.action.replaceAll("_", " ").toLowerCase()}`,
+        summary: `Approve ${data.action.replaceAll("_", " ").toLowerCase()} for ${selected.length} LETW member(s).`,
+        payload: {
+          action: data.action,
+          userIds: selected.map((member) => member.id),
+          expiresAt: data.expiresAt ?? null
+        }
+      });
+      if (pendingApproval) return ok({ result: { pendingApproval: true, count: selected.length, id: pendingApproval.id } }, { status: 202 });
       for (const member of selected) {
         await issueOrReissueCard({
           userId: member.id,
@@ -350,9 +364,27 @@ export async function POST(request: Request) {
       });
       result = { count: selected.length };
     } else if (data.action === "MARK_LOST") {
+      const pendingApproval = await maybeQueuePresidentialApproval({
+        requesterId: actor.id,
+        targetType: PresidentialApprovalTargetType.ID_CARD,
+        targetId: data.cardId,
+        title: "Digital ID lost-card approval",
+        summary: "Approve marking this digital membership card as lost.",
+        payload: { action: data.action, cardId: data.cardId, reason: data.reason ?? null }
+      });
+      if (pendingApproval) return ok({ result: { pendingApproval: true, id: pendingApproval.id } }, { status: 202 });
       result = await markCardLost({ cardId: data.cardId, actorId: actor.id, reason: data.reason });
       targetId = data.cardId;
     } else if (data.action === "RENEW_CARD") {
+      const pendingApproval = await maybeQueuePresidentialApproval({
+        requesterId: actor.id,
+        targetType: PresidentialApprovalTargetType.ID_CARD,
+        targetId: data.cardId,
+        title: "Digital ID renewal approval",
+        summary: "Approve renewing this digital membership card.",
+        payload: { action: data.action, cardId: data.cardId, expiresAt: data.expiresAt ?? null, rotateQr: data.rotateQr }
+      });
+      if (pendingApproval) return ok({ result: { pendingApproval: true, id: pendingApproval.id } }, { status: 202 });
       result = await renewCard({
         cardId: data.cardId,
         actorId: actor.id,
@@ -361,6 +393,15 @@ export async function POST(request: Request) {
       });
       targetId = data.cardId;
     } else if (data.action === "ROTATE_QR") {
+      const pendingApproval = await maybeQueuePresidentialApproval({
+        requesterId: actor.id,
+        targetType: PresidentialApprovalTargetType.ID_CARD,
+        targetId: data.cardId,
+        title: "Digital ID QR rotation approval",
+        summary: "Approve rotating this digital membership card QR code.",
+        payload: { action: data.action, cardId: data.cardId, reason: data.reason ?? null }
+      });
+      if (pendingApproval) return ok({ result: { pendingApproval: true, id: pendingApproval.id } }, { status: 202 });
       result = await rotateCardQr({ cardId: data.cardId, actorId: actor.id, reason: data.reason });
       targetId = data.cardId;
     } else if (data.action === "CREATE_VISITOR_PASS") {
@@ -432,6 +473,21 @@ export async function POST(request: Request) {
       activityAction = activityActions.onboardingItemCompleted;
       targetId = data.id;
     } else if (data.action === "CREATE_CERTIFICATION_BADGE") {
+      const pendingApproval = await maybeQueuePresidentialApproval({
+        requesterId: actor.id,
+        targetType: PresidentialApprovalTargetType.CERTIFICATE,
+        targetId: data.userId,
+        title: `Worker badge approval: ${data.title}`,
+        summary: "Approve creating a worker certification badge.",
+        payload: {
+          userId: data.userId,
+          title: data.title,
+          issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
+          certificateNumber: data.certificateNumber || null,
+          expiresAt: data.expiresAt ?? null
+        }
+      });
+      if (pendingApproval) return ok({ result: { pendingApproval: true, id: pendingApproval.id } }, { status: 202 });
       result = await prisma.memberCertificationBadge.create({
         data: {
           userId: data.userId,

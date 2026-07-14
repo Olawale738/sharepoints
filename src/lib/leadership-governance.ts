@@ -10,6 +10,7 @@ import {
   MonthlyReportStatus,
   OfficialLetterStatus,
   OfficialLetterType,
+  PresidentialApprovalTargetType,
   Prisma,
   WorkspaceRole
 } from "@prisma/client";
@@ -18,6 +19,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { requireOfficialLetterIssuer } from "@/lib/official-issuance";
+import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireAnyWorkspacePermission } from "@/lib/rbac";
 import { getLeadershipWorkspaces, requireLeadershipAccess } from "@/lib/leadership-suite";
@@ -854,7 +856,18 @@ export async function createOfficialLetter(actorId: string, input: {
   organizationUnitId?: string | null;
   issueNow?: boolean;
 }) {
+  await requireOfficialLetterIssuer(actorId);
   await requireLeadershipGovernanceScopeAccess(actorId, input);
+  const pendingApproval = await maybeQueuePresidentialApproval({
+    requesterId: actorId,
+    targetType: PresidentialApprovalTargetType.OFFICIAL_LETTER,
+    workspaceId: input.workspaceId ?? null,
+    organizationUnitId: input.organizationUnitId ?? null,
+    title: input.title,
+    summary: `Official ${input.letterType.toLowerCase().replaceAll("_", " ")} letter for ${input.recipientName}.`,
+    payload: input as Prisma.InputJsonObject
+  });
+  if (pendingApproval) return pendingApproval;
   const letter = await prisma.officialLetter.create({
     data: {
       letterType: input.letterType,
@@ -887,6 +900,17 @@ export async function updateOfficialLetter(actorId: string, id: string, status: 
     ...existing,
     participantIds: [existing.recipientUserId]
   });
+  const pendingApproval = await maybeQueuePresidentialApproval({
+    requesterId: actorId,
+    targetType: PresidentialApprovalTargetType.OFFICIAL_LETTER,
+    targetId: id,
+    workspaceId: existing.workspaceId,
+    organizationUnitId: existing.organizationUnitId,
+    title: `Official letter ${status.toLowerCase()} approval`,
+    summary: `Approve changing official letter status to ${status}.`,
+    payload: { action: "UPDATE_STATUS", id, status }
+  });
+  if (pendingApproval) return pendingApproval;
   const letter = await prisma.officialLetter.update({
     where: { id },
     data: {
@@ -918,6 +942,17 @@ export async function deleteOfficialLetter(actorId: string, id: string) {
     ...existing,
     participantIds: [existing.recipientUserId]
   });
+  const pendingApproval = await maybeQueuePresidentialApproval({
+    requesterId: actorId,
+    targetType: PresidentialApprovalTargetType.OFFICIAL_LETTER,
+    targetId: id,
+    workspaceId: existing.workspaceId,
+    organizationUnitId: existing.organizationUnitId,
+    title: "Official letter deletion approval",
+    summary: `Approve deleting official letter ${existing.letterNumber}.`,
+    payload: { action: "DELETE", id }
+  });
+  if (pendingApproval) return pendingApproval;
   await prisma.officialLetter.delete({ where: { id } });
   await logActivity({
     userId: actorId,

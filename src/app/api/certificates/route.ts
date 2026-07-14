@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
+import { PresidentialApprovalTargetType } from "@prisma/client";
 import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { getOfficialIssuanceAuthority, requireCertificateIssuer } from "@/lib/official-issuance";
+import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
@@ -97,6 +99,22 @@ export async function POST(request: Request) {
     if (!recipient) {
       throw new ApiError(404, "Recipient not found or inactive.");
     }
+
+    const pendingApproval = await maybeQueuePresidentialApproval({
+      requesterId: actor.id,
+      targetType: PresidentialApprovalTargetType.CERTIFICATE,
+      targetId: recipient.id,
+      title: `Certificate approval: ${data.title}`,
+      summary: `Approve issuing ${data.title} to ${recipient.name ?? recipient.email ?? "LETW member"}.`,
+      payload: {
+        userId: recipient.id,
+        title: data.title,
+        issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
+        certificateNumber: data.certificateNumber ?? null,
+        expiresAt: data.expiresAt ?? null
+      }
+    });
+    if (pendingApproval) return ok({ pendingApproval }, { status: 202 });
 
     const certificate = await prisma.memberCertificationBadge.create({
       data: {

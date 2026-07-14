@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 
+import { ApprovalStatus, PresidentialApprovalTargetType } from "@prisma/client";
+
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { createApprovalRequestIfNeeded, initialApprovalStatus } from "@/lib/governance";
 import { scanUploadedFile } from "@/lib/file-security";
 import { inspectForDlp, recordDlpIncidents } from "@/lib/dlp";
+import { approvalWallRequires, assertEmergencyLockdownAllows, queuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { getMaxUploadBytes, uploadObject } from "@/lib/storage";
@@ -35,6 +38,7 @@ export async function POST(request: Request) {
       throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid upload details.");
     }
 
+    await assertEmergencyLockdownAllows("DOCUMENT_CHANGE", user.id);
     await requireWorkspacePermission(user.id, parsed.data.workspaceId, "canUploadFiles");
 
     if (file.size <= 0) {
@@ -92,7 +96,12 @@ export async function POST(request: Request) {
       contentLength: body.length
     });
 
-    const approvalStatus = await initialApprovalStatus(user.id, parsed.data.workspaceId);
+    const requiresPresidentFileApproval =
+      dlp.action === "RESTRICT" &&
+      (await approvalWallRequires(PresidentialApprovalTargetType.SENSITIVE_FILE, user.id));
+    const approvalStatus = requiresPresidentFileApproval
+      ? ApprovalStatus.PENDING
+      : await initialApprovalStatus(user.id, parsed.data.workspaceId);
     const createdFile = await prisma.file.create({
       data: {
         workspaceId: parsed.data.workspaceId,
@@ -152,14 +161,30 @@ export async function POST(request: Request) {
         }
       }
     });
-    await createApprovalRequestIfNeeded({
-      status: approvalStatus,
-      workspaceId: parsed.data.workspaceId,
-      requesterId: user.id,
-      targetType: "FILE",
-      targetId: createdFile.id,
-      title: createdFile.fileName
-    });
+    if (requiresPresidentFileApproval) {
+      await queuePresidentialApproval({
+        requesterId: user.id,
+        targetType: PresidentialApprovalTargetType.SENSITIVE_FILE,
+        targetId: createdFile.id,
+        workspaceId: parsed.data.workspaceId,
+        title: `Sensitive file approval: ${createdFile.fileName}`,
+        summary: `DLP classification ${dlp.classification} requires presidential approval before this file becomes visible.`,
+        payload: {
+          fileId: createdFile.id,
+          fileName: createdFile.fileName,
+          dlpClassification: dlp.classification
+        }
+      });
+    } else {
+      await createApprovalRequestIfNeeded({
+        status: approvalStatus,
+        workspaceId: parsed.data.workspaceId,
+        requesterId: user.id,
+        targetType: "FILE",
+        targetId: createdFile.id,
+        title: createdFile.fileName
+      });
+    }
     await recordDlpIncidents({
       workspaceId: parsed.data.workspaceId,
       fileId: createdFile.id,

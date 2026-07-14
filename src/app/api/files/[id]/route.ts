@@ -1,5 +1,6 @@
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
+import { assertEmergencyLockdownAllows } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspacePermission } from "@/lib/rbac";
 import { recycleFile } from "@/lib/recycle-bin";
@@ -13,6 +14,7 @@ export const runtime = "nodejs";
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
+    await assertEmergencyLockdownAllows("DOCUMENT_CHANGE", user.id);
     const { id } = await context.params;
     const file = await prisma.file.findUnique({
       where: { id },

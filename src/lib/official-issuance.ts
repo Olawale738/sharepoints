@@ -3,6 +3,7 @@ import { WorkspaceRole } from "@prisma/client";
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { isPresidentDocumentAuthority } from "@/lib/governance";
+import { assertEmergencyLockdownAllows } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 
 type OfficialIssuanceInput = {
@@ -60,6 +61,7 @@ export async function requirePresidentIssuanceAuthority(actorId: string) {
 }
 
 export async function requireCertificateIssuer(actorId: string) {
+  await assertEmergencyLockdownAllows("OFFICIAL_ISSUING", actorId);
   const authority = await getOfficialIssuanceAuthority(actorId);
   if (!authority.canIssueCertificates) {
     throw new ApiError(403, "Only the LETW president or a president-approved certificate issuer can issue certificates.");
@@ -68,6 +70,7 @@ export async function requireCertificateIssuer(actorId: string) {
 }
 
 export async function requireIdCardIssuer(actorId: string) {
+  await assertEmergencyLockdownAllows("OFFICIAL_ISSUING", actorId);
   const authority = await getOfficialIssuanceAuthority(actorId);
   if (!authority.canIssueIdCards) {
     throw new ApiError(403, "Only the LETW president or a president-approved ID-card issuer can issue or reissue digital IDs.");
@@ -76,6 +79,7 @@ export async function requireIdCardIssuer(actorId: string) {
 }
 
 export async function requireOfficialLetterIssuer(actorId: string) {
+  await assertEmergencyLockdownAllows("OFFICIAL_ISSUING", actorId);
   const authority = await getOfficialIssuanceAuthority(actorId);
   if (!authority.canIssueLetters) {
     throw new ApiError(403, "Only the LETW president or a president-approved letter issuer can issue official LETW letters.");

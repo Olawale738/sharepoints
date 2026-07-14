@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardCheck, Crown, FileClock, FileSignature, Handshake, ShieldCheck } from "lucide-react";
+import { ClipboardCheck, Crown, FileClock, FileSignature, Handshake, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { auth } from "@/auth";
 import { ApprovalQueue } from "@/components/dashboard/approval-queue";
@@ -54,7 +54,7 @@ export default async function PresidentApprovalDeskPage() {
   const isAdmin = await hasAnyWorkspaceAdminRole(session.user.id);
   const workspaceIds = await getAdminVisibleWorkspaceIds(session.user.id);
   const scopedWhere = isAdmin ? {} : { workspaceId: { in: workspaceIds.length ? workspaceIds : ["__none__"] } };
-  const [approvals, letters, reports, handovers, signatures, presidentialActions] = await Promise.all([
+  const [approvals, letters, reports, handovers, signatures, presidentialActions, wallApprovals] = await Promise.all([
     getApprovalItems(workspaceIds),
     prisma.officialLetter.findMany({
       where: { ...scopedWhere, status: "DRAFT" },
@@ -80,6 +80,11 @@ export default async function PresidentApprovalDeskPage() {
       where: { ...scopedWhere, status: { in: ["PENDING", "IN_REVIEW", "ASSIGNED"] } },
       orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
       take: 12
+    }),
+    prisma.presidentialApprovalItem.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      take: 12
     })
   ]);
 
@@ -90,7 +95,8 @@ export default async function PresidentApprovalDeskPage() {
     { label: "Reports", value: reports.length, detail: "Monthly packs requiring review", icon: FileClock },
     { label: "Handovers", value: handovers.length, detail: "Leadership transition matters", icon: Handshake },
     { label: "Signatures", value: signatures.length, detail: "Documents awaiting signature", icon: ShieldCheck },
-    { label: "Presidential actions", value: presidentialActions.length, detail: "Executive decisions needing movement", icon: Crown }
+    { label: "Presidential actions", value: presidentialActions.length, detail: "Executive decisions needing movement", icon: Crown },
+    { label: "Approval wall", value: wallApprovals.length, detail: "Sensitive requests waiting for president", icon: LockKeyhole }
   ];
 
   return (
@@ -164,6 +170,17 @@ export default async function PresidentApprovalDeskPage() {
             title: item.title,
             meta: `${item.status.toLowerCase().replaceAll("_", " ")} - updated ${formatDate(item.updatedAt)}`,
             href: "/dashboard/leadership-governance",
+            status: item.status
+          }))}
+        />
+        <DeskList
+          title="President Approval Wall"
+          empty="No sensitive approval wall requests are waiting."
+          items={wallApprovals.map((item) => ({
+            id: item.id,
+            title: item.title,
+            meta: `${item.targetType.toLowerCase().replaceAll("_", " ")} - ${formatDate(item.createdAt)}`,
+            href: "/dashboard/admin/president-wall",
             status: item.status
           }))}
         />

@@ -1,8 +1,9 @@
-import { ApprovalStatus, WorkspaceRole } from "@prisma/client";
+import { ApprovalStatus, PresidentialApprovalTargetType, WorkspaceRole } from "@prisma/client";
 
 import { hasActiveFileGrant } from "@/lib/access-requests";
 import { ApiError } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
+import { approvalWallRequires, assertEmergencyLockdownAllows, isSensitiveFileLike } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { getRolePermissions, getWorkspaceMembership, hasAnyWorkspaceAdminRole, hasWorkspaceAdminAccess } from "@/lib/rbac";
 
@@ -202,6 +203,7 @@ export async function ensureCanDownloadFile(userId: string, file: {
   dlpRestricted?: boolean | null;
   downloadRestricted?: boolean | null;
 }) {
+  await assertEmergencyLockdownAllows("DOWNLOAD", userId);
   await ensureCanSeeFile(userId, file);
 
   if (!(await isPresidentDocumentAuthority(userId)) && !(await hasActiveFileDownloadGrant(userId, file.id))) {
@@ -217,6 +219,7 @@ export async function ensureCanEditFile(userId: string, file: {
   sensitivityLabel?: string | null;
   dlpRestricted?: boolean | null;
 }) {
+  await assertEmergencyLockdownAllows("DOCUMENT_CHANGE", userId);
   await ensureCanSeeFile(userId, file);
 
   if (!(await isPresidentDocumentAuthority(userId))) {
@@ -255,6 +258,26 @@ export async function applyApprovalDecision(input: {
 
   if (!request) {
     throw new ApiError(404, "Approval request not found.");
+  }
+
+  if (request.targetType === "FILE") {
+    const file = await prisma.file.findUnique({
+      where: { id: request.targetId },
+      select: {
+        dlpRestricted: true,
+        downloadRestricted: true,
+        shareRestricted: true,
+        aiRestricted: true,
+        sensitivityLabel: true
+      }
+    });
+    if (
+      file &&
+      isSensitiveFileLike(file) &&
+      (await approvalWallRequires(PresidentialApprovalTargetType.SENSITIVE_FILE, input.reviewerId))
+    ) {
+      throw new ApiError(403, "This sensitive file requires president approval.");
+    }
   }
 
   if (!(await canApproveWorkspaceContent(input.reviewerId, request.workspaceId))) {

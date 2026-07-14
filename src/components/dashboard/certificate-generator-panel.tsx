@@ -172,7 +172,7 @@ export function CertificateGeneratorPanel({
         expiresAt: payload.expiresAt ? new Date(payload.expiresAt).toISOString() : null
       })
     });
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
     setBusy("");
 
     if (!response.ok) {
@@ -181,7 +181,7 @@ export function CertificateGeneratorPanel({
     }
 
     form.reset();
-    setNotice("Certificate created.");
+    setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : "Certificate created.");
     router.refresh();
   }
 
@@ -194,7 +194,7 @@ export function CertificateGeneratorPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action })
     });
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
     setBusy("");
 
     if (!response.ok) {
@@ -202,7 +202,7 @@ export function CertificateGeneratorPanel({
       return;
     }
 
-    setNotice(action === "REVOKE" ? "Certificate revoked." : "Certificate restored.");
+    setNotice(body?.pendingApproval ? "Certificate action sent to the president for approval." : action === "REVOKE" ? "Certificate revoked." : "Certificate restored.");
     router.refresh();
   }
 
@@ -214,7 +214,7 @@ export function CertificateGeneratorPanel({
     const response = await fetch(`/api/certificates/${id}`, {
       method: "DELETE"
     });
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
     setBusy("");
 
     if (!response.ok) {
@@ -222,7 +222,7 @@ export function CertificateGeneratorPanel({
       return;
     }
 
-    setNotice("Certificate deleted.");
+    setNotice(body?.pendingApproval ? "Certificate deletion sent to the president for approval." : "Certificate deleted.");
     router.refresh();
   }
 

@@ -1,6 +1,7 @@
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { ensureCanEditFile } from "@/lib/governance";
+import { assertEmergencyLockdownAllows } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasWorkspaceAdminAccess, requireWorkspaceMembership, requireWorkspacePermission } from "@/lib/rbac";
 import { fileGovernanceSchema } from "@/lib/validators";
@@ -12,6 +13,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
+    await assertEmergencyLockdownAllows("DOCUMENT_CHANGE", user.id);
     const { id } = await context.params;
     const file = await prisma.file.findUnique({
       where: { id }

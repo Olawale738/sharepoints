@@ -27,6 +27,7 @@ import {
   Globe2,
   IdCard,
   KeyRound,
+  LockKeyhole,
   MessageCircle
 } from "lucide-react";
 
@@ -369,6 +370,12 @@ export default async function AdminControlCenterPage() {
           label: "President approval desk",
           detail: "Central approval queue for files, meetings, tasks, announcements, and executive matters.",
           icon: Crown
+        },
+        {
+          href: "/dashboard/admin/president-wall",
+          label: "President Approval Wall",
+          detail: "President-only sensitive approvals and emergency lockdown for downloads, logins, documents, issuing, workspaces, and finance.",
+          icon: LockKeyhole
         },
         {
           href: "/dashboard/admin/enterprise",

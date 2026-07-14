@@ -4,6 +4,7 @@ import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { activityActions, logActivity } from "@/lib/activity";
 import { getOrCreateGeneralChannel } from "@/lib/chat";
 import { requireWorkspaceUnitCreationAccess } from "@/lib/organization-access";
+import { assertEmergencyLockdownAllows } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole, requireWorkspaceCreatorRole } from "@/lib/rbac";
 import { createWorkspaceSchema } from "@/lib/validators";
@@ -86,6 +87,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
+    await assertEmergencyLockdownAllows("WORKSPACE_ACTION", user.id);
     await requireWorkspaceCreatorRole(user.id);
 
     const body = await request.json();

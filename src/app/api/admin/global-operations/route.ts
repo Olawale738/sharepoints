@@ -7,6 +7,7 @@ import {
   GovernanceHoldStatus,
   MembershipCardStatus,
   OrganizationUnitType,
+  PresidentialApprovalTargetType,
   Prisma,
   SafeguardingCaseStatus,
   SafeguardingSeverity
@@ -18,6 +19,7 @@ import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { notifyUsers } from "@/lib/notifications";
 import { getOrganizationScopeUserIds } from "@/lib/organization-access";
+import { approvalWallRequires, assertEmergencyLockdownAllows, queuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { refreshOfflinePayload } from "@/lib/qr-identity";
 import { requireAnyWorkspaceAdmin } from "@/lib/rbac";
@@ -531,6 +533,24 @@ export async function POST(request: Request) {
       action = activityActions.organizationUnitCreated;
       targetId = (result as { id: string }).id;
     } else if (data.entity === "LEADER") {
+      await assertEmergencyLockdownAllows("WORKSPACE_ACTION", user.id);
+      if (await approvalWallRequires(PresidentialApprovalTargetType.LEADERSHIP_APPOINTMENT, user.id)) {
+        const pendingApproval = await queuePresidentialApproval({
+          requesterId: user.id,
+          targetType: PresidentialApprovalTargetType.LEADERSHIP_APPOINTMENT,
+          organizationUnitId: data.unitId,
+          title: `Network leader appointment: ${data.title}`,
+          summary: "Approve assigning a leader to a country, region, church, branch, or ministry network unit.",
+          payload: {
+            unitId: data.unitId,
+            userId: data.userId,
+            title: data.title,
+            canCreateWorkspaces: data.canCreateWorkspaces,
+            inheritToChildren: data.inheritToChildren
+          }
+        });
+        return ok({ pendingApproval }, { status: 202 });
+      }
       result = await prisma.organizationUnitLeader.upsert({
         where: {
           unitId_userId_title: {

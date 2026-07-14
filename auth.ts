@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 import { SecurityEventType } from "@prisma/client";
 
 import { isBlockedServiceEmail, markCompanyInvitationAccepted } from "@/lib/email-policy";
+import { assertEmergencyLockdownAllows } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { logSecurityEvent } from "@/lib/security";
 import { verifyTotpCode } from "@/lib/totp";
@@ -46,6 +47,18 @@ const providers: NextAuthConfig["providers"] = [
           metadata: {
             reason: user.forcePasswordReset ? "force_password_reset" : "restricted_account"
           }
+        });
+        return null;
+      }
+
+      try {
+        await assertEmergencyLockdownAllows("LOGIN", user.id);
+      } catch {
+        await logSecurityEvent({
+          userId: user.id,
+          type: SecurityEventType.LOGIN_FAILED,
+          email: user.email,
+          metadata: { reason: "emergency_lockdown" }
         });
         return null;
       }
