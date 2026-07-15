@@ -4,8 +4,10 @@ import QRCode from "qrcode";
 import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
+import { certificateCredentialHash, shortHash, signCertificate } from "@/lib/certificate-security";
 import { certificateIsLive } from "@/lib/certificates";
 import { getObjectBuffer } from "@/lib/storage";
+import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
@@ -180,6 +182,17 @@ async function loadProfilePhoto(userId: string, image?: string | null) {
   }
 }
 
+async function loadExternalPhoto(url?: string | null) {
+  if (!url?.startsWith("http")) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
@@ -192,29 +205,34 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(404, "Certificate not found.");
     }
 
-    const isAdmin = await hasAnyWorkspaceAdminRole(actor.id);
-    if (!isAdmin && certificate.userId !== actor.id) {
+    const [isAdmin, authority] = await Promise.all([
+      hasAnyWorkspaceAdminRole(actor.id),
+      getOfficialIssuanceAuthority(actor.id)
+    ]);
+    if (!isAdmin && !authority.canIssueCertificates && certificate.userId !== actor.id) {
       throw new ApiError(403, "You cannot download this certificate.");
     }
 
-    const certificateUser = await prisma.user.findUnique({
-      where: { id: certificate.userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        memberProfile: {
+    const certificateUser = certificate.userId
+      ? await prisma.user.findUnique({
+          where: { id: certificate.userId },
           select: {
-            membershipNumber: true,
-            organizationPosition: true,
-            phone: true
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            memberProfile: {
+              select: {
+                membershipNumber: true,
+                organizationPosition: true,
+                phone: true
+              }
+            }
           }
-        }
-      }
-    });
+        })
+      : null;
 
-    if (!certificateUser) {
+    if (certificate.userId && !certificateUser) {
       throw new ApiError(404, "Certificate owner not found.");
     }
 
@@ -235,7 +253,12 @@ export async function GET(request: Request, context: RouteContext) {
     const script = await pdf.embedFont(StandardFonts.TimesRomanItalic);
     const logoBytes = await readFile(path.join(process.cwd(), "public", "letw-logo.png"));
     const logo = await pdf.embedPng(logoBytes);
-    const photo = await embedImage(pdf, (await loadProfilePhoto(certificateUser.id, certificateUser.image)) ?? Buffer.alloc(0));
+    const photoBytes = certificate.recipientPhotoUrl
+      ? await loadExternalPhoto(certificate.recipientPhotoUrl)
+      : certificateUser
+        ? await loadProfilePhoto(certificateUser.id, certificateUser.image)
+        : null;
+    const photo = await embedImage(pdf, photoBytes ?? Buffer.alloc(0));
     const origin = new URL(request.url).origin;
     const verifyUrl = `${origin}/verify/certificate/${certificate.verifyToken}`;
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
@@ -245,11 +268,17 @@ export async function GET(request: Request, context: RouteContext) {
       color: { dark: "#0b1b3d", light: "#ffffff" }
     });
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
-    const holderName = displayName(certificateUser);
+    const holderName = certificate.recipientName || (certificateUser ? displayName(certificateUser) : "LETW Certificate Holder");
     const certificateNumber = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
-    const position = certificateUser.memberProfile?.organizationPosition ?? "LETW Member";
-    const memberNumber = certificateUser.memberProfile?.membershipNumber ?? "Member number pending";
+    const isEducation = certificate.certificateCategory === "EDUCATION";
+    const position = isEducation
+      ? certificate.educationLevel ?? certificate.programName ?? "Theology Candidate"
+      : certificateUser?.memberProfile?.organizationPosition ?? "LETW Member";
+    const memberNumber = certificateUser?.memberProfile?.membershipNumber ?? (isEducation ? "External education candidate" : "Member number pending");
     const valid = certificateIsLive(certificate);
+    const credentialHash = certificate.credentialHash ?? certificateCredentialHash(certificate);
+    const digitalSignature = certificate.digitalSignature ?? signCertificate(certificate);
+    const sealNumber = certificate.sealNumber ?? certificateNumber;
 
     page.drawRectangle({ x: 0, y: 0, width, height, color: white });
     page.drawRectangle({ x: 22, y: 22, width: width - 44, height: height - 44, borderColor: navy, borderWidth: 7 });
@@ -258,7 +287,7 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawRectangle({ x: 48, y: height - 121, width: width - 96, height: 5, color: gold });
     page.drawImage(logo, { x: 64, y: height - 105, width: 52, height: 52 });
     page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 130, y: height - 82, size: 14, font: sansBold, color: white });
-    page.drawText("Official certificate | letw.org", { x: 130, y: height - 101, size: 9, font: sansBold, color: gold });
+    page.drawText(isEducation ? "LETW School of Theology | cryptographically verified academic credential" : "Official certificate | letw.org", { x: 130, y: height - 101, size: 8.4, font: sansBold, color: gold });
     page.drawRectangle({
       x: width - 205,
       y: height - 101,
@@ -279,7 +308,7 @@ export async function GET(request: Request, context: RouteContext) {
     const mainX = 84;
     const mainWidth = 500;
     const mainCenter = mainX + mainWidth / 2;
-    drawCenteredText(page, "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
+    drawCenteredText(page, isEducation ? "ACADEMIC CERTIFICATE OF THEOLOGY" : "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
     const titleSize = fittedFontSize(serif, certificate.title, mainWidth, 34, 24);
     drawCenteredText(page, certificate.title, mainCenter, 384, serif, titleSize, navy);
     drawCenteredText(page, "This certifies that the certificate holder is", mainCenter, 346, sansBold, 12.5, muted);
@@ -296,7 +325,10 @@ export async function GET(request: Request, context: RouteContext) {
     drawCenteredText(page, positionText, mainCenter, 266, sansBold, 8.6, white);
 
     const statement =
-      "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.";
+      certificate.customBody ||
+      (isEducation
+        ? `has successfully completed the prescribed studies for ${certificate.programName || certificate.title} in ${certificate.fieldOfStudy || "Theology"} and is recorded in the official LETW theological education register.`
+        : "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.");
     wrapText(statement, 74).forEach((line, index) => {
       drawCenteredText(page, line, mainCenter, 231 - index * 16, sans, 10.8, ink);
     });
@@ -328,12 +360,19 @@ export async function GET(request: Request, context: RouteContext) {
     });
 
     const detailY = 137;
-    const details = [
-      ["Certificate number", certificateNumber],
-      ["Member number", memberNumber],
-      ["Issued", formatDate(certificate.issuedAt)],
-      ["Expires", certificate.expiresAt ? formatDate(certificate.expiresAt) : "No expiry"]
-    ];
+    const details = isEducation
+      ? [
+          ["Certificate number", certificateNumber],
+          ["Seal number", sealNumber],
+          ["Field", certificate.fieldOfStudy ?? "Theology"],
+          ["Completed", certificate.completionDate ? formatDate(certificate.completionDate) : formatDate(certificate.issuedAt)]
+        ]
+      : [
+          ["Certificate number", certificateNumber],
+          ["Member number", memberNumber],
+          ["Issued", formatDate(certificate.issuedAt)],
+          ["Expires", certificate.expiresAt ? formatDate(certificate.expiresAt) : "No expiry"]
+        ];
     details.forEach(([label, value], index) => {
       const x = 70 + index * 130;
       const cardWidth = 122;
@@ -365,10 +404,13 @@ export async function GET(request: Request, context: RouteContext) {
 
     page.drawText("Olawale N Sanni", { x: 98, y: 80, size: 22, font: script, color: navy });
     page.drawLine({ start: { x: 86, y: 74 }, end: { x: 276, y: 74 }, thickness: 0.7, color: navy });
-    page.drawText("President / Authorized Signature", { x: 105, y: 58, size: 8, font: sansBold, color: muted });
+    page.drawText("President / Digitally Authorized Signature", { x: 96, y: 58, size: 8, font: sansBold, color: muted });
     page.drawImage(qr, { x: width - 172, y: 54, width: 86, height: 86 });
     page.drawText("SCAN TO VERIFY", { x: width - 164, y: 39, size: 8, font: sansBold, color: navy });
     page.drawText(certificateNumber, { x: width - 238, y: 30, size: 7, font: sansBold, color: blue });
+    page.drawText(`Seal: ${sealNumber}`, { x: 300, y: 75, size: 7, font: sansBold, color: navy });
+    page.drawText(`Credential hash: ${shortHash(credentialHash, 24)}`, { x: 300, y: 61, size: 7, font: sans, color: blue });
+    page.drawText(`Signature: ${shortHash(digitalSignature, 24)}`, { x: 300, y: 48, size: 7, font: sans, color: blue });
 
     if (!valid) {
       page.drawRectangle({ x: 270, y: 256, width: 275, height: 62, color: rgb(1, 1, 1), opacity: 0.72 });

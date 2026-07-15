@@ -4,6 +4,7 @@ import { ApprovalStatus, OfficialLetterStatus, OfficialLetterType, PresidentialA
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
+import { certificateCredentialHash, generateCertificateNumber, generateSealNumber, signCertificate } from "@/lib/certificate-security";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -43,6 +44,16 @@ function letterNumber(type: string) {
 
 function receiptNumber() {
   return `LETW-GIVE-${new Date().getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
+}
+
+function payloadText(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function payloadDate(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return typeof value === "string" && value ? new Date(value) : null;
 }
 
 export async function isPresidentAuthority(userId?: string | null) {
@@ -283,21 +294,44 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
       await prisma.memberCertificationBadge.delete({ where: { id: item.targetId } });
       return;
     }
-    const userId = String(payload.userId ?? "");
+    const userId = payloadText(payload, "userId");
     const title = String(payload.title ?? "Membership Certificate");
-    if (!userId) throw new ApiError(422, "Certificate request is missing the recipient.");
-    await prisma.memberCertificationBadge.create({
+    const category = payloadText(payload, "certificateCategory") ?? "MINISTRY";
+    const issuedAt = new Date();
+    const certificate = await prisma.memberCertificationBadge.create({
       data: {
         userId,
         title,
         issuer: String(payload.issuer ?? "Light Encounter Tabernacle Worldwide"),
+        certificateCategory: category,
+        recipientName: payloadText(payload, "recipientName"),
+        recipientEmail: payloadText(payload, "recipientEmail"),
+        recipientPhone: payloadText(payload, "recipientPhone"),
+        recipientPhotoUrl: payloadText(payload, "recipientPhotoUrl"),
+        recipientOrganization: payloadText(payload, "recipientOrganization"),
+        educationLevel: payloadText(payload, "educationLevel"),
+        programName: payloadText(payload, "programName"),
+        fieldOfStudy: payloadText(payload, "fieldOfStudy"),
+        gradeOrHonors: payloadText(payload, "gradeOrHonors"),
+        studyMode: payloadText(payload, "studyMode"),
+        studyStartDate: payloadDate(payload, "studyStartDate"),
+        studyEndDate: payloadDate(payload, "studyEndDate"),
+        completionDate: payloadDate(payload, "completionDate"),
+        customBody: payloadText(payload, "customBody"),
         certificateNumber:
-          typeof payload.certificateNumber === "string" && payload.certificateNumber
-            ? payload.certificateNumber
-            : `LETW-CERT-${new Date().getFullYear()}-${randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+          typeof payload.certificateNumber === "string" && payload.certificateNumber ? payload.certificateNumber : generateCertificateNumber(category),
+        sealNumber: generateSealNumber(category),
         verifyToken: randomUUID(),
+        issuedAt,
         expiresAt: normalizeCertificateExpiry(typeof payload.expiresAt === "string" ? payload.expiresAt : null),
         createdById: item.requesterId
+      }
+    });
+    await prisma.memberCertificationBadge.update({
+      where: { id: certificate.id },
+      data: {
+        digitalSignature: signCertificate(certificate),
+        credentialHash: certificateCredentialHash(certificate)
       }
     });
     return;

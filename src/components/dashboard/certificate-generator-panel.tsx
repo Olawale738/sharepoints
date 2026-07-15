@@ -7,10 +7,11 @@ import { Award, BadgeCheck, Download, ExternalLink, Loader2, PenLine, Printer, Q
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 
 type CertificateUser = {
-  id: string;
+  id: string | null;
   name?: string | null;
   email?: string | null;
   image?: string | null;
@@ -23,10 +24,25 @@ type CertificateUser = {
 
 type CertificateRow = {
   id: string;
-  userId: string;
+  userId: string | null;
   title: string;
   issuer: string;
   certificateNumber?: string | null;
+  certificateCategory?: string | null;
+  recipientName?: string | null;
+  recipientEmail?: string | null;
+  recipientPhotoUrl?: string | null;
+  educationLevel?: string | null;
+  programName?: string | null;
+  fieldOfStudy?: string | null;
+  gradeOrHonors?: string | null;
+  studyMode?: string | null;
+  studyStartDate?: string | Date | null;
+  studyEndDate?: string | Date | null;
+  completionDate?: string | Date | null;
+  customBody?: string | null;
+  sealNumber?: string | null;
+  credentialHash?: string | null;
   verifyToken: string;
   status: string;
   issuedAt: string | Date;
@@ -42,6 +58,15 @@ const certificateTypes = [
   "Ordination Certificate",
   "Conference Certificate",
   "Volunteer Service Certificate"
+] as const;
+
+const theologyCertificateTypes = [
+  "Certificate in Theology",
+  "Diploma in Theology",
+  "Advanced Diploma in Theology",
+  "Bachelor of Science in Theology",
+  "Master of Science in Theology",
+  "Doctor of Philosophy in Theology"
 ] as const;
 
 function displayName(user: CertificateUser) {
@@ -77,6 +102,7 @@ export function CertificateGeneratorPanel({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION">("MINISTRY");
 
   const filteredCertificates = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -89,6 +115,14 @@ export function CertificateGeneratorPanel({
         certificate.status,
         certificate.user.name,
         certificate.user.email,
+        certificate.recipientName,
+        certificate.recipientEmail,
+        certificate.educationLevel,
+        certificate.programName,
+        certificate.fieldOfStudy,
+        certificate.gradeOrHonors,
+        certificate.sealNumber,
+        certificate.credentialHash,
         certificate.user.memberProfile?.membershipNumber,
         certificate.user.memberProfile?.organizationPosition
       ]
@@ -166,8 +200,23 @@ export function CertificateGeneratorPanel({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        userId: payload.userId,
-        title: payload.title,
+        userId: payload.userId || null,
+        title: payload.customTitle || payload.title,
+        certificateCategory: payload.certificateCategory,
+        recipientName: payload.recipientName || undefined,
+        recipientEmail: payload.recipientEmail || undefined,
+        recipientPhone: payload.recipientPhone || undefined,
+        recipientPhotoUrl: payload.recipientPhotoUrl || undefined,
+        recipientOrganization: payload.recipientOrganization || undefined,
+        educationLevel: payload.educationLevel || undefined,
+        programName: payload.programName || payload.title,
+        fieldOfStudy: payload.fieldOfStudy || (payload.certificateCategory === "EDUCATION" ? "Theology" : undefined),
+        gradeOrHonors: payload.gradeOrHonors || undefined,
+        studyMode: payload.studyMode || undefined,
+        studyStartDate: payload.studyStartDate ? new Date(payload.studyStartDate).toISOString() : null,
+        studyEndDate: payload.studyEndDate ? new Date(payload.studyEndDate).toISOString() : null,
+        completionDate: payload.completionDate ? new Date(payload.completionDate).toISOString() : null,
+        customBody: payload.customBody || undefined,
         certificateNumber: payload.certificateNumber || undefined,
         expiresAt: payload.expiresAt ? new Date(payload.expiresAt).toISOString() : null
       })
@@ -240,27 +289,79 @@ export function CertificateGeneratorPanel({
             </p>
             <p className="mt-1 text-xs text-ink/55">Generate official LETW certificates with public verification links.</p>
           </div>
-          <form className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_1fr_auto]" onSubmit={createCertificate}>
-            <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="userId" required>
-              <option value="">Select member</option>
+          <form className="space-y-4" onSubmit={createCertificate}>
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]">
+              <select
+                className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
+                name="certificateCategory"
+                value={certificateCategory}
+                onChange={(event) => setCertificateCategory(event.target.value as "MINISTRY" | "EDUCATION")}
+              >
+                <option value="MINISTRY">Ministry certificate</option>
+                <option value="EDUCATION">Theology education certificate</option>
+              </select>
+              <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="title" required>
+                {(certificateCategory === "EDUCATION" ? theologyCertificateTypes : certificateTypes).map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+              <Input name="customTitle" placeholder="Custom certificate title optional" />
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+            <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="userId" required={certificateCategory === "MINISTRY"}>
+              <option value="">{certificateCategory === "EDUCATION" ? "Optional LETW member account" : "Select LETW member"}</option>
               {users.map((user) => (
-                <option key={user.id} value={user.id}>
+                <option key={user.id ?? user.email ?? user.name} value={user.id ?? ""}>
                   {displayName(user)} {user.memberProfile?.membershipNumber ? `- ${user.memberProfile.membershipNumber}` : ""}
                 </option>
               ))}
             </select>
-            <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="title" required>
-              {certificateTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <Input name="certificateNumber" placeholder="Certificate no. optional" />
-            <Input name="expiresAt" type="date" />
+              <Input name="recipientName" placeholder={certificateCategory === "EDUCATION" ? "External candidate full name" : "Override holder name optional"} />
+              <Input name="recipientEmail" placeholder="Candidate email optional" type="email" />
+              <Input name="recipientPhone" placeholder="Candidate phone optional" />
+              <Input name="recipientPhotoUrl" placeholder="Candidate photo URL optional" />
+              <Input name="recipientOrganization" placeholder="Candidate church/ministry/school optional" />
+            </div>
+
+            {certificateCategory === "EDUCATION" ? (
+              <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b1b3d]">Theology education details</p>
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <Input name="educationLevel" placeholder="Level, e.g. Diploma" />
+                  <Input name="programName" placeholder="Program name, e.g. LETW School of Theology" />
+                  <Input name="fieldOfStudy" placeholder="Field of study, e.g. Theology" defaultValue="Theology" />
+                  <Input name="gradeOrHonors" placeholder="Grade, honors, class, distinction" />
+                  <Input name="studyMode" placeholder="Study mode, e.g. online / resident" />
+                  <Input name="completionDate" type="date" />
+                  <Input name="studyStartDate" type="date" />
+                  <Input name="studyEndDate" type="date" />
+                  <Input name="certificateNumber" placeholder="Certificate no. optional" />
+                </div>
+                <Textarea className="mt-3" name="customBody" placeholder="Custom education wording, credits, thesis title, authorization note, or academic distinction optional" />
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-3">
+                <Input name="certificateNumber" placeholder="Certificate no. optional" />
+                <Input name="expiresAt" type="date" />
+                <Textarea className="lg:col-span-1" name="customBody" placeholder="Custom certificate wording optional" />
+              </div>
+            )}
+
+            {certificateCategory === "EDUCATION" ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                <Input name="expiresAt" type="date" />
+                <p className="rounded-md bg-mint px-3 py-2 text-xs leading-5 text-moss">
+                  Nonmembers are allowed for theology education certificates. The QR page verifies the live LETW register record, seal number, cryptographic hash, and status.
+                </p>
+              </div>
+            ) : null}
+
             <Button disabled={busy === "create"} type="submit">
               {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
-              Generate
+              Generate secure certificate
             </Button>
           </form>
         </section>
@@ -290,12 +391,19 @@ export function CertificateGeneratorPanel({
             const publicStatus = certificatePublicStatus(certificate).toLowerCase();
             const verifyHref = `/verify/certificate/${certificate.verifyToken}`;
             const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
-            const position = certificate.user.memberProfile?.organizationPosition ?? "LETW Member";
-            const membershipNumber = certificate.user.memberProfile?.membershipNumber ?? "Member number pending";
-            const photoSrc = certificate.user.image || `/api/profile/photo/${certificate.user.id}`;
+            const isEducation = certificate.certificateCategory === "EDUCATION";
+            const position = isEducation
+              ? certificate.educationLevel ?? certificate.programName ?? "Theology Candidate"
+              : certificate.user.memberProfile?.organizationPosition ?? "LETW Member";
+            const membershipNumber = certificate.user.memberProfile?.membershipNumber ?? (isEducation ? "Education candidate" : "Member number pending");
+            const holderName = certificate.recipientName || displayName(certificate.user);
+            const photoSrc = certificate.recipientPhotoUrl || certificate.user.image || (certificate.user.id ? `/api/profile/photo/${certificate.user.id}` : "");
+            const statement = certificate.customBody || (isEducation
+              ? `has successfully completed the required studies for ${certificate.programName || certificate.title} in ${certificate.fieldOfStudy || "Theology"} and is recorded in the LETW educational credential register.`
+              : "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.");
 
             return (
-              <article className="official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft" key={certificate.id}>
+              <article className={`official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft ${isEducation ? "education-certificate" : ""}`} key={certificate.id}>
                 <div className="official-certificate-inner">
                   <div className="certificate-watermark" aria-hidden="true" />
                   <header className="certificate-header">
@@ -314,22 +422,19 @@ export function CertificateGeneratorPanel({
 
                   <div className="certificate-body">
                     <section className="certificate-main-copy">
-                      <p className="certificate-eyebrow">Certificate of LETW Recognition</p>
+                      <p className="certificate-eyebrow">{isEducation ? "LETW School of Theology Academic Credential" : "Certificate of LETW Recognition"}</p>
                       <h3>{certificate.title}</h3>
                       <p className="certificate-intro">This certifies that</p>
-                      <h4>{displayName(certificate.user)}</h4>
+                      <h4>{holderName}</h4>
                       <p className="certificate-position">{position}</p>
-                      <p className="certificate-statement">
-                        has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only
-                        when the QR verification page confirms an active status.
-                      </p>
+                      <p className="certificate-statement">{statement}</p>
                     </section>
 
                     <aside className="certificate-identity">
                       <div className="certificate-photo">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          alt={`${displayName(certificate.user)} profile`}
+                          alt={`${holderName} profile`}
                           src={photoSrc}
                           onError={(event) => {
                             event.currentTarget.style.display = "none";
@@ -352,9 +457,15 @@ export function CertificateGeneratorPanel({
                       <strong>{certificateCode}</strong>
                     </div>
                     <div>
-                      <span>Member number</span>
+                      <span>{isEducation ? "Candidate / registry" : "Member number"}</span>
                       <strong>{membershipNumber}</strong>
                     </div>
+                    {isEducation ? (
+                      <div>
+                        <span>Seal number</span>
+                        <strong>{certificate.sealNumber ?? "Pending seal"}</strong>
+                      </div>
+                    ) : null}
                     <div>
                       <span>Issued</span>
                       <strong>{formatDate(certificate.issuedAt)}</strong>
@@ -375,7 +486,7 @@ export function CertificateGeneratorPanel({
                       <Stamp className="h-5 w-5" />
                       <div>
                         <p>Credential code</p>
-                        <span>{certificateCode}</span>
+                        <span>{certificate.sealNumber ?? certificateCode}</span>
                       </div>
                     </div>
                     <div className="certificate-qr">

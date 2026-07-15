@@ -4187,10 +4187,28 @@ model MemberOnboardingItem {
 
 model MemberCertificationBadge {
   id                String    @id @default(cuid())
-  userId            String
+  userId            String?
   title             String
   issuer            String    @default("Light Encounter Tabernacle Worldwide")
   certificateNumber String?   @unique
+  certificateCategory String  @default("MINISTRY")
+  recipientName     String?
+  recipientEmail    String?
+  recipientPhone    String?
+  recipientPhotoUrl String?
+  recipientOrganization String?
+  educationLevel    String?
+  programName       String?
+  fieldOfStudy      String?
+  gradeOrHonors     String?
+  studyMode         String?
+  studyStartDate    DateTime?
+  studyEndDate      DateTime?
+  completionDate    DateTime?
+  customBody        String?   @db.Text
+  sealNumber        String?   @unique
+  credentialHash    String?
+  digitalSignature  String?
   verifyToken       String    @unique
   status            String    @default("ACTIVE")
   issuedAt          DateTime  @default(now())
@@ -4201,6 +4219,10 @@ model MemberCertificationBadge {
   updatedAt         DateTime  @updatedAt
 
   @@index([userId, status, issuedAt])
+  @@index([certificateCategory, status, issuedAt])
+  @@index([educationLevel, status])
+  @@index([recipientEmail, status])
+  @@index([sealNumber])
   @@index([status, expiresAt])
 }
 

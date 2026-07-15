@@ -55,7 +55,7 @@ export default async function CertificatesPage() {
   const certificateUsers = await prisma.user.findMany({
     where: {
       id: {
-        in: Array.from(new Set(certificateRows.map((certificate) => certificate.userId)))
+        in: Array.from(new Set(certificateRows.map((certificate) => certificate.userId).filter(Boolean))) as string[]
       }
     },
     select: {
@@ -75,11 +75,17 @@ export default async function CertificatesPage() {
   const usersById = new Map(certificateUsers.map((user) => [user.id, user]));
   const certificates = certificateRows.map((certificate) => ({
     ...certificate,
-    user: usersById.get(certificate.userId) ?? {
+    user: certificate.userId ? usersById.get(certificate.userId) ?? {
       id: certificate.userId,
       name: null,
       email: null,
       image: null,
+      memberProfile: null
+    } : {
+      id: null,
+      name: certificate.recipientName,
+      email: certificate.recipientEmail,
+      image: certificate.recipientPhotoUrl,
       memberProfile: null
     }
   }));

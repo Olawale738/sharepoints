@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
+import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 
@@ -25,9 +26,12 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(404, "Certificate not found.");
     }
 
-    const isAdmin = await hasAnyWorkspaceAdminRole(user.id);
+    const [isAdmin, authority] = await Promise.all([
+      hasAnyWorkspaceAdminRole(user.id),
+      getOfficialIssuanceAuthority(user.id)
+    ]);
 
-    if (!isAdmin && certificate.userId !== user.id) {
+    if (!isAdmin && !authority.canIssueCertificates && certificate.userId !== user.id) {
       throw new ApiError(403, "You cannot view this certificate QR code.");
     }
 

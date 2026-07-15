@@ -16,7 +16,7 @@ export default async function CertificateVerificationPage(context: PageContext) 
   const certificate = await prisma.memberCertificationBadge.findUnique({
     where: { verifyToken: token }
   });
-  const user = certificate
+  const user = certificate?.userId
     ? await prisma.user.findUnique({
         where: { id: certificate.userId },
         select: {
@@ -35,6 +35,10 @@ export default async function CertificateVerificationPage(context: PageContext) 
     : null;
   const valid = Boolean(certificate && certificateIsLive(certificate));
   const statusLabel = certificate ? certificatePublicStatus(certificate).toLowerCase() : "not found";
+  const holderName = user?.name ?? certificate?.recipientName ?? "LETW Certificate Holder";
+  const holderPosition = user?.memberProfile?.organizationPosition ?? certificate?.educationLevel ?? certificate?.programName ?? "Certificate holder";
+  const holderNumber = user?.memberProfile?.membershipNumber ?? (certificate?.certificateCategory === "EDUCATION" ? "Education candidate" : "Pending");
+  const photoSrc = certificate?.recipientPhotoUrl || (user && certificate ? `/api/profile/photo/${user.id}?certificateToken=${encodeURIComponent(certificate.verifyToken)}` : null);
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10">
@@ -75,20 +79,32 @@ export default async function CertificateVerificationPage(context: PageContext) 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-md bg-paper p-3">
                     <p className="text-xs uppercase tracking-wide text-ink/45">Certificate holder</p>
-                    <p className="mt-1 font-semibold text-ink">{valid ? user?.name ?? "LETW Member" : "Hidden for inactive certificate"}</p>
+                    <p className="mt-1 font-semibold text-ink">{valid ? holderName : "Hidden for inactive certificate"}</p>
                   </div>
                   <div className="rounded-md bg-paper p-3">
-                    <p className="text-xs uppercase tracking-wide text-ink/45">Member number</p>
-                    <p className="mt-1 font-semibold text-ink">{valid ? user?.memberProfile?.membershipNumber ?? "Pending" : "Hidden"}</p>
+                    <p className="text-xs uppercase tracking-wide text-ink/45">{certificate.certificateCategory === "EDUCATION" ? "Candidate register" : "Member number"}</p>
+                    <p className="mt-1 font-semibold text-ink">{valid ? holderNumber : "Hidden"}</p>
                   </div>
                   <div className="rounded-md bg-paper p-3">
-                    <p className="text-xs uppercase tracking-wide text-ink/45">Position</p>
-                    <p className="mt-1 font-semibold text-ink">{valid ? user?.memberProfile?.organizationPosition ?? "LETW Member" : "Hidden"}</p>
+                    <p className="text-xs uppercase tracking-wide text-ink/45">{certificate.certificateCategory === "EDUCATION" ? "Program / level" : "Position"}</p>
+                    <p className="mt-1 font-semibold text-ink">{valid ? holderPosition : "Hidden"}</p>
                   </div>
                   <div className="rounded-md bg-paper p-3">
                     <p className="text-xs uppercase tracking-wide text-ink/45">Certificate number</p>
                     <p className="mt-1 font-semibold text-ink">{certificate.certificateNumber ?? "Pending"}</p>
                   </div>
+                  {certificate.certificateCategory === "EDUCATION" ? (
+                    <>
+                      <div className="rounded-md bg-paper p-3">
+                        <p className="text-xs uppercase tracking-wide text-ink/45">Seal number</p>
+                        <p className="mt-1 font-semibold text-ink">{certificate.sealNumber ?? "Pending"}</p>
+                      </div>
+                      <div className="rounded-md bg-paper p-3">
+                        <p className="text-xs uppercase tracking-wide text-ink/45">Credential hash</p>
+                        <p className="mt-1 break-all font-semibold text-ink">{valid ? certificate.credentialHash?.slice(0, 24).toUpperCase() ?? "Pending" : "Hidden"}</p>
+                      </div>
+                    </>
+                  ) : null}
                   <div className="rounded-md bg-paper p-3">
                     <p className="text-xs uppercase tracking-wide text-ink/45">Issued</p>
                     <p className="mt-1 font-semibold text-ink">{formatDate(certificate.issuedAt)}</p>
@@ -101,13 +117,13 @@ export default async function CertificateVerificationPage(context: PageContext) 
               </div>
 
               <div className="rounded-lg border border-[#d4af37]/40 bg-[#fffaf0] p-4 text-center">
-                {valid && user ? (
+                {valid && photoSrc ? (
                   <div className="mx-auto mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#d4af37] bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      alt={`${user.name ?? "LETW member"} profile`}
+                      alt={`${holderName} profile`}
                       className="h-full w-full object-cover"
-                      src={`/api/profile/photo/${user.id}?certificateToken=${encodeURIComponent(certificate.verifyToken)}`}
+                      src={photoSrc}
                     />
                   </div>
                 ) : null}

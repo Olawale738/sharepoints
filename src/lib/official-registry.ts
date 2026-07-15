@@ -141,12 +141,16 @@ export async function lookupOfficialSeal(rawCode: string, origin?: string | null
       issuedAt: true,
       expiresAt: true,
       revokedAt: true,
-      userId: true
+      userId: true,
+      recipientName: true,
+      recipientEmail: true,
+      sealNumber: true,
+      certificateCategory: true
     }
   });
   if (certificate) {
     const active = certificateActive(certificate);
-    const owner = active
+    const owner = active && certificate.userId
       ? await prisma.user.findUnique({ where: { id: certificate.userId }, select: { name: true, email: true } })
       : null;
     return {
@@ -154,10 +158,10 @@ export async function lookupOfficialSeal(rawCode: string, origin?: string | null
       kind: "CERTIFICATE",
       recordId: certificate.id,
       title: certificate.title,
-      sealNumber: certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`,
+      sealNumber: certificate.sealNumber ?? certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`,
       status: certificate.status,
       active,
-      ownerName: active ? owner?.name ?? owner?.email ?? null : null,
+      ownerName: active ? owner?.name ?? owner?.email ?? certificate.recipientName ?? certificate.recipientEmail ?? null : null,
       issuedAt: certificate.issuedAt,
       expiresAt: certificate.expiresAt,
       revokedAt: certificate.revokedAt,
@@ -375,7 +379,7 @@ export async function officialSealRegistrySummary() {
     prisma.leadershipHandover.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.digitalSignature.findMany({ orderBy: { createdAt: "desc" }, take: 50 })
   ]);
-  const userIds = Array.from(new Set([...certificates.map((item) => item.userId), ...cards.map((item) => item.userId)].filter(Boolean)));
+  const userIds = Array.from(new Set([...certificates.map((item) => item.userId), ...cards.map((item) => item.userId)].filter(Boolean))) as string[];
   const users = userIds.length
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
@@ -404,11 +408,11 @@ export async function officialSealRegistrySummary() {
       kind: "CERTIFICATE" as const,
       recordId: certificate.id,
       title: certificate.title,
-      sealNumber: certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`,
+      sealNumber: certificate.sealNumber ?? certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`,
       status: certificate.status,
       active: certificateActive(certificate),
       ownerName: certificateActive(certificate)
-        ? usersById.get(certificate.userId)?.name ?? usersById.get(certificate.userId)?.email ?? null
+        ? (certificate.userId ? usersById.get(certificate.userId)?.name ?? usersById.get(certificate.userId)?.email : null) ?? certificate.recipientName ?? certificate.recipientEmail ?? null
         : null,
       issuedAt: certificate.issuedAt,
       expiresAt: certificate.expiresAt,
