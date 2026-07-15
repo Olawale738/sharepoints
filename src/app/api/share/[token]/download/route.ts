@@ -4,7 +4,14 @@ import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanDownloadFile, ensureCanSeeFile, hasActiveFileDownloadGrant, isPresidentDocumentAuthority } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
-import { getProtectedDownloadResponse, getProtectedInlineResponse } from "@/lib/storage";
+import { getObjectBuffer, getProtectedDownloadResponse, getProtectedInlineResponse } from "@/lib/storage";
+import {
+  createWatermarkedPdf,
+  getViewerWatermark,
+  isPdfDocument,
+  protectedWatermarkHeaders,
+  watermarkedDownloadHeaders
+} from "@/lib/watermark";
 
 type RouteContext = {
   params: Promise<{ token: string }>;
@@ -90,11 +97,50 @@ export async function GET(request: Request, context: RouteContext) {
 
     if ((await isPresidentDocumentAuthority(session.user.id)) || (await hasActiveFileDownloadGrant(session.user.id, shareLink.file.id))) {
       await ensureCanDownloadFile(session.user.id, shareLink.file);
-      return getProtectedDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+      const watermark = await getViewerWatermark(session.user.id);
+
+      if (isPdfDocument(shareLink.file.fileName, shareLink.file.fileType)) {
+        const buffer = await getObjectBuffer(shareLink.file.storageKey);
+        const watermarked = await createWatermarkedPdf({ buffer, fileName: shareLink.file.fileName, watermark });
+        return new Response(watermarked, {
+          headers: watermarkedDownloadHeaders({
+            fileName: shareLink.file.fileName,
+            contentType: "application/pdf",
+            bodyLength: watermarked.length,
+            disposition: "attachment",
+            watermark
+          })
+        });
+      }
+
+      const response = await getProtectedDownloadResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+      for (const [key, value] of Object.entries(protectedWatermarkHeaders(watermark))) {
+        response.headers.set(key, value);
+      }
+      return response;
     }
 
     await ensureCanSeeFile(session.user.id, shareLink.file);
-    return getProtectedInlineResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+    const watermark = await getViewerWatermark(session.user.id);
+    if (isPdfDocument(shareLink.file.fileName, shareLink.file.fileType)) {
+      const buffer = await getObjectBuffer(shareLink.file.storageKey);
+      const watermarked = await createWatermarkedPdf({ buffer, fileName: shareLink.file.fileName, watermark });
+      return new Response(watermarked, {
+        headers: watermarkedDownloadHeaders({
+          fileName: shareLink.file.fileName,
+          contentType: "application/pdf",
+          bodyLength: watermarked.length,
+          disposition: "inline",
+          watermark
+        })
+      });
+    }
+
+    const response = await getProtectedInlineResponse(shareLink.file.storageKey, shareLink.file.fileName, shareLink.file.fileType);
+    for (const [key, value] of Object.entries(protectedWatermarkHeaders(watermark))) {
+      response.headers.set(key, value);
+    }
+    return response;
   } catch (error) {
     return handleRouteError(error);
   }

@@ -22,7 +22,24 @@ type Option = { id: string; name?: string | null; email?: string | null; fileNam
 type PrayerAssignment = { id: string; title: string; prayerPoint: string; status: string; priority: string; dueAt?: string | null; assignedToUserId?: string | null; assignedWorkspaceId?: string | null; testimony?: string | null; createdAt: string };
 type CalendarConflict = { id: string; title: string; details: string; conflictType: string; severity: string; status: string; startsAt: string; endsAt: string };
 type ExternalGuest = { id: string; name: string; email: string; guestType: string; purpose: string; status: string; workspaceId?: string | null; fileId?: string | null; token: string; expiresAt: string; revokedAt?: string | null };
-type Delegation = { id: string; delegatedToId: string; status: string; expiresAt: string; canIssueCertificates: boolean; canIssueIdCards: boolean; canIssueLetters: boolean; canManagePrayerAssignments: boolean; canResolveCalendarConflicts: boolean; canManageExternalGuests: boolean; canRunSystemCleanup: boolean; reason?: string | null };
+type Delegation = {
+  id: string;
+  delegatedToId: string;
+  status: string;
+  expiresAt: string;
+  canIssueCertificates: boolean;
+  canIssueIdCards: boolean;
+  canIssueLetters: boolean;
+  canManagePrayerAssignments: boolean;
+  canResolveCalendarConflicts: boolean;
+  canManageExternalGuests: boolean;
+  canRunSystemCleanup: boolean;
+  canEmergencySuccession: boolean;
+  emergencyOnly: boolean;
+  emergencyActivatedAt?: string | null;
+  emergencyReason?: string | null;
+  reason?: string | null;
+};
 type CleanupPreview = { workspaceAccess: number; fileAccess: number; shareLinks: number; issuanceGrants: number; oldDevices: number; delegationsExpired: number; guestsExpired: number; staleAccessRequests: number; total: number };
 type CenterData = {
   users: Option[];
@@ -36,6 +53,7 @@ type CenterData = {
   externalGuests: ExternalGuest[];
   delegations: Delegation[];
   cleanupPreview: CleanupPreview;
+  currentUserId: string;
 };
 
 const emptyData: CenterData = {
@@ -49,6 +67,7 @@ const emptyData: CenterData = {
   calendarConflicts: [],
   externalGuests: [],
   delegations: [],
+  currentUserId: "",
   cleanupPreview: {
     workspaceAccess: 0,
     fileAccess: 0,
@@ -113,7 +132,9 @@ export function ExecutiveOperationsPanel() {
     canManagePrayerAssignments: true,
     canResolveCalendarConflicts: true,
     canManageExternalGuests: true,
-    canRunSystemCleanup: false
+    canRunSystemCleanup: false,
+    canEmergencySuccession: false,
+    emergencyOnly: false
   });
 
   const pendingPrayer = useMemo(() => data.prayerAssignments.filter((item) => !["COMPLETED", "TESTIMONY_RECORDED", "CANCELLED"].includes(item.status)).length, [data.prayerAssignments]);
@@ -187,6 +208,16 @@ export function ExecutiveOperationsPanel() {
       ...delegationForm,
       expiresAt: toIso(delegationForm.expiresAt)
     }, "President delegation granted.");
+  }
+
+  async function activateEmergencyDelegation(id: string) {
+    const reason = window.prompt("Enter the emergency reason. This will unlock the pre-approved emergency delegation and create an audit record.");
+    if (!reason?.trim()) return;
+    await request("PATCH", {
+      entity: "PRESIDENT_DELEGATION_ACTIVATE",
+      id,
+      reason: reason.trim()
+    }, "Emergency succession activated.");
   }
 
   return (
@@ -331,18 +362,26 @@ export function ExecutiveOperationsPanel() {
               ["canManagePrayerAssignments", "Manage prayer assignments"],
               ["canResolveCalendarConflicts", "Resolve calendar conflicts"],
               ["canManageExternalGuests", "Manage external guests"],
-              ["canRunSystemCleanup", "Run cleanup"]
+              ["canRunSystemCleanup", "Run cleanup"],
+              ["canEmergencySuccession", "Emergency succession"],
+              ["emergencyOnly", "Activate only in emergency"]
             ].map(([key, label]) => (
               <label className="flex items-center gap-2 rounded-md border border-ink/10 bg-paper px-3 py-2 text-sm" key={key}>
                 <input
                   checked={Boolean(delegationForm[key as keyof typeof delegationForm])}
-                  onChange={(event) => setDelegationForm({ ...delegationForm, [key]: event.target.checked })}
+                  onChange={(event) => setDelegationForm({
+                    ...delegationForm,
+                    [key]: event.target.checked,
+                    ...(key === "emergencyOnly" && event.target.checked ? { canEmergencySuccession: true } : {}),
+                    ...(key === "canEmergencySuccession" && !event.target.checked ? { emergencyOnly: false } : {})
+                  })}
                   type="checkbox"
                 />
                 {label}
               </label>
             ))}
           </div>
+          <p className="mt-2 text-xs leading-5 text-ink/55">Emergency-only powers stay locked until the trusted leader activates the protocol with a written reason.</p>
           <Button className="mt-3" disabled={Boolean(busy) || !delegationForm.delegatedToId || !delegationForm.expiresAt} onClick={() => void createDelegation()}>Grant temporary delegation</Button>
           <RecordList empty="No delegations yet." loading={loading}>
             {data.delegations.slice(0, 8).map((item) => (
@@ -361,8 +400,14 @@ export function ExecutiveOperationsPanel() {
                   item.canManagePrayerAssignments ? "prayer" : "",
                   item.canResolveCalendarConflicts ? "calendar" : "",
                   item.canManageExternalGuests ? "guests" : "",
-                  item.canRunSystemCleanup ? "cleanup" : ""
+                  item.canRunSystemCleanup ? "cleanup" : "",
+                  item.canEmergencySuccession ? "emergency succession" : "",
+                  item.emergencyOnly ? "emergency-only" : "",
+                  item.emergencyActivatedAt ? "activated" : ""
                 ].filter(Boolean).join(", ") || "No active permissions"}</p>
+                {item.canEmergencySuccession && item.emergencyOnly && !item.emergencyActivatedAt && item.delegatedToId === data.currentUserId ? (
+                  <Button className="mt-3 mr-2" onClick={() => void activateEmergencyDelegation(item.id)}>Activate emergency</Button>
+                ) : null}
                 <Button className="mt-3" variant="danger" onClick={() => void request("DELETE", { entity: "PRESIDENT_DELEGATION", id: item.id }, "President delegation revoked.")}>Revoke delegation</Button>
               </div>
             ))}

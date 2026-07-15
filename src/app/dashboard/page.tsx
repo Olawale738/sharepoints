@@ -29,6 +29,7 @@ import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command
 import { DashboardGovernanceCenter } from "@/components/dashboard/dashboard-governance-center";
 import { OrganizationChatPanel } from "@/components/dashboard/organization-chat-panel";
 import { PersonalizedHome } from "@/components/dashboard/personalized-home";
+import { ReadConfirmationInbox } from "@/components/dashboard/read-confirmation-inbox";
 import { UserAccessPassport } from "@/components/dashboard/user-access-passport";
 import { WorkspaceActions } from "@/components/dashboard/workspace-actions";
 import { Badge } from "@/components/ui/badge";
@@ -930,6 +931,8 @@ export default async function DashboardPage() {
           duties: personalDuties.length
         }}
       />
+
+      <ReadConfirmationInbox />
 
       {isGlobalAdmin ? (
         <section className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">

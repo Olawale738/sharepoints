@@ -492,6 +492,12 @@ export default async function AdminControlCenterPage() {
           icon: FileClock
         },
         {
+          href: "/dashboard/admin/read-confirmations",
+          label: "Read confirmations",
+          detail: "Require leaders and members to confirm they opened and read files, policies, announcements, letters, and reports.",
+          icon: ClipboardCheck
+        },
+        {
           href: "/dashboard/admin/notifications",
           label: "Notification center",
           detail: "Broadcast in-app, email, and configured WhatsApp messages to controlled audiences.",

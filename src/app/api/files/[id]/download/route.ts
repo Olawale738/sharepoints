@@ -4,7 +4,14 @@ import { ApiError, handleRouteError } from "@/lib/api";
 import { ensureCanDownloadFile } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
-import { getProtectedDownloadResponse } from "@/lib/storage";
+import { getObjectBuffer, getProtectedDownloadResponse } from "@/lib/storage";
+import {
+  createWatermarkedPdf,
+  getViewerWatermark,
+  isPdfDocument,
+  protectedWatermarkHeaders,
+  watermarkedDownloadHeaders
+} from "@/lib/watermark";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -64,7 +71,28 @@ export async function GET(request: Request, context: RouteContext) {
       throw new ApiError(423, "This document was blocked by security screening.");
     }
 
-    return getProtectedDownloadResponse(file.storageKey, file.fileName, file.fileType);
+    const watermark = await getViewerWatermark(session.user.id);
+
+    if (isPdfDocument(file.fileName, file.fileType)) {
+      const buffer = await getObjectBuffer(file.storageKey);
+      const watermarked = await createWatermarkedPdf({ buffer, fileName: file.fileName, watermark });
+
+      return new Response(watermarked, {
+        headers: watermarkedDownloadHeaders({
+          fileName: file.fileName,
+          contentType: "application/pdf",
+          bodyLength: watermarked.length,
+          disposition: "attachment",
+          watermark
+        })
+      });
+    }
+
+    const response = await getProtectedDownloadResponse(file.storageKey, file.fileName, file.fileType);
+    for (const [key, value] of Object.entries(protectedWatermarkHeaders(watermark))) {
+      response.headers.set(key, value);
+    }
+    return response;
   } catch (error) {
     return handleRouteError(error);
   }

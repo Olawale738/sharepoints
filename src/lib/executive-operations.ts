@@ -27,7 +27,8 @@ type DelegationPermission =
   | "canManagePrayerAssignments"
   | "canResolveCalendarConflicts"
   | "canManageExternalGuests"
-  | "canRunSystemCleanup";
+  | "canRunSystemCleanup"
+  | "canEmergencySuccession";
 
 type CalendarItem = {
   kind: string;
@@ -74,6 +75,9 @@ export async function hasActivePresidentDelegation(userId: string, permission: D
       revokedAt: null,
       startsAt: { lte: now },
       expiresAt: { gt: now },
+      ...(permission === "canEmergencySuccession"
+        ? {}
+        : { OR: [{ emergencyOnly: false }, { emergencyActivatedAt: { not: null } }] }),
       [permission]: true
     },
     select: { id: true }
@@ -445,10 +449,13 @@ export async function createPresidentDelegation(actorId: string, input: {
   canResolveCalendarConflicts: boolean;
   canManageExternalGuests: boolean;
   canRunSystemCleanup: boolean;
+  canEmergencySuccession: boolean;
+  emergencyOnly?: boolean;
   reason?: string | null;
 }) {
   if (!(await isPresidentAuthority(actorId))) throw new ApiError(403, "Only the LETW president can delegate presidential powers.");
   if (input.expiresAt <= new Date()) throw new ApiError(422, "Delegation expiry must be in the future.");
+  if (input.emergencyOnly && !input.canEmergencySuccession) throw new ApiError(422, "Emergency-only delegation must include emergency succession permission.");
   const target = await prisma.user.findFirst({
     where: {
       id: input.delegatedToId,
@@ -475,11 +482,13 @@ export async function createPresidentDelegation(actorId: string, input: {
       canResolveCalendarConflicts: input.canResolveCalendarConflicts,
       canManageExternalGuests: input.canManageExternalGuests,
       canRunSystemCleanup: input.canRunSystemCleanup,
+      canEmergencySuccession: input.canEmergencySuccession,
+      emergencyOnly: Boolean(input.emergencyOnly),
       reason: input.reason ?? null
     }
   });
 
-  if (input.canIssueCertificates || input.canIssueIdCards || input.canIssueLetters) {
+  if (!input.emergencyOnly && (input.canIssueCertificates || input.canIssueIdCards || input.canIssueLetters)) {
     await prisma.officialIssuanceGrant.upsert({
       where: { userId: target.id },
       create: {
@@ -506,8 +515,10 @@ export async function createPresidentDelegation(actorId: string, input: {
 
   await notifyUsers([target.id], {
     type: "SYSTEM_ALERT",
-    title: "President delegation granted",
-    body: "You have temporary LETW authority for approved executive actions.",
+    title: input.emergencyOnly ? "Emergency succession pre-approved" : "President delegation granted",
+    body: input.emergencyOnly
+      ? "You are pre-approved for emergency LETW authority. Powers remain locked until emergency activation is recorded."
+      : "You have temporary LETW authority for approved executive actions.",
     href: "/dashboard/admin/executive-operations",
     priority: NotificationPriority.HIGH
   }).catch(() => null);
@@ -515,7 +526,82 @@ export async function createPresidentDelegation(actorId: string, input: {
     userId: actorId,
     action: activityActions.presidentDelegationCreated,
     targetId: delegation.id,
-    metadata: { delegatedToId: target.id, expiresAt: delegation.expiresAt.toISOString() }
+    metadata: { delegatedToId: target.id, expiresAt: delegation.expiresAt.toISOString(), emergencyOnly: delegation.emergencyOnly, canEmergencySuccession: delegation.canEmergencySuccession }
+  });
+  return delegation;
+}
+
+export async function activateEmergencySuccession(actorId: string, id: string, reason: string) {
+  const now = new Date();
+  const presidentActor = await isPresidentAuthority(actorId);
+  const existing = await prisma.presidentDelegation.findFirst({
+    where: {
+      id,
+      ...(presidentActor ? {} : { delegatedToId: actorId }),
+      status: PresidentDelegationStatus.ACTIVE,
+      revokedAt: null,
+      startsAt: { lte: now },
+      expiresAt: { gt: now },
+      canEmergencySuccession: true
+    },
+    select: {
+      id: true,
+      delegatedToId: true,
+      grantedById: true,
+      expiresAt: true,
+      canIssueCertificates: true,
+      canIssueIdCards: true,
+      canIssueLetters: true
+    }
+  });
+  if (!existing) throw new ApiError(404, "No active emergency succession delegation was found for this user.");
+
+  const delegation = await prisma.presidentDelegation.update({
+    where: { id },
+    data: {
+      emergencyActivatedAt: now,
+      emergencyActivatedById: actorId,
+      emergencyReason: reason
+    }
+  });
+
+  if (existing.canIssueCertificates || existing.canIssueIdCards || existing.canIssueLetters) {
+    await prisma.officialIssuanceGrant.upsert({
+      where: { userId: existing.delegatedToId },
+      create: {
+        userId: existing.delegatedToId,
+        grantedById: existing.grantedById,
+        canIssueCertificates: existing.canIssueCertificates,
+        canIssueIdCards: existing.canIssueIdCards,
+        canIssueLetters: existing.canIssueLetters,
+        expiresAt: existing.expiresAt,
+        reason: `Emergency succession activated: ${reason}`
+      },
+      update: {
+        grantedById: existing.grantedById,
+        canIssueCertificates: existing.canIssueCertificates,
+        canIssueIdCards: existing.canIssueIdCards,
+        canIssueLetters: existing.canIssueLetters,
+        expiresAt: existing.expiresAt,
+        revokedAt: null,
+        revokedById: null,
+        reason: `Emergency succession activated: ${reason}`
+      }
+    });
+  }
+
+  await notifyUsers(Array.from(new Set([existing.delegatedToId, existing.grantedById])), {
+    type: "SYSTEM_ALERT",
+    title: "Emergency succession activated",
+    body: "A pre-approved LETW emergency succession delegation has been activated and audited.",
+    href: "/dashboard/admin/executive-operations",
+    priority: NotificationPriority.URGENT
+  }).catch(() => null);
+  await logActivity({
+    userId: actorId,
+    action: activityActions.presidentEmergencySuccessionActivated,
+    targetId: id,
+    metadata: { delegatedToId: existing.delegatedToId, reason }
   });
   return delegation;
 }
@@ -533,13 +619,18 @@ export async function revokePresidentDelegation(actorId: string, id: string) {
       status: PresidentDelegationStatus.ACTIVE,
       revokedAt: null,
       expiresAt: { gt: new Date() },
-      OR: [{ canIssueCertificates: true }, { canIssueIdCards: true }, { canIssueLetters: true }]
+      OR: [{ emergencyOnly: false }, { emergencyActivatedAt: { not: null } }],
+      AND: [
+        {
+          OR: [{ canIssueCertificates: true }, { canIssueIdCards: true }, { canIssueLetters: true }]
+        }
+      ]
     },
     select: { id: true }
   });
   if (!activeIssuingDelegation) {
     const grant = await prisma.officialIssuanceGrant.findUnique({ where: { userId: delegation.delegatedToId } });
-    if (grant?.reason?.startsWith("President delegation:")) {
+    if (grant?.reason?.startsWith("President delegation:") || grant?.reason?.startsWith("Emergency succession activated:")) {
       await prisma.officialIssuanceGrant.update({
         where: { userId: delegation.delegatedToId },
         data: { revokedAt: new Date(), revokedById: actorId, canIssueCertificates: false, canIssueIdCards: false, canIssueLetters: false }

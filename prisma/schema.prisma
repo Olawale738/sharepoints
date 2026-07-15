@@ -567,6 +567,14 @@ enum DocumentExpiryStatus {
   ARCHIVED
 }
 
+enum ReadRequirementTargetType {
+  FILE
+  POLICY
+  ANNOUNCEMENT
+  OFFICIAL_LETTER
+  MONTHLY_REPORT
+}
+
 enum NewsAudienceType {
   LETW_WIDE
   ORGANIZATION_UNIT
@@ -3557,6 +3565,11 @@ model PresidentDelegation {
   canResolveCalendarConflicts Boolean                   @default(false)
   canManageExternalGuests     Boolean                   @default(false)
   canRunSystemCleanup         Boolean                   @default(false)
+  canEmergencySuccession      Boolean                   @default(false)
+  emergencyOnly               Boolean                   @default(false)
+  emergencyActivatedAt        DateTime?
+  emergencyActivatedById      String?
+  emergencyReason             String?                   @db.Text
   reason                      String?                   @db.Text
   startsAt                    DateTime                  @default(now())
   expiresAt                   DateTime
@@ -3834,6 +3847,43 @@ model PolicyAssignment {
   @@unique([policyId, userId])
   @@index([userId, acknowledgedAt, dueAt])
   @@index([policyId, acknowledgedAt])
+}
+
+model DocumentReadRequirement {
+  id              String                    @id @default(cuid())
+  targetType      ReadRequirementTargetType
+  targetId        String
+  workspaceId     String?
+  title           String
+  instructions    String?                   @db.Text
+  audienceLabel   String                    @default("Selected LETW members")
+  audienceUserIds Json
+  dueAt           DateTime?
+  active          Boolean                   @default(true)
+  requiredById    String
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  @@unique([targetType, targetId])
+  @@index([workspaceId, active, dueAt])
+  @@index([requiredById, createdAt])
+  @@index([targetType, active])
+}
+
+model DocumentReadReceipt {
+  id            String   @id @default(cuid())
+  requirementId String
+  userId        String
+  signatureName String?
+  ipAddress     String?
+  userAgent     String?
+  confirmedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([requirementId, userId])
+  @@index([userId, confirmedAt])
+  @@index([requirementId, confirmedAt])
 }
 
 model LeaveRequest {

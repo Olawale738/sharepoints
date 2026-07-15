@@ -4,6 +4,7 @@ import { z } from "zod";
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import {
+  activateEmergencySuccession,
   createExternalGuest,
   createPrayerAssignment,
   createPresidentDelegation,
@@ -65,6 +66,8 @@ const postSchema = z.discriminatedUnion("entity", [
     canResolveCalendarConflicts: z.boolean().default(false),
     canManageExternalGuests: z.boolean().default(false),
     canRunSystemCleanup: z.boolean().default(false),
+    canEmergencySuccession: z.boolean().default(false),
+    emergencyOnly: z.boolean().default(false),
     reason: z.string().trim().max(2000).nullable().optional()
   }),
   z.object({ entity: z.literal("SYSTEM_CLEANUP"), confirmation: z.literal("CLEAN STALE ACCESS") })
@@ -82,6 +85,11 @@ const patchSchema = z.discriminatedUnion("entity", [
     entity: z.literal("CALENDAR_CONFLICT"),
     id: z.string().cuid(),
     status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED", "DISMISSED"])
+  }),
+  z.object({
+    entity: z.literal("PRESIDENT_DELEGATION_ACTIVATE"),
+    id: z.string().cuid(),
+    reason: z.string().trim().min(5).max(2000)
   })
 ]);
 
@@ -110,7 +118,8 @@ export async function GET() {
   try {
     const user = await requireUser();
     await ensureExecutiveAccess(user.id);
-    return ok(await listExecutiveOperationsCenter());
+    const center = await listExecutiveOperationsCenter();
+    return ok({ ...center, currentUserId: user.id });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -172,6 +181,9 @@ export async function PATCH(request: Request) {
         testimony: data.testimony
       });
       return ok({ assignment });
+    }
+    if (data.entity === "PRESIDENT_DELEGATION_ACTIVATE") {
+      return ok({ delegation: await activateEmergencySuccession(user.id, data.id, data.reason) });
     }
     await ensureActionAccess(user.id, "canResolveCalendarConflicts", "You cannot resolve calendar conflicts.");
     const conflict = await updateCalendarConflict(user.id, data.id, data.status as CalendarConflictStatus);
