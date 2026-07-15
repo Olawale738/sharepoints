@@ -23,6 +23,7 @@ import { TaskStatus, WorkspaceRole } from "@prisma/client";
 
 import { auth } from "@/auth";
 import { AdminUsersPanel } from "@/components/dashboard/admin-users-panel";
+import { ClearOrganizationActivityButton } from "@/components/dashboard/clear-organization-activity-button";
 import { CompanyInvitationsPanel } from "@/components/dashboard/company-invitations-panel";
 import { DashboardCommandCenter } from "@/components/dashboard/dashboard-command-center";
 import { DashboardGovernanceCenter } from "@/components/dashboard/dashboard-governance-center";
@@ -1271,9 +1272,12 @@ export default async function DashboardPage() {
           ) : null}
 
           <div className="rounded-lg border border-ink/10 bg-white p-4">
-            <div className="mb-4 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-moss" />
-              <h2 className="text-sm font-semibold">Recent activity</h2>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-moss" />
+                <h2 className="text-sm font-semibold">Recent activity</h2>
+              </div>
+              {isGlobalAdmin ? <ClearOrganizationActivityButton /> : null}
             </div>
             {recentActivities.length === 0 ? (
               <p className="text-sm text-ink/55">No activity yet.</p>
