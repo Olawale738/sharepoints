@@ -430,24 +430,94 @@ export async function GET(request: Request, context: RouteContext) {
       });
     });
 
-    page.drawText("Olawale N Sanni", { x: 98, y: 80, size: 22, font: script, color: navy });
-    page.drawLine({ start: { x: 86, y: 74 }, end: { x: 276, y: 74 }, thickness: 0.7, color: navy });
-    page.drawText("President / Digitally Authorized Signature", { x: 96, y: 58, size: 8, font: sansBold, color: muted });
+    page.drawText("Olawale N Sanni", { x: 98, y: 82, size: 22, font: script, color: navy });
+    page.drawLine({ start: { x: 86, y: 76 }, end: { x: 276, y: 76 }, thickness: 0.7, color: navy });
+    page.drawText("President / Digitally Authorized Signature", { x: 96, y: 61, size: 8, font: sansBold, color: muted });
     const secondName = certificate.secondSignatoryName ?? (isEducation ? "Registrar" : isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer");
     const secondTitle = certificate.secondSignatoryTitle ?? (isEducation ? "Registrar / Academic Dean / Rector" : isMarriage ? "Officiating Minister" : "Second Signatory");
     if (secondSignature) {
-      page.drawImage(secondSignature, { x: 316, y: 78, width: 140, height: 34, opacity: 0.95 });
+      page.drawImage(secondSignature, { x: 316, y: 80, width: 140, height: 34, opacity: 0.95 });
     } else {
-      page.drawText(secondName, { x: 318, y: 80, size: 18, font: script, color: navy });
+      drawFittedText({
+        page,
+        text: secondName,
+        x: 318,
+        y: 82,
+        maxWidth: 180,
+        font: script,
+        preferredSize: 18,
+        minimumSize: 11,
+        color: navy
+      });
     }
-    page.drawLine({ start: { x: 306, y: 74 }, end: { x: 506, y: 74 }, thickness: 0.7, color: navy });
-    page.drawText(secondTitle, { x: 318, y: 58, size: 8, font: sansBold, color: muted });
-    page.drawImage(qr, { x: width - 172, y: 54, width: 86, height: 86 });
-    page.drawText("SCAN TO VERIFY", { x: width - 164, y: 39, size: 8, font: sansBold, color: navy });
-    page.drawText(certificateNumber, { x: width - 238, y: 30, size: 7, font: sansBold, color: blue });
-    page.drawText(`Seal: ${sealNumber}`, { x: 300, y: 75, size: 7, font: sansBold, color: navy });
-    page.drawText(`Credential hash: ${shortHash(credentialHash, 24)}`, { x: 300, y: 61, size: 7, font: sans, color: blue });
-    page.drawText(`Signature: ${shortHash(digitalSignature, 24)}`, { x: 300, y: 48, size: 7, font: sans, color: blue });
+    page.drawLine({ start: { x: 306, y: 76 }, end: { x: 506, y: 76 }, thickness: 0.7, color: navy });
+    drawFittedText({
+      page,
+      text: secondTitle,
+      x: 318,
+      y: 61,
+      maxWidth: 180,
+      font: sansBold,
+      preferredSize: 8,
+      minimumSize: 5.8,
+      color: muted
+    });
+
+    const qrX = width - 172;
+    const qrY = 57;
+    const qrSize = 84;
+    page.drawRectangle({ x: qrX - 6, y: qrY - 6, width: qrSize + 12, height: qrSize + 12, color: white, borderColor: rgb(0.68, 0.82, 0.95), borderWidth: 0.9 });
+    page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+    drawCenteredText(page, "SCAN TO VERIFY", qrX + qrSize / 2, 38, sansBold, 8, navy);
+    drawFittedText({
+      page,
+      text: certificateNumber,
+      x: width - 232,
+      y: 28,
+      maxWidth: 175,
+      font: sansBold,
+      preferredSize: 6.8,
+      minimumSize: 5.2,
+      color: blue
+    });
+
+    const securityY = 32;
+    const securityX = 70;
+    const securityWidth = 520;
+    page.drawRectangle({ x: securityX, y: securityY, width: securityWidth, height: 20, color: rgb(0.967, 0.986, 1), borderColor: rgb(0.78, 0.86, 0.96), borderWidth: 0.5 });
+    drawFittedText({
+      page,
+      text: `Seal: ${sealNumber}`,
+      x: securityX + 8,
+      y: securityY + 12,
+      maxWidth: 178,
+      font: sansBold,
+      preferredSize: 6.2,
+      minimumSize: 4.8,
+      color: navy
+    });
+    drawFittedText({
+      page,
+      text: `Credential hash: ${shortHash(credentialHash, 24)}`,
+      x: securityX + 194,
+      y: securityY + 12,
+      maxWidth: 154,
+      font: sans,
+      preferredSize: 6.2,
+      minimumSize: 4.8,
+      color: blue
+    });
+    drawFittedText({
+      page,
+      text: `Signature: ${shortHash(digitalSignature, 24)}`,
+      x: securityX + 356,
+      y: securityY + 12,
+      maxWidth: 154,
+      font: sans,
+      preferredSize: 6.2,
+      minimumSize: 4.8,
+      color: blue
+    });
 
     if (!valid) {
       page.drawRectangle({ x: 270, y: 256, width: 275, height: 62, color: rgb(1, 1, 1), opacity: 0.72 });
