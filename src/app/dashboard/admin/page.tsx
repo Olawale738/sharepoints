@@ -330,6 +330,12 @@ export default async function AdminControlCenterPage() {
       description: "Organization structure and enterprise-wide controls.",
       links: [
         {
+          href: "/dashboard/admin/command-center",
+          label: "Unified command center",
+          detail: "Urgent approvals, failed notifications, weak branches, expired access, signatures, backups, security alerts, document issues, and search intelligence.",
+          icon: SlidersHorizontal
+        },
+        {
           href: "/dashboard/admin/global",
           label: "Global church network",
           detail: "Countries, regions, branches, churches, ministries, and leaders.",
@@ -388,6 +394,12 @@ export default async function AdminControlCenterPage() {
           label: "Platform excellence",
           detail: "Reliability, document editing, mobile readiness, search, backups, monitoring, and security score.",
           icon: Gauge
+        },
+        {
+          href: "/dashboard/admin/recovery-center",
+          label: "Backup Recovery Center",
+          detail: "Restore or permanently delete recoverable files, messages, users, workspaces, certificates, letters, and reports.",
+          icon: Database
         },
         {
           href: "/dashboard/admin/enterprise",
