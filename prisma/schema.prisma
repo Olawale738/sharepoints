@@ -855,6 +855,33 @@ enum PrayerRequestStatus {
   CLOSED
 }
 
+enum PrayerAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  TESTIMONY_RECORDED
+  CANCELLED
+}
+
+enum CalendarConflictStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum ExternalGuestStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum PresidentDelegationStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
 enum GrowthPriority {
   LOW
   NORMAL
@@ -3429,6 +3456,118 @@ model PrayerRequestNote {
 
   @@index([prayerRequestId, createdAt])
   @@index([authorId, createdAt])
+}
+
+model PrayerAssignment {
+  id                         String                 @id @default(cuid())
+  workspaceId                String?
+  organizationUnitId         String?
+  departmentId               String?
+  assignedToUserId           String?
+  assignedWorkspaceId        String?
+  assignedOrganizationUnitId String?
+  assignedDepartmentId       String?
+  title                      String
+  prayerPoint                String                 @db.Text
+  category                   String                 @default("GENERAL")
+  priority                   GrowthPriority         @default(NORMAL)
+  status                     PrayerAssignmentStatus @default(ASSIGNED)
+  dueAt                      DateTime?
+  completionNotes            String?                @db.Text
+  testimony                  String?                @db.Text
+  completedAt                DateTime?
+  createdById                String
+  updatedById                String?
+  createdAt                  DateTime               @default(now())
+  updatedAt                  DateTime               @updatedAt
+
+  @@index([workspaceId, status, dueAt])
+  @@index([organizationUnitId, status, dueAt])
+  @@index([departmentId, status])
+  @@index([assignedToUserId, status, dueAt])
+  @@index([assignedWorkspaceId, status, dueAt])
+  @@index([assignedOrganizationUnitId, status, dueAt])
+  @@index([assignedDepartmentId, status])
+  @@index([createdById, createdAt])
+}
+
+model ChurchCalendarConflict {
+  id                 String                 @id @default(cuid())
+  conflictType       String
+  severity           GrowthPriority         @default(NORMAL)
+  title              String
+  details            String                 @db.Text
+  firstKind          String
+  firstId            String
+  secondKind         String
+  secondId           String
+  workspaceId        String?
+  organizationUnitId String?
+  resourceId         String?
+  startsAt           DateTime
+  endsAt             DateTime
+  status             CalendarConflictStatus @default(OPEN)
+  detectedById       String
+  resolvedById       String?
+  resolvedAt         DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([status, severity, startsAt])
+  @@index([workspaceId, status, startsAt])
+  @@index([organizationUnitId, status, startsAt])
+  @@index([resourceId, status, startsAt])
+  @@index([detectedById, createdAt])
+}
+
+model ExternalGuestAccess {
+  id           String              @id @default(cuid())
+  name         String
+  email        String
+  organization String?
+  guestType    String              @default("PARTNER")
+  purpose      String              @db.Text
+  status       ExternalGuestStatus @default(ACTIVE)
+  token        String              @unique
+  workspaceId  String?
+  fileId       String?
+  grantedById  String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  revokedById  String?
+  lastViewedAt DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([email, status, expiresAt])
+  @@index([workspaceId, status, expiresAt])
+  @@index([fileId, status, expiresAt])
+  @@index([grantedById, createdAt])
+}
+
+model PresidentDelegation {
+  id                          String                    @id @default(cuid())
+  delegatedToId               String
+  grantedById                 String
+  status                      PresidentDelegationStatus @default(ACTIVE)
+  canIssueCertificates        Boolean                   @default(false)
+  canIssueIdCards             Boolean                   @default(false)
+  canIssueLetters             Boolean                   @default(false)
+  canManagePrayerAssignments  Boolean                   @default(false)
+  canResolveCalendarConflicts Boolean                   @default(false)
+  canManageExternalGuests     Boolean                   @default(false)
+  canRunSystemCleanup         Boolean                   @default(false)
+  reason                      String?                   @db.Text
+  startsAt                    DateTime                  @default(now())
+  expiresAt                   DateTime
+  revokedAt                   DateTime?
+  revokedById                 String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+
+  @@index([delegatedToId, status, expiresAt])
+  @@index([grantedById, createdAt])
+  @@index([revokedAt, expiresAt])
 }
 
 model AssetMaintenanceTicket {

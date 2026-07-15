@@ -378,6 +378,12 @@ export default async function AdminControlCenterPage() {
           icon: LockKeyhole
         },
         {
+          href: "/dashboard/admin/executive-operations",
+          label: "Executive operations",
+          detail: "Prayer assignments, calendar intelligence, secure guest access, president delegation, and stale-access cleanup.",
+          icon: CalendarClock
+        },
+        {
           href: "/dashboard/admin/enterprise",
           label: "Enterprise controls",
           detail: "Security, governance, backup, DLP, AI agents, and platform controls.",
