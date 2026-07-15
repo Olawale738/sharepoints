@@ -3092,6 +3092,41 @@ select {
   background: #a75a43;
 }
 
+.education-certificate .official-certificate-inner {
+  border-color: #092c60;
+  background:
+    linear-gradient(135deg, rgb(11 27 61 / 5%) 0 0.2rem, transparent 0.2rem),
+    linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.education-certificate .certificate-header {
+  background:
+    radial-gradient(circle at 88% 18%, rgb(212 175 55 / 18%), transparent 18%),
+    #092c60;
+}
+
+.marriage-certificate .official-certificate-inner {
+  border-color: #6e1025;
+  background:
+    radial-gradient(circle at 14% 22%, rgb(212 175 55 / 10%), transparent 24%),
+    linear-gradient(180deg, #fffdf8, #ffffff);
+}
+
+.marriage-certificate .certificate-header {
+  background:
+    radial-gradient(circle at 88% 18%, rgb(255 231 158 / 22%), transparent 18%),
+    linear-gradient(135deg, #0b1b3d, #6e1025);
+}
+
+.marriage-certificate .certificate-main-copy h3 {
+  color: #6e1025;
+}
+
+.marriage-certificate .certificate-main-copy h4 {
+  color: #0b1b3d;
+  background: linear-gradient(180deg, #fffdf6, #fff8df);
+}
+
 .certificate-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 14rem;

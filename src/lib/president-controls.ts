@@ -4,7 +4,8 @@ import { ApprovalStatus, OfficialLetterStatus, OfficialLetterType, PresidentialA
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
-import { certificateCredentialHash, generateCertificateNumber, generateSealNumber, signCertificate } from "@/lib/certificate-security";
+import { generateCertificateNumber, generateSealNumber } from "@/lib/certificate-security";
+import { recordCertificateEvent, reissueCertificate, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { notifyUsers } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -280,13 +281,27 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
   }
 
   if (item.targetType === PresidentialApprovalTargetType.CERTIFICATE) {
+    if (payload.action === "REISSUE" && typeof item.targetId === "string") {
+      await reissueCertificate({
+        certificateId: item.targetId,
+        actorId: item.requesterId,
+        reason: String(payload.reason ?? "Certificate reissued after president approval.")
+      });
+      return;
+    }
     if (payload.action === "UPDATE_STATUS" && typeof item.targetId === "string" && typeof payload.status === "string") {
-      await prisma.memberCertificationBadge.update({
+      const updated = await prisma.memberCertificationBadge.update({
         where: { id: item.targetId },
         data:
           payload.status === "REVOKED"
             ? { status: "REVOKED", revokedAt: new Date() }
             : { status: "ACTIVE", revokedAt: null }
+      });
+      await recordCertificateEvent({
+        certificateId: updated.id,
+        actorId: item.reviewerId,
+        eventType: payload.status === "REVOKED" ? "REVOKED" : "RESTORED",
+        summary: payload.status === "REVOKED" ? "Certificate revoked after president approval." : "Certificate restored after president approval."
       });
       return;
     }
@@ -318,6 +333,25 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
         studyEndDate: payloadDate(payload, "studyEndDate"),
         completionDate: payloadDate(payload, "completionDate"),
         customBody: payloadText(payload, "customBody"),
+        templateStyle: payloadText(payload, "templateStyle") ?? "CLASSIC",
+        templateAccent: payloadText(payload, "templateAccent") ?? "NAVY_GOLD",
+        sealStyle: payloadText(payload, "sealStyle") ?? "CHIP",
+        signatureLayout: payloadText(payload, "signatureLayout") ?? "DUAL",
+        watermarkStrength: payloadText(payload, "watermarkStrength") ?? "STANDARD",
+        secondSignatoryName: payloadText(payload, "secondSignatoryName"),
+        secondSignatoryTitle: payloadText(payload, "secondSignatoryTitle"),
+        secondSignatorySignatureUrl: payloadText(payload, "secondSignatorySignatureUrl"),
+        spouseOneName: payloadText(payload, "spouseOneName"),
+        spouseOneEmail: payloadText(payload, "spouseOneEmail"),
+        spouseOnePhotoUrl: payloadText(payload, "spouseOnePhotoUrl"),
+        spouseTwoName: payloadText(payload, "spouseTwoName"),
+        spouseTwoEmail: payloadText(payload, "spouseTwoEmail"),
+        spouseTwoPhotoUrl: payloadText(payload, "spouseTwoPhotoUrl"),
+        marriageDate: payloadDate(payload, "marriageDate"),
+        marriageLocation: payloadText(payload, "marriageLocation"),
+        officiantName: payloadText(payload, "officiantName"),
+        witnessOneName: payloadText(payload, "witnessOneName"),
+        witnessTwoName: payloadText(payload, "witnessTwoName"),
         certificateNumber:
           typeof payload.certificateNumber === "string" && payload.certificateNumber ? payload.certificateNumber : generateCertificateNumber(category),
         sealNumber: generateSealNumber(category),
@@ -327,11 +361,16 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
         createdById: item.requesterId
       }
     });
-    await prisma.memberCertificationBadge.update({
-      where: { id: certificate.id },
-      data: {
-        digitalSignature: signCertificate(certificate),
-        credentialHash: certificateCredentialHash(certificate)
+    const signedCertificate = await signStoredCertificate(certificate);
+    await recordCertificateEvent({
+      certificateId: signedCertificate.id,
+      actorId: item.requesterId,
+      eventType: "ISSUED",
+      summary: `${signedCertificate.title} issued after president approval.`,
+      metadata: {
+        certificateNumber: signedCertificate.certificateNumber,
+        sealNumber: signedCertificate.sealNumber,
+        category: signedCertificate.certificateCategory
       }
     });
     return;

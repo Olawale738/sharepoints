@@ -14,6 +14,18 @@ type SignableCertificate = {
   educationLevel?: string | null;
   programName?: string | null;
   fieldOfStudy?: string | null;
+  certificateCategory?: string | null;
+  templateStyle?: string | null;
+  templateAccent?: string | null;
+  sealStyle?: string | null;
+  signatureLayout?: string | null;
+  watermarkStrength?: string | null;
+  secondSignatoryName?: string | null;
+  secondSignatoryTitle?: string | null;
+  spouseOneName?: string | null;
+  spouseTwoName?: string | null;
+  marriageDate?: Date | string | null;
+  replacementOfId?: string | null;
   issuedAt?: Date | string | null;
 };
 
@@ -26,8 +38,17 @@ export const THEOLOGY_CERTIFICATE_TYPES = [
   "Doctor of Philosophy in Theology"
 ] as const;
 
+export const MARRIAGE_CERTIFICATE_TYPES = [
+  "Marriage Certificate",
+  "Certificate of Holy Matrimony",
+  "Marriage Blessing Certificate",
+  "Marriage Dedication Certificate"
+] as const;
+
 export function certificatePrefix(category?: string | null) {
-  return category === "EDUCATION" ? "LETW-THEO" : "LETW-CERT";
+  if (category === "EDUCATION") return "LETW-THEO";
+  if (category === "MARRIAGE") return "LETW-MARR";
+  return "LETW-CERT";
 }
 
 export function generateCertificateNumber(category?: string | null) {
@@ -35,7 +56,8 @@ export function generateCertificateNumber(category?: string | null) {
 }
 
 export function generateSealNumber(category?: string | null) {
-  return `${category === "EDUCATION" ? "LETW-ACA-SEAL" : "LETW-SEAL"}-${new Date().getUTCFullYear()}-${randomBytes(5).toString("hex").toUpperCase()}`;
+  const prefix = category === "EDUCATION" ? "LETW-ACA-SEAL" : category === "MARRIAGE" ? "LETW-MARR-SEAL" : "LETW-SEAL";
+  return `${prefix}-${new Date().getUTCFullYear()}-${randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
 export function certificateSignaturePayload(certificate: SignableCertificate) {
@@ -48,9 +70,21 @@ export function certificateSignaturePayload(certificate: SignableCertificate) {
     recipientName: certificate.recipientName ?? null,
     recipientEmail: certificate.recipientEmail ?? null,
     userId: certificate.userId ?? null,
+    certificateCategory: certificate.certificateCategory ?? null,
     educationLevel: certificate.educationLevel ?? null,
     programName: certificate.programName ?? null,
     fieldOfStudy: certificate.fieldOfStudy ?? null,
+    templateStyle: certificate.templateStyle ?? null,
+    templateAccent: certificate.templateAccent ?? null,
+    sealStyle: certificate.sealStyle ?? null,
+    signatureLayout: certificate.signatureLayout ?? null,
+    watermarkStrength: certificate.watermarkStrength ?? null,
+    secondSignatoryName: certificate.secondSignatoryName ?? null,
+    secondSignatoryTitle: certificate.secondSignatoryTitle ?? null,
+    spouseOneName: certificate.spouseOneName ?? null,
+    spouseTwoName: certificate.spouseTwoName ?? null,
+    marriageDate: certificate.marriageDate ? new Date(certificate.marriageDate).toISOString() : null,
+    replacementOfId: certificate.replacementOfId ?? null,
     issuedAt: certificate.issuedAt ? new Date(certificate.issuedAt).toISOString() : null
   });
 }

@@ -4206,6 +4206,28 @@ model MemberCertificationBadge {
   studyEndDate      DateTime?
   completionDate    DateTime?
   customBody        String?   @db.Text
+  templateStyle     String    @default("CLASSIC")
+  templateAccent    String    @default("NAVY_GOLD")
+  sealStyle         String    @default("CHIP")
+  signatureLayout   String    @default("DUAL")
+  watermarkStrength String    @default("STANDARD")
+  secondSignatoryName String?
+  secondSignatoryTitle String?
+  secondSignatorySignatureUrl String?
+  spouseOneName     String?
+  spouseOneEmail    String?
+  spouseOnePhotoUrl String?
+  spouseTwoName     String?
+  spouseTwoEmail    String?
+  spouseTwoPhotoUrl String?
+  marriageDate      DateTime?
+  marriageLocation  String?
+  officiantName     String?
+  witnessOneName    String?
+  witnessTwoName    String?
+  replacementOfId   String?
+  replacedById      String?
+  reissueReason     String?   @db.Text
   sealNumber        String?   @unique
   credentialHash    String?
   digitalSignature  String?
@@ -4222,8 +4244,26 @@ model MemberCertificationBadge {
   @@index([certificateCategory, status, issuedAt])
   @@index([educationLevel, status])
   @@index([recipientEmail, status])
+  @@index([replacementOfId])
+  @@index([replacedById])
   @@index([sealNumber])
   @@index([status, expiresAt])
+}
+
+model CertificateEvent {
+  id            String   @id @default(cuid())
+  certificateId String
+  actorId       String?
+  eventType     String
+  summary       String?  @db.Text
+  metadata      Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([certificateId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([actorId, createdAt])
 }
 
 model DigitalIdAccessApproval {

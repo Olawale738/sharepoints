@@ -41,6 +41,22 @@ type CertificateRow = {
   studyEndDate?: string | Date | null;
   completionDate?: string | Date | null;
   customBody?: string | null;
+  templateStyle?: string | null;
+  templateAccent?: string | null;
+  sealStyle?: string | null;
+  signatureLayout?: string | null;
+  watermarkStrength?: string | null;
+  secondSignatoryName?: string | null;
+  secondSignatoryTitle?: string | null;
+  spouseOneName?: string | null;
+  spouseTwoName?: string | null;
+  marriageDate?: string | Date | null;
+  marriageLocation?: string | null;
+  officiantName?: string | null;
+  witnessOneName?: string | null;
+  witnessTwoName?: string | null;
+  replacementOfId?: string | null;
+  replacedById?: string | null;
   sealNumber?: string | null;
   credentialHash?: string | null;
   verifyToken: string;
@@ -67,6 +83,13 @@ const theologyCertificateTypes = [
   "Bachelor of Science in Theology",
   "Master of Science in Theology",
   "Doctor of Philosophy in Theology"
+] as const;
+
+const marriageCertificateTypes = [
+  "Marriage Certificate",
+  "Certificate of Holy Matrimony",
+  "Marriage Blessing Certificate",
+  "Marriage Dedication Certificate"
 ] as const;
 
 function displayName(user: CertificateUser) {
@@ -102,7 +125,7 @@ export function CertificateGeneratorPanel({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION">("MINISTRY");
+  const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION" | "MARRIAGE">("MINISTRY");
 
   const filteredCertificates = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -121,6 +144,12 @@ export function CertificateGeneratorPanel({
         certificate.programName,
         certificate.fieldOfStudy,
         certificate.gradeOrHonors,
+        certificate.spouseOneName,
+        certificate.spouseTwoName,
+        certificate.marriageLocation,
+        certificate.officiantName,
+        certificate.secondSignatoryName,
+        certificate.secondSignatoryTitle,
         certificate.sealNumber,
         certificate.credentialHash,
         certificate.user.memberProfile?.membershipNumber,
@@ -217,6 +246,25 @@ export function CertificateGeneratorPanel({
         studyEndDate: payload.studyEndDate ? new Date(payload.studyEndDate).toISOString() : null,
         completionDate: payload.completionDate ? new Date(payload.completionDate).toISOString() : null,
         customBody: payload.customBody || undefined,
+        templateStyle: payload.templateStyle || undefined,
+        templateAccent: payload.templateAccent || undefined,
+        sealStyle: payload.sealStyle || undefined,
+        signatureLayout: payload.signatureLayout || undefined,
+        watermarkStrength: payload.watermarkStrength || undefined,
+        secondSignatoryName: payload.secondSignatoryName || undefined,
+        secondSignatoryTitle: payload.secondSignatoryTitle || undefined,
+        secondSignatorySignatureUrl: payload.secondSignatorySignatureUrl || undefined,
+        spouseOneName: payload.spouseOneName || undefined,
+        spouseOneEmail: payload.spouseOneEmail || undefined,
+        spouseOnePhotoUrl: payload.spouseOnePhotoUrl || undefined,
+        spouseTwoName: payload.spouseTwoName || undefined,
+        spouseTwoEmail: payload.spouseTwoEmail || undefined,
+        spouseTwoPhotoUrl: payload.spouseTwoPhotoUrl || undefined,
+        marriageDate: payload.marriageDate ? new Date(payload.marriageDate).toISOString() : null,
+        marriageLocation: payload.marriageLocation || undefined,
+        officiantName: payload.officiantName || undefined,
+        witnessOneName: payload.witnessOneName || undefined,
+        witnessTwoName: payload.witnessTwoName || undefined,
         certificateNumber: payload.certificateNumber || undefined,
         expiresAt: payload.expiresAt ? new Date(payload.expiresAt).toISOString() : null
       })
@@ -234,14 +282,16 @@ export function CertificateGeneratorPanel({
     router.refresh();
   }
 
-  async function updateCertificate(id: string, action: "REVOKE" | "RESTORE") {
+  async function updateCertificate(id: string, action: "REVOKE" | "RESTORE" | "REISSUE") {
+    const reason = action === "REISSUE" ? window.prompt("Why is this certificate being reissued or replaced?") : null;
+    if (action === "REISSUE" && !reason?.trim()) return;
     setBusy(`${action}-${id}`);
     setNotice("");
     setError("");
     const response = await fetch(`/api/certificates/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action })
+      body: JSON.stringify({ action, reason })
     });
     const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
     setBusy("");
@@ -251,7 +301,7 @@ export function CertificateGeneratorPanel({
       return;
     }
 
-    setNotice(body?.pendingApproval ? "Certificate action sent to the president for approval." : action === "REVOKE" ? "Certificate revoked." : "Certificate restored.");
+    setNotice(body?.pendingApproval ? "Certificate action sent to the president for approval." : action === "REVOKE" ? "Certificate revoked." : action === "REISSUE" ? "Certificate reissued and old certificate replaced." : "Certificate restored.");
     router.refresh();
   }
 
@@ -295,13 +345,14 @@ export function CertificateGeneratorPanel({
                 className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
                 name="certificateCategory"
                 value={certificateCategory}
-                onChange={(event) => setCertificateCategory(event.target.value as "MINISTRY" | "EDUCATION")}
+                onChange={(event) => setCertificateCategory(event.target.value as "MINISTRY" | "EDUCATION" | "MARRIAGE")}
               >
                 <option value="MINISTRY">Ministry certificate</option>
                 <option value="EDUCATION">Theology education certificate</option>
+                <option value="MARRIAGE">Marriage certificate</option>
               </select>
               <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="title" required>
-                {(certificateCategory === "EDUCATION" ? theologyCertificateTypes : certificateTypes).map((type) => (
+                {(certificateCategory === "EDUCATION" ? theologyCertificateTypes : certificateCategory === "MARRIAGE" ? marriageCertificateTypes : certificateTypes).map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -312,18 +363,59 @@ export function CertificateGeneratorPanel({
 
             <div className="grid gap-3 lg:grid-cols-3">
             <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="userId" required={certificateCategory === "MINISTRY"}>
-              <option value="">{certificateCategory === "EDUCATION" ? "Optional LETW member account" : "Select LETW member"}</option>
+              <option value="">{certificateCategory === "MINISTRY" ? "Select LETW member" : "Optional LETW member account"}</option>
               {users.map((user) => (
                 <option key={user.id ?? user.email ?? user.name} value={user.id ?? ""}>
                   {displayName(user)} {user.memberProfile?.membershipNumber ? `- ${user.memberProfile.membershipNumber}` : ""}
                 </option>
               ))}
             </select>
-              <Input name="recipientName" placeholder={certificateCategory === "EDUCATION" ? "External candidate full name" : "Override holder name optional"} />
+              <Input name="recipientName" placeholder={certificateCategory === "MARRIAGE" ? "Couple display name optional" : certificateCategory === "EDUCATION" ? "External candidate full name" : "Override holder name optional"} />
               <Input name="recipientEmail" placeholder="Candidate email optional" type="email" />
               <Input name="recipientPhone" placeholder="Candidate phone optional" />
               <Input name="recipientPhotoUrl" placeholder="Candidate photo URL optional" />
               <Input name="recipientOrganization" placeholder="Candidate church/ministry/school optional" />
+            </div>
+
+            <div className="rounded-lg border border-ink/10 bg-paper p-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink">Certificate template designer</p>
+              <div className="mt-3 grid gap-3 lg:grid-cols-5">
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateStyle" defaultValue={certificateCategory === "MARRIAGE" ? "MARRIAGE_ELEGANT" : certificateCategory === "EDUCATION" ? "ACADEMIC" : "CLASSIC"}>
+                  <option value="CLASSIC">Classic official</option>
+                  <option value="ACADEMIC">Academic</option>
+                  <option value="MARRIAGE_ELEGANT">Marriage elegant</option>
+                  <option value="MODERN">Modern clean</option>
+                  <option value="ROYAL">Royal ceremonial</option>
+                </select>
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateAccent" defaultValue="NAVY_GOLD">
+                  <option value="NAVY_GOLD">Navy and gold</option>
+                  <option value="BLUE_GOLD">Blue and gold</option>
+                  <option value="BURGUNDY_GOLD">Burgundy and gold</option>
+                  <option value="GREEN_GOLD">Green and gold</option>
+                  <option value="MONOCHROME">Monochrome</option>
+                </select>
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="sealStyle" defaultValue="CHIP">
+                  <option value="CHIP">Seal chip</option>
+                  <option value="EMBOSSED">Embossed seal</option>
+                  <option value="ROUND">Round seal</option>
+                  <option value="SCRIPTURE">Scripture seal</option>
+                </select>
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="signatureLayout" defaultValue="DUAL">
+                  <option value="DUAL">Dual signature</option>
+                  <option value="PRESIDENT_LEFT">President left</option>
+                  <option value="PRESIDENT_RIGHT">President right</option>
+                </select>
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="watermarkStrength" defaultValue="STANDARD">
+                  <option value="SUBTLE">Subtle watermark</option>
+                  <option value="STANDARD">Standard watermark</option>
+                  <option value="STRONG">Strong watermark</option>
+                </select>
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                <Input name="secondSignatoryName" placeholder="Second signatory name, e.g. Registrar" />
+                <Input name="secondSignatoryTitle" placeholder="Registrar / Academic Dean / Rector / Officiant" />
+                <Input name="secondSignatorySignatureUrl" placeholder="Second signature image URL optional" />
+              </div>
             </div>
 
             {certificateCategory === "EDUCATION" ? (
@@ -342,6 +434,25 @@ export function CertificateGeneratorPanel({
                 </div>
                 <Textarea className="mt-3" name="customBody" placeholder="Custom education wording, credits, thesis title, authorization note, or academic distinction optional" />
               </div>
+            ) : certificateCategory === "MARRIAGE" ? (
+              <div className="rounded-lg border border-[#d4af37]/30 bg-[#fffaf0] p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b1b3d]">Marriage certificate details</p>
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <Input name="spouseOneName" placeholder="Spouse one full name" required />
+                  <Input name="spouseTwoName" placeholder="Spouse two full name" required />
+                  <Input name="marriageDate" type="date" />
+                  <Input name="spouseOneEmail" placeholder="Spouse one email optional" />
+                  <Input name="spouseTwoEmail" placeholder="Spouse two email optional" />
+                  <Input name="marriageLocation" placeholder="Marriage location" />
+                  <Input name="spouseOnePhotoUrl" placeholder="Spouse one photo URL optional" />
+                  <Input name="spouseTwoPhotoUrl" placeholder="Spouse two photo URL optional" />
+                  <Input name="officiantName" placeholder="Officiating minister" />
+                  <Input name="witnessOneName" placeholder="Witness one" />
+                  <Input name="witnessTwoName" placeholder="Witness two" />
+                  <Input name="certificateNumber" placeholder="Certificate no. optional" />
+                </div>
+                <Textarea className="mt-3" name="customBody" placeholder="Custom marriage wording, vows note, scripture, or register note optional" />
+              </div>
             ) : (
               <div className="grid gap-3 lg:grid-cols-3">
                 <Input name="certificateNumber" placeholder="Certificate no. optional" />
@@ -350,11 +461,11 @@ export function CertificateGeneratorPanel({
               </div>
             )}
 
-            {certificateCategory === "EDUCATION" ? (
+            {certificateCategory !== "MINISTRY" ? (
               <div className="grid gap-3 lg:grid-cols-2">
                 <Input name="expiresAt" type="date" />
                 <p className="rounded-md bg-mint px-3 py-2 text-xs leading-5 text-moss">
-                  Nonmembers are allowed for theology education certificates. The QR page verifies the live LETW register record, seal number, cryptographic hash, and status.
+                  {certificateCategory === "EDUCATION" ? "Nonmembers are allowed for theology education certificates." : "Marriage certificates can be issued to couples without LETW member accounts."} The QR page verifies the live LETW register record, seal number, cryptographic hash, and status.
                 </p>
               </div>
             ) : null}
@@ -392,18 +503,23 @@ export function CertificateGeneratorPanel({
             const verifyHref = `/verify/certificate/${certificate.verifyToken}`;
             const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
             const isEducation = certificate.certificateCategory === "EDUCATION";
-            const position = isEducation
+            const isMarriage = certificate.certificateCategory === "MARRIAGE";
+            const position = isMarriage
+              ? "Holy Matrimony"
+              : isEducation
               ? certificate.educationLevel ?? certificate.programName ?? "Theology Candidate"
               : certificate.user.memberProfile?.organizationPosition ?? "LETW Member";
-            const membershipNumber = certificate.user.memberProfile?.membershipNumber ?? (isEducation ? "Education candidate" : "Member number pending");
-            const holderName = certificate.recipientName || displayName(certificate.user);
-            const photoSrc = certificate.recipientPhotoUrl || certificate.user.image || (certificate.user.id ? `/api/profile/photo/${certificate.user.id}` : "");
-            const statement = certificate.customBody || (isEducation
+            const membershipNumber = certificate.user.memberProfile?.membershipNumber ?? (isEducation ? "Education candidate" : isMarriage ? "Marriage register" : "Member number pending");
+            const holderName = isMarriage ? `${certificate.spouseOneName ?? "Spouse one"} and ${certificate.spouseTwoName ?? "Spouse two"}` : certificate.recipientName || displayName(certificate.user);
+            const photoSrc = certificate.recipientPhotoUrl || (isMarriage ? "" : certificate.user.image || (certificate.user.id ? `/api/profile/photo/${certificate.user.id}` : ""));
+            const statement = certificate.customBody || (isMarriage
+              ? `${certificate.spouseOneName ?? "The couple"} and ${certificate.spouseTwoName ?? ""} were joined in holy matrimony under Light Encounter Tabernacle Worldwide${certificate.marriageDate ? ` on ${formatDate(certificate.marriageDate)}` : ""}${certificate.marriageLocation ? ` at ${certificate.marriageLocation}` : ""}.`
+              : isEducation
               ? `has successfully completed the required studies for ${certificate.programName || certificate.title} in ${certificate.fieldOfStudy || "Theology"} and is recorded in the LETW educational credential register.`
               : "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.");
 
             return (
-              <article className={`official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft ${isEducation ? "education-certificate" : ""}`} key={certificate.id}>
+              <article className={`official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft ${isEducation ? "education-certificate" : ""} ${isMarriage ? "marriage-certificate" : ""}`} key={certificate.id}>
                 <div className="official-certificate-inner">
                   <div className="certificate-watermark" aria-hidden="true" />
                   <header className="certificate-header">
@@ -422,7 +538,7 @@ export function CertificateGeneratorPanel({
 
                   <div className="certificate-body">
                     <section className="certificate-main-copy">
-                      <p className="certificate-eyebrow">{isEducation ? "LETW School of Theology Academic Credential" : "Certificate of LETW Recognition"}</p>
+                      <p className="certificate-eyebrow">{isMarriage ? "LETW Marriage Register Credential" : isEducation ? "LETW School of Theology Academic Credential" : "Certificate of LETW Recognition"}</p>
                       <h3>{certificate.title}</h3>
                       <p className="certificate-intro">This certifies that</p>
                       <h4>{holderName}</h4>
@@ -466,6 +582,18 @@ export function CertificateGeneratorPanel({
                         <strong>{certificate.sealNumber ?? "Pending seal"}</strong>
                       </div>
                     ) : null}
+                    {isMarriage ? (
+                      <>
+                        <div>
+                          <span>Marriage date</span>
+                          <strong>{certificate.marriageDate ? formatDate(certificate.marriageDate) : "Pending"}</strong>
+                        </div>
+                        <div>
+                          <span>Officiant</span>
+                          <strong>{certificate.officiantName ?? "LETW Minister"}</strong>
+                        </div>
+                      </>
+                    ) : null}
                     <div>
                       <span>Issued</span>
                       <strong>{formatDate(certificate.issuedAt)}</strong>
@@ -482,6 +610,13 @@ export function CertificateGeneratorPanel({
                       <p>Olawale N Sanni</p>
                       <span>President / Authorized Signature</span>
                     </div>
+                    {certificate.secondSignatoryName || certificate.secondSignatoryTitle || isEducation || isMarriage ? (
+                      <div className="certificate-signature">
+                        <PenLine className="h-4 w-4" />
+                        <p>{certificate.secondSignatoryName ?? (isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Registrar")}</p>
+                        <span>{certificate.secondSignatoryTitle ?? (isMarriage ? "Officiating Minister" : "Registrar / Academic Dean / Rector")}</span>
+                      </div>
+                    ) : null}
                     <div className="certificate-chip">
                       <Stamp className="h-5 w-5" />
                       <div>
@@ -540,6 +675,17 @@ export function CertificateGeneratorPanel({
                           Restore
                         </Button>
                       )
+                    ) : null}
+                    {canManage ? (
+                      <Button
+                        className="h-9"
+                        disabled={busy === `REISSUE-${certificate.id}`}
+                        variant="secondary"
+                        onClick={() => updateCertificate(certificate.id, "REISSUE")}
+                      >
+                        {busy === `REISSUE-${certificate.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                        Reissue
+                      </Button>
                     ) : null}
                     {canManage ? (
                       <Button

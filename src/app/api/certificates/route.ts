@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { certificateCredentialHash, generateCertificateNumber, generateSealNumber, signCertificate, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-security";
+import { generateCertificateNumber, generateSealNumber, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-security";
+import { recordCertificateEvent, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
 import { getOfficialIssuanceAuthority, requireCertificateIssuer } from "@/lib/official-issuance";
 import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
@@ -14,7 +15,7 @@ import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
 const certificateSchema = z.object({
   userId: z.string().cuid().optional().nullable(),
   title: z.string().trim().min(3).max(160),
-  certificateCategory: z.enum(["MINISTRY", "EDUCATION"]).default("MINISTRY"),
+  certificateCategory: z.enum(["MINISTRY", "EDUCATION", "MARRIAGE"]).default("MINISTRY"),
   recipientName: z.string().trim().max(180).optional().nullable(),
   recipientEmail: z.string().trim().email().optional().nullable(),
   recipientPhone: z.string().trim().max(60).optional().nullable(),
@@ -29,6 +30,25 @@ const certificateSchema = z.object({
   studyEndDate: z.string().datetime().optional().nullable(),
   completionDate: z.string().datetime().optional().nullable(),
   customBody: z.string().trim().max(1200).optional().nullable(),
+  templateStyle: z.enum(["CLASSIC", "ACADEMIC", "MARRIAGE_ELEGANT", "MODERN", "ROYAL"]).default("CLASSIC"),
+  templateAccent: z.enum(["NAVY_GOLD", "BLUE_GOLD", "BURGUNDY_GOLD", "GREEN_GOLD", "MONOCHROME"]).default("NAVY_GOLD"),
+  sealStyle: z.enum(["CHIP", "EMBOSSED", "ROUND", "SCRIPTURE"]).default("CHIP"),
+  signatureLayout: z.enum(["DUAL", "PRESIDENT_LEFT", "PRESIDENT_RIGHT"]).default("DUAL"),
+  watermarkStrength: z.enum(["SUBTLE", "STANDARD", "STRONG"]).default("STANDARD"),
+  secondSignatoryName: z.string().trim().max(160).optional().nullable(),
+  secondSignatoryTitle: z.string().trim().max(120).optional().nullable(),
+  secondSignatorySignatureUrl: z.string().trim().url().optional().nullable(),
+  spouseOneName: z.string().trim().max(180).optional().nullable(),
+  spouseOneEmail: z.string().trim().email().optional().nullable(),
+  spouseOnePhotoUrl: z.string().trim().url().optional().nullable(),
+  spouseTwoName: z.string().trim().max(180).optional().nullable(),
+  spouseTwoEmail: z.string().trim().email().optional().nullable(),
+  spouseTwoPhotoUrl: z.string().trim().url().optional().nullable(),
+  marriageDate: z.string().datetime().optional().nullable(),
+  marriageLocation: z.string().trim().max(220).optional().nullable(),
+  officiantName: z.string().trim().max(160).optional().nullable(),
+  witnessOneName: z.string().trim().max(160).optional().nullable(),
+  witnessTwoName: z.string().trim().max(160).optional().nullable(),
   issuer: z.string().trim().min(2).max(160).optional(),
   certificateNumber: z.string().trim().min(3).max(80).optional().nullable(),
   expiresAt: z.string().datetime().optional().nullable()
@@ -113,6 +133,8 @@ export async function POST(request: Request) {
     const data = parsed.data;
     const normalizedTitle = normalizeNullableText(data.title) ?? "Membership Certificate";
     const isEducation = data.certificateCategory === "EDUCATION";
+    const isMarriage = data.certificateCategory === "MARRIAGE";
+    const marriageHolderName = isMarriage && data.spouseOneName && data.spouseTwoName ? `${data.spouseOneName} and ${data.spouseTwoName}` : null;
     const recipient = data.userId
       ? await prisma.user.findFirst({
           where: {
@@ -127,7 +149,10 @@ export async function POST(request: Request) {
     if (data.userId && !recipient) {
       throw new ApiError(404, "Recipient not found or inactive.");
     }
-    if (!recipient && !normalizeNullableText(data.recipientName)) {
+    if (isMarriage && (!normalizeNullableText(data.spouseOneName) || !normalizeNullableText(data.spouseTwoName))) {
+      throw new ApiError(422, "Marriage certificates require both spouse names.");
+    }
+    if (!recipient && !normalizeNullableText(data.recipientName) && !marriageHolderName) {
       throw new ApiError(422, "Enter the external candidate name or select a LETW member.");
     }
     if (isEducation && !THEOLOGY_CERTIFICATE_TYPES.includes(normalizedTitle as (typeof THEOLOGY_CERTIFICATE_TYPES)[number]) && !normalizeNullableText(data.programName)) {
@@ -144,7 +169,7 @@ export async function POST(request: Request) {
         userId: recipient?.id ?? null,
         title: normalizedTitle,
         certificateCategory: data.certificateCategory,
-        recipientName: normalizeNullableText(data.recipientName) ?? recipient?.name ?? null,
+        recipientName: normalizeNullableText(data.recipientName) ?? marriageHolderName ?? recipient?.name ?? null,
         recipientEmail: normalizeNullableText(data.recipientEmail) ?? recipient?.email ?? null,
         recipientPhone: normalizeNullableText(data.recipientPhone),
         recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl),
@@ -158,6 +183,25 @@ export async function POST(request: Request) {
         studyEndDate: data.studyEndDate ?? null,
         completionDate: data.completionDate ?? null,
         customBody: normalizeNullableText(data.customBody),
+        templateStyle: data.templateStyle,
+        templateAccent: data.templateAccent,
+        sealStyle: data.sealStyle,
+        signatureLayout: data.signatureLayout,
+        watermarkStrength: data.watermarkStrength,
+        secondSignatoryName: normalizeNullableText(data.secondSignatoryName),
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle),
+        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl),
+        spouseOneName: normalizeNullableText(data.spouseOneName),
+        spouseOneEmail: normalizeNullableText(data.spouseOneEmail),
+        spouseOnePhotoUrl: normalizeNullableText(data.spouseOnePhotoUrl),
+        spouseTwoName: normalizeNullableText(data.spouseTwoName),
+        spouseTwoEmail: normalizeNullableText(data.spouseTwoEmail),
+        spouseTwoPhotoUrl: normalizeNullableText(data.spouseTwoPhotoUrl),
+        marriageDate: data.marriageDate ?? null,
+        marriageLocation: normalizeNullableText(data.marriageLocation),
+        officiantName: normalizeNullableText(data.officiantName),
+        witnessOneName: normalizeNullableText(data.witnessOneName),
+        witnessTwoName: normalizeNullableText(data.witnessTwoName),
         issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
         certificateNumber: data.certificateNumber ?? null,
         expiresAt: data.expiresAt ?? null
@@ -172,7 +216,7 @@ export async function POST(request: Request) {
         title: normalizedTitle,
         issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
         certificateCategory: data.certificateCategory,
-        recipientName: normalizeNullableText(data.recipientName) ?? recipient?.name ?? null,
+        recipientName: normalizeNullableText(data.recipientName) ?? marriageHolderName ?? recipient?.name ?? null,
         recipientEmail: normalizeNullableText(data.recipientEmail) ?? recipient?.email ?? null,
         recipientPhone: normalizeNullableText(data.recipientPhone),
         recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl),
@@ -186,6 +230,25 @@ export async function POST(request: Request) {
         studyEndDate: nullableDate(data.studyEndDate),
         completionDate: nullableDate(data.completionDate),
         customBody: normalizeNullableText(data.customBody),
+        templateStyle: data.templateStyle,
+        templateAccent: data.templateAccent,
+        sealStyle: data.sealStyle,
+        signatureLayout: data.signatureLayout,
+        watermarkStrength: data.watermarkStrength,
+        secondSignatoryName: normalizeNullableText(data.secondSignatoryName),
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle),
+        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl),
+        spouseOneName: normalizeNullableText(data.spouseOneName),
+        spouseOneEmail: normalizeNullableText(data.spouseOneEmail),
+        spouseOnePhotoUrl: normalizeNullableText(data.spouseOnePhotoUrl),
+        spouseTwoName: normalizeNullableText(data.spouseTwoName),
+        spouseTwoEmail: normalizeNullableText(data.spouseTwoEmail),
+        spouseTwoPhotoUrl: normalizeNullableText(data.spouseTwoPhotoUrl),
+        marriageDate: nullableDate(data.marriageDate),
+        marriageLocation: normalizeNullableText(data.marriageLocation),
+        officiantName: normalizeNullableText(data.officiantName),
+        witnessOneName: normalizeNullableText(data.witnessOneName),
+        witnessTwoName: normalizeNullableText(data.witnessTwoName),
         certificateNumber: data.certificateNumber || generateCertificateNumber(data.certificateCategory),
         sealNumber: generateSealNumber(data.certificateCategory),
         verifyToken: randomUUID(),
@@ -194,11 +257,17 @@ export async function POST(request: Request) {
         createdById: actor.id
       }
     });
-    const digitalSignature = signCertificate(certificate);
-    const credentialHash = certificateCredentialHash(certificate);
-    const signedCertificate = await prisma.memberCertificationBadge.update({
-      where: { id: certificate.id },
-      data: { digitalSignature, credentialHash }
+    const signedCertificate = await signStoredCertificate(certificate);
+    await recordCertificateEvent({
+      certificateId: signedCertificate.id,
+      actorId: actor.id,
+      eventType: "ISSUED",
+      summary: `${signedCertificate.title} issued.`,
+      metadata: {
+        certificateNumber: signedCertificate.certificateNumber,
+        sealNumber: signedCertificate.sealNumber,
+        category: signedCertificate.certificateCategory
+      }
     });
 
     await logActivity({

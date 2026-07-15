@@ -74,6 +74,20 @@ function drawCenteredText(page: PDFPage, text: string, centerX: number, y: numbe
   });
 }
 
+function accentColor(name?: string | null) {
+  if (name === "BLUE_GOLD") return rgb(0.055, 0.29, 0.68);
+  if (name === "BURGUNDY_GOLD") return rgb(0.43, 0.055, 0.12);
+  if (name === "GREEN_GOLD") return rgb(0.05, 0.34, 0.21);
+  if (name === "MONOCHROME") return rgb(0.12, 0.14, 0.17);
+  return rgb(0.043, 0.106, 0.239);
+}
+
+function watermarkOpacity(strength?: string | null) {
+  if (strength === "SUBTLE") return 0.025;
+  if (strength === "STRONG") return 0.075;
+  return 0.045;
+}
+
 function drawFittedText(input: {
   page: PDFPage;
   text: string;
@@ -247,18 +261,20 @@ export async function GET(request: Request, context: RouteContext) {
     const muted = rgb(0.38, 0.42, 0.48);
     const white = rgb(1, 1, 1);
     const lightBlue = rgb(0.94, 0.973, 1);
+    const templateNavy = accentColor(certificate.templateAccent);
     const serif = await pdf.embedFont(StandardFonts.TimesRomanBold);
     const sans = await pdf.embedFont(StandardFonts.Helvetica);
     const sansBold = await pdf.embedFont(StandardFonts.HelveticaBold);
     const script = await pdf.embedFont(StandardFonts.TimesRomanItalic);
     const logoBytes = await readFile(path.join(process.cwd(), "public", "letw-logo.png"));
     const logo = await pdf.embedPng(logoBytes);
-    const photoBytes = certificate.recipientPhotoUrl
-      ? await loadExternalPhoto(certificate.recipientPhotoUrl)
+    const photoBytes = certificate.recipientPhotoUrl || certificate.spouseOnePhotoUrl
+      ? await loadExternalPhoto(certificate.recipientPhotoUrl ?? certificate.spouseOnePhotoUrl)
       : certificateUser
         ? await loadProfilePhoto(certificateUser.id, certificateUser.image)
         : null;
     const photo = await embedImage(pdf, photoBytes ?? Buffer.alloc(0));
+    const secondSignature = await embedImage(pdf, (await loadExternalPhoto(certificate.secondSignatorySignatureUrl)) ?? Buffer.alloc(0));
     const origin = new URL(request.url).origin;
     const verifyUrl = `${origin}/verify/certificate/${certificate.verifyToken}`;
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
@@ -271,7 +287,10 @@ export async function GET(request: Request, context: RouteContext) {
     const holderName = certificate.recipientName || (certificateUser ? displayName(certificateUser) : "LETW Certificate Holder");
     const certificateNumber = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
     const isEducation = certificate.certificateCategory === "EDUCATION";
-    const position = isEducation
+    const isMarriage = certificate.certificateCategory === "MARRIAGE";
+    const position = isMarriage
+      ? "Holy Matrimony"
+      : isEducation
       ? certificate.educationLevel ?? certificate.programName ?? "Theology Candidate"
       : certificateUser?.memberProfile?.organizationPosition ?? "LETW Member";
     const memberNumber = certificateUser?.memberProfile?.membershipNumber ?? (isEducation ? "External education candidate" : "Member number pending");
@@ -281,9 +300,9 @@ export async function GET(request: Request, context: RouteContext) {
     const sealNumber = certificate.sealNumber ?? certificateNumber;
 
     page.drawRectangle({ x: 0, y: 0, width, height, color: white });
-    page.drawRectangle({ x: 22, y: 22, width: width - 44, height: height - 44, borderColor: navy, borderWidth: 7 });
+    page.drawRectangle({ x: 22, y: 22, width: width - 44, height: height - 44, borderColor: templateNavy, borderWidth: 7 });
     page.drawRectangle({ x: 37, y: 37, width: width - 74, height: height - 74, borderColor: gold, borderWidth: 1.4 });
-    page.drawRectangle({ x: 48, y: height - 116, width: width - 96, height: 70, color: navy });
+    page.drawRectangle({ x: 48, y: height - 116, width: width - 96, height: 70, color: templateNavy });
     page.drawRectangle({ x: 48, y: height - 121, width: width - 96, height: 5, color: gold });
     page.drawImage(logo, { x: 64, y: height - 105, width: 52, height: 52 });
     page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 130, y: height - 82, size: 14, font: sansBold, color: white });
@@ -304,11 +323,11 @@ export async function GET(request: Request, context: RouteContext) {
       color: valid ? navy : white
     });
 
-    page.drawImage(logo, { x: width / 2 - 118, y: 183, width: 236, height: 236, opacity: 0.045 });
+    page.drawImage(logo, { x: width / 2 - 118, y: 183, width: 236, height: 236, opacity: watermarkOpacity(certificate.watermarkStrength) });
     const mainX = 84;
     const mainWidth = 500;
     const mainCenter = mainX + mainWidth / 2;
-    drawCenteredText(page, isEducation ? "ACADEMIC CERTIFICATE OF THEOLOGY" : "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
+    drawCenteredText(page, isMarriage ? "CERTIFICATE OF HOLY MATRIMONY" : isEducation ? "ACADEMIC CERTIFICATE OF THEOLOGY" : "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
     const titleSize = fittedFontSize(serif, certificate.title, mainWidth, 34, 24);
     drawCenteredText(page, certificate.title, mainCenter, 384, serif, titleSize, navy);
     drawCenteredText(page, "This certifies that the certificate holder is", mainCenter, 346, sansBold, 12.5, muted);
@@ -326,7 +345,9 @@ export async function GET(request: Request, context: RouteContext) {
 
     const statement =
       certificate.customBody ||
-      (isEducation
+      (isMarriage
+        ? `${certificate.spouseOneName ?? "Bride/Groom"} and ${certificate.spouseTwoName ?? "Bride/Groom"} were joined in holy matrimony under the covering of Light Encounter Tabernacle Worldwide${certificate.marriageDate ? ` on ${formatDate(certificate.marriageDate)}` : ""}${certificate.marriageLocation ? ` at ${certificate.marriageLocation}` : ""}. This marriage certificate remains valid only when the QR verification page confirms an active status.`
+        : isEducation
         ? `has successfully completed the prescribed studies for ${certificate.programName || certificate.title} in ${certificate.fieldOfStudy || "Theology"} and is recorded in the official LETW theological education register.`
         : "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.");
     wrapText(statement, 74).forEach((line, index) => {
@@ -360,7 +381,14 @@ export async function GET(request: Request, context: RouteContext) {
     });
 
     const detailY = 137;
-    const details = isEducation
+    const details = isMarriage
+      ? [
+          ["Certificate number", certificateNumber],
+          ["Seal number", sealNumber],
+          ["Marriage date", certificate.marriageDate ? formatDate(certificate.marriageDate) : formatDate(certificate.issuedAt)],
+          ["Officiant", certificate.officiantName ?? "LETW Minister"]
+        ]
+      : isEducation
       ? [
           ["Certificate number", certificateNumber],
           ["Seal number", sealNumber],
@@ -405,6 +433,15 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawText("Olawale N Sanni", { x: 98, y: 80, size: 22, font: script, color: navy });
     page.drawLine({ start: { x: 86, y: 74 }, end: { x: 276, y: 74 }, thickness: 0.7, color: navy });
     page.drawText("President / Digitally Authorized Signature", { x: 96, y: 58, size: 8, font: sansBold, color: muted });
+    const secondName = certificate.secondSignatoryName ?? (isEducation ? "Registrar" : isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer");
+    const secondTitle = certificate.secondSignatoryTitle ?? (isEducation ? "Registrar / Academic Dean / Rector" : isMarriage ? "Officiating Minister" : "Second Signatory");
+    if (secondSignature) {
+      page.drawImage(secondSignature, { x: 316, y: 78, width: 140, height: 34, opacity: 0.95 });
+    } else {
+      page.drawText(secondName, { x: 318, y: 80, size: 18, font: script, color: navy });
+    }
+    page.drawLine({ start: { x: 306, y: 74 }, end: { x: 506, y: 74 }, thickness: 0.7, color: navy });
+    page.drawText(secondTitle, { x: 318, y: 58, size: 8, font: sansBold, color: muted });
     page.drawImage(qr, { x: width - 172, y: 54, width: 86, height: 86 });
     page.drawText("SCAN TO VERIFY", { x: width - 164, y: 39, size: 8, font: sansBold, color: navy });
     page.drawText(certificateNumber, { x: width - 238, y: 30, size: 7, font: sansBold, color: blue });
