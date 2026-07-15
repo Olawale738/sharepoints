@@ -6,7 +6,7 @@ import {
   onlyOfficeServerUrl,
   signOnlyOfficeConfig
 } from "@/lib/onlyoffice";
-import { ensureCanEditFile } from "@/lib/governance";
+import { ensureCanEditFile, isPresidentDocumentAuthority } from "@/lib/governance";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/rbac";
 import { getInlineUrl } from "@/lib/storage";
@@ -36,6 +36,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     const origin = new URL(request.url).origin;
     const callbackSignature = onlyOfficeCallbackSignature(file.id);
+    const canExportFromEditor = (await isPresidentDocumentAuthority(user.id)) && !file.dlpRestricted && !file.downloadRestricted;
     const config = {
       document: {
         fileType: file.fileName.split(".").pop()?.toLowerCase(),
@@ -44,8 +45,8 @@ export async function GET(request: Request, context: RouteContext) {
         url: await getInlineUrl(file.storageKey, file.fileName, file.fileType),
         permissions: {
           edit: true,
-          download: !file.dlpRestricted,
-          print: !file.dlpRestricted
+          download: canExportFromEditor,
+          print: canExportFromEditor
         }
       },
       documentType,
@@ -59,7 +60,9 @@ export async function GET(request: Request, context: RouteContext) {
         customization: {
           autosave: true,
           forcesave: true,
-          compactHeader: false
+          compactHeader: false,
+          compactToolbar: false,
+          hideRightMenu: false
         }
       }
     };

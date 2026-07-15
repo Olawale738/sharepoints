@@ -384,6 +384,12 @@ export default async function AdminControlCenterPage() {
           icon: CalendarClock
         },
         {
+          href: "/dashboard/admin/platform-excellence",
+          label: "Platform excellence",
+          detail: "Reliability, document editing, mobile readiness, search, backups, monitoring, and security score.",
+          icon: Gauge
+        },
+        {
           href: "/dashboard/admin/enterprise",
           label: "Enterprise controls",
           detail: "Security, governance, backup, DLP, AI agents, and platform controls.",

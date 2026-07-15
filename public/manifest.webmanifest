@@ -39,6 +39,20 @@
       "description": "Open LETW doctrines, policies, guides, and FAQs.",
       "url": "/dashboard/knowledge",
       "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Platform Excellence",
+      "short_name": "Excellence",
+      "description": "Open LETW reliability, backup, search, and monitoring controls.",
+      "url": "/dashboard/admin/platform-excellence",
+      "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
+    },
+    {
+      "name": "Notifications",
+      "short_name": "Alerts",
+      "description": "Open LETW notification and broadcast controls.",
+      "url": "/dashboard/admin/notifications",
+      "icons": [{ "src": "/letw-logo.png", "sizes": "512x512" }]
     }
   ]
 }

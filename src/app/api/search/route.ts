@@ -23,8 +23,25 @@ export async function GET(request: Request) {
     }
 
     const approvalFilter = isGlobalAdmin ? {} : { approvalStatus: "APPROVED" as const };
-    const [workspaces, files, folders, tasks, members, messages, directMessages, orgMessages, wikiPages, forms, meetings] =
-      await Promise.all([
+    const [
+      workspaces,
+      files,
+      folders,
+      tasks,
+      members,
+      messages,
+      directMessages,
+      orgMessages,
+      wikiPages,
+      forms,
+      meetings,
+      officialLetters,
+      certificates,
+      policies,
+      servicePlans,
+      prayerAssignments,
+      externalGuests
+    ] = await Promise.all([
       prisma.workspace.findMany({
         where: {
           id: { in: workspaceIds },
@@ -164,7 +181,92 @@ export async function GET(request: Request) {
           workspace: { select: { name: true } }
         },
         take: 8
-      })
+      }),
+      prisma.officialLetter.findMany({
+        where: {
+          ...(isGlobalAdmin ? {} : { workspaceId: { in: workspaceIds } }),
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { letterNumber: { contains: q, mode: "insensitive" } },
+            { recipientName: { contains: q, mode: "insensitive" } },
+            { body: { contains: q, mode: "insensitive" } }
+          ]
+        },
+        select: { id: true, title: true, letterNumber: true, status: true, recipientName: true, workspaceId: true },
+        take: 8
+      }),
+      prisma.memberCertificationBadge.findMany({
+        where: {
+          ...(isGlobalAdmin ? {} : { userId: user.id }),
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { certificateNumber: { contains: q, mode: "insensitive" } }
+          ]
+        },
+        select: { id: true, title: true, certificateNumber: true, status: true },
+        take: 8
+      }),
+      prisma.policyDocument.findMany({
+        where: {
+          ...(isGlobalAdmin ? {} : { workspaceId: { in: workspaceIds }, status: "PUBLISHED" as const }),
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { summary: { contains: q, mode: "insensitive" } },
+            { content: { contains: q, mode: "insensitive" } }
+          ]
+        },
+        select: { id: true, title: true, summary: true, status: true, workspaceId: true },
+        take: 8
+      }),
+      prisma.servicePlan.findMany({
+        where: {
+          ...(isGlobalAdmin ? {} : { workspaceId: { in: workspaceIds } }),
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { theme: { contains: q, mode: "insensitive" } },
+            { preacher: { contains: q, mode: "insensitive" } },
+            { prayerPoints: { contains: q, mode: "insensitive" } },
+            { postServiceReport: { contains: q, mode: "insensitive" } }
+          ]
+        },
+        select: { id: true, title: true, status: true, startsAt: true, workspaceId: true },
+        take: 8
+      }),
+      prisma.prayerAssignment.findMany({
+        where: {
+          AND: [
+            isGlobalAdmin
+              ? {}
+              : {
+                  OR: [{ workspaceId: { in: workspaceIds } }, { assignedWorkspaceId: { in: workspaceIds } }, { assignedToUserId: user.id }]
+                },
+            {
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { prayerPoint: { contains: q, mode: "insensitive" } },
+                { completionNotes: { contains: q, mode: "insensitive" } },
+                { testimony: { contains: q, mode: "insensitive" } }
+              ]
+            }
+          ]
+        },
+        select: { id: true, title: true, status: true, category: true },
+        take: 8
+      }),
+      isGlobalAdmin
+        ? prisma.externalGuestAccess.findMany({
+            where: {
+              OR: [
+                { name: { contains: q, mode: "insensitive" } },
+                { email: { contains: q, mode: "insensitive" } },
+                { organization: { contains: q, mode: "insensitive" } },
+                { purpose: { contains: q, mode: "insensitive" } }
+              ]
+            },
+            select: { id: true, name: true, email: true, status: true, expiresAt: true },
+            take: 8
+          })
+        : Promise.resolve([])
     ]);
 
     return ok({
@@ -234,8 +336,44 @@ export async function GET(request: Request) {
           title: meeting.title,
           detail: meeting.transcriptSummary?.slice(0, 120) ?? meeting.workspace.name,
           href: `/dashboard/meetings/${meeting.id}`
+        })),
+        ...officialLetters.map((letter) => ({
+          type: "official letter",
+          title: letter.title,
+          detail: `${letter.letterNumber} - ${letter.recipientName} - ${letter.status.toLowerCase()}`,
+          href: "/dashboard/leadership-governance"
+        })),
+        ...certificates.map((certificate) => ({
+          type: "certificate",
+          title: certificate.title,
+          detail: `${certificate.certificateNumber ?? "No certificate number"} - ${certificate.status.toLowerCase()}`,
+          href: "/dashboard/certificates"
+        })),
+        ...policies.map((policy) => ({
+          type: "policy",
+          title: policy.title,
+          detail: policy.summary?.slice(0, 120) ?? policy.status.toLowerCase(),
+          href: "/dashboard/compliance"
+        })),
+        ...servicePlans.map((plan) => ({
+          type: "service plan",
+          title: plan.title,
+          detail: `${plan.status.toLowerCase()} - ${plan.startsAt.toLocaleDateString()}`,
+          href: "/dashboard/leadership"
+        })),
+        ...prayerAssignments.map((assignment) => ({
+          type: "prayer assignment",
+          title: assignment.title,
+          detail: `${assignment.category} - ${assignment.status.toLowerCase()}`,
+          href: "/dashboard/admin/executive-operations"
+        })),
+        ...externalGuests.map((guest) => ({
+          type: "guest access",
+          title: guest.name,
+          detail: `${guest.email} - ${guest.status.toLowerCase()} - expires ${guest.expiresAt.toLocaleDateString()}`,
+          href: "/dashboard/admin/executive-operations"
         }))
-      ].slice(0, 30)
+      ].slice(0, 50)
     });
   } catch (error) {
     return handleRouteError(error);
