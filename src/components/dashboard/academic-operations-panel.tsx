@@ -13,13 +13,19 @@ type Candidate = {
   id: string;
   fullName: string;
   email?: string | null;
+  phone?: string | null;
   programName: string;
   educationLevel: string;
+  fieldOfStudy?: string | null;
+  studyMode?: string | null;
+  graduationDate?: string | Date | null;
   clearanceStatus: string;
   photoUrl?: string | null;
+  feesCleared?: boolean;
   nameVerified: boolean;
   coursesCompleted: boolean;
   rectorApproved: boolean;
+  photoUploaded?: boolean;
 };
 
 type Board = {
@@ -170,6 +176,20 @@ async function jsonRequest(url: string, method: string, body?: unknown) {
   return data;
 }
 
+async function uploadCertificateAsset(file: FormDataEntryValue | null, kind: string) {
+  if (!(file instanceof File) || file.size <= 0) return undefined;
+  const uploadForm = new FormData();
+  uploadForm.append("kind", kind);
+  uploadForm.append("file", file);
+  const response = await fetch("/api/certificates/assets", {
+    method: "POST",
+    body: uploadForm
+  });
+  const data = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+  if (!response.ok || !data?.imageUrl) throw new Error(data?.error ?? "Graduand photo upload failed.");
+  return data.imageUrl;
+}
+
 export function AcademicOperationsPanel({
   canAcademic,
   canMinistryLicense,
@@ -248,6 +268,38 @@ export function AcademicOperationsPanel({
       });
       form.reset();
       setNotice("Graduation board list created.");
+    });
+  }
+
+  async function createAcademicCandidate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    await runAction("candidate-create", async () => {
+      const photoUrl = await uploadCertificateAsset(formData.get("photoFile"), "recipient-photo");
+      await jsonRequest("/api/academic-candidates", "POST", {
+        fullName: formText(formData, "fullName"),
+        email: formText(formData, "email") || null,
+        phone: formText(formData, "phone") || null,
+        photoUrl,
+        organization: formText(formData, "organization") || null,
+        programName: formText(formData, "programName"),
+        educationLevel: formText(formData, "educationLevel"),
+        fieldOfStudy: formText(formData, "fieldOfStudy") || "Theology",
+        studyMode: formText(formData, "studyMode") || null,
+        admissionDate: dateIso(formData, "admissionDate"),
+        graduationDate: dateIso(formData, "graduationDate"),
+        paymentStatus: formData.get("feesCleared") === "on" ? "CLEARED" : "PENDING",
+        feesCleared: formData.get("feesCleared") === "on",
+        coursesCompleted: formData.get("coursesCompleted") === "on",
+        rectorApproved: formData.get("rectorApproved") === "on",
+        photoUploaded: Boolean(photoUrl) || formData.get("photoUploaded") === "on",
+        nameVerified: formData.get("nameVerified") === "on",
+        clearanceNotes: formText(formData, "clearanceNotes") || null
+      });
+      form.reset();
+      setNotice("Graduand added to the academic candidate registry.");
     });
   }
 
@@ -383,6 +435,78 @@ export function AcademicOperationsPanel({
       </section>
 
       {canAcademic ? (
+        <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Award className="h-4 w-4 text-moss" />Register Graduand / Student</p>
+            <p className="mt-1 text-xs text-ink/55">This is where the graduand name is captured before board approval and certificate issuing.</p>
+            <form className="mt-4 grid gap-3 lg:grid-cols-3" onSubmit={createAcademicCandidate}>
+              <Input className="lg:col-span-2" name="fullName" placeholder="Graduand full name" required />
+              <Input name="email" placeholder="Email optional" type="email" />
+              <Input name="phone" placeholder="Phone optional" />
+              <Input name="programName" placeholder="Program name" required />
+              <Input name="educationLevel" placeholder="Certificate / Diploma / BSc / MSc / PhD" required />
+              <Input name="fieldOfStudy" placeholder="Field of study" defaultValue="Theology" />
+              <Input name="organization" placeholder="School / church / ministry optional" />
+              <Input name="studyMode" placeholder="Study mode" />
+              <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                Graduand photo
+                <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="photoFile" type="file" />
+              </label>
+              <Input name="admissionDate" type="date" />
+              <Input name="graduationDate" type="date" />
+              <Textarea className="lg:col-span-1" name="clearanceNotes" placeholder="Clearance notes optional" />
+              <div className="flex flex-wrap gap-3 rounded-md bg-paper p-3 text-xs text-ink/65 lg:col-span-3">
+                {[
+                  ["feesCleared", "fees cleared"],
+                  ["coursesCompleted", "courses completed"],
+                  ["rectorApproved", "rector approved"],
+                  ["photoUploaded", "photo uploaded"],
+                  ["nameVerified", "name verified"]
+                ].map(([name, label]) => (
+                  <label className="flex items-center gap-2" key={name}>
+                    <input name={name} type="checkbox" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <Button className="lg:col-span-3" disabled={busy === "candidate-create"} type="submit">
+                {busy === "candidate-create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+                Add graduand
+              </Button>
+            </form>
+          </div>
+
+          <div className="rounded-lg border border-ink/10 bg-white shadow-soft">
+            <div className="border-b border-ink/10 p-4">
+              <p className="text-sm font-semibold text-ink">Registered graduands</p>
+              <p className="mt-1 text-xs text-ink/55">Select these names when creating a graduation approval list.</p>
+            </div>
+            <div className="divide-y divide-ink/10">
+              {candidates.slice(0, 8).map((candidate) => (
+                <div className="flex items-start gap-3 p-4" key={candidate.id}>
+                  {candidate.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt={candidate.fullName} className="h-12 w-12 rounded-md border border-ink/10 object-cover" src={candidate.photoUrl} />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ink/10 bg-paper text-xs font-semibold text-ink/45">Photo</div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-ink">{candidate.fullName}</p>
+                      <Badge className={statusClass(candidate.clearanceStatus)}>{candidate.clearanceStatus.toLowerCase()}</Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-ink/55">{candidate.educationLevel} - {candidate.programName}</p>
+                    <p className="mt-1 text-xs text-ink/50">{candidate.email ?? "No email"}{candidate.graduationDate ? ` - graduates ${formatDate(candidate.graduationDate)}` : ""}</p>
+                  </div>
+                </div>
+              ))}
+              {candidates.length === 0 ? <p className="p-6 text-sm text-ink/55">No graduands registered yet.</p> : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {canAcademic ? (
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><GraduationCap className="h-4 w-4 text-moss" />Academic Board Approval</p>
@@ -395,6 +519,7 @@ export function AcademicOperationsPanel({
                 <Input name="educationLevel" placeholder="Degree level, e.g. BSc" />
               </div>
               <Textarea name="notes" placeholder="Board notes, conditions, or academic remarks" />
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink/45">Select graduand names</p>
               <div className="max-h-56 overflow-auto rounded-md border border-ink/10 bg-paper p-2">
                 {candidates.map((candidate) => (
                   <label className="flex items-start gap-2 border-b border-ink/5 py-2 text-xs last:border-0" key={candidate.id}>
@@ -407,7 +532,7 @@ export function AcademicOperationsPanel({
                 ))}
                 {candidates.length === 0 ? (
                   <p className="rounded-md border border-ink/10 bg-white p-3 text-xs leading-5 text-ink/60">
-                    No academic candidates are available yet. Add a student or candidate record before creating a graduation list.
+                    No graduands are available yet. Register a graduand above before creating a graduation list.
                   </p>
                 ) : null}
               </div>
