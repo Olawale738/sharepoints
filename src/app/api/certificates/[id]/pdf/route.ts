@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import QRCode from "qrcode";
-import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
+import { BlendMode, PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
 import { certificatePresetDisplay, inferCertificatePreset } from "@/lib/certificate-presets";
@@ -120,6 +120,28 @@ function drawFittedText(input: {
   }
 
   page.drawText(displayText, { x, y, size, font, color });
+}
+
+function drawNaturalSignatureImage(input: {
+  page: PDFPage;
+  image: PDFImage;
+  x: number;
+  y: number;
+  maxWidth: number;
+  maxHeight: number;
+  opacity?: number;
+}) {
+  const { page, image, x, y, maxWidth, maxHeight, opacity = 0.9 } = input;
+  const scaled = image.scaleToFit(maxWidth, maxHeight);
+
+  page.drawImage(image, {
+    x: x + (maxWidth - scaled.width) / 2,
+    y: y + (maxHeight - scaled.height) / 2,
+    width: scaled.width,
+    height: scaled.height,
+    opacity,
+    blendMode: BlendMode.Multiply
+  });
 }
 
 function drawVerificationSealChip(input: {
@@ -360,8 +382,13 @@ export async function GET(request: Request, context: RouteContext) {
       page.drawImage(logo, { x: 69, y: height - 105, width: 52, height: 52 });
       page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 136, y: height - 78, size: 14.5, font: sansBold, color: white });
       page.drawText("LETW SCHOOL OF THEOLOGY | letw.org", { x: 136, y: height - 98, size: 8.8, font: sansBold, color: gold });
-      page.drawRectangle({ x: width - 210, y: height - 99, width: 140, height: 30, color: valid ? gold : rgb(0.65, 0.28, 0.2) });
-      drawCenteredText(page, valid ? "VERIFIED ACTIVE" : "NOT ACTIVE", width - 140, height - 87, sansBold, 10.5, valid ? academicBlue : white);
+      if (valid) {
+        page.drawText("LETW ACADEMIC REGISTRY", { x: width - 238, y: height - 80, size: 8.2, font: sansBold, color: gold });
+        page.drawText("Scan QR to confirm live status", { x: width - 238, y: height - 96, size: 7.2, font: sansBold, color: white });
+      } else {
+        page.drawRectangle({ x: width - 210, y: height - 99, width: 140, height: 30, color: rgb(0.65, 0.28, 0.2) });
+        drawCenteredText(page, "NOT ACTIVE", width - 140, height - 87, sansBold, 10.5, white);
+      }
 
       page.drawImage(logo, { x: width / 2 - 135, y: 166, width: 270, height: 270, opacity: watermarkOpacity(certificate.watermarkStrength) });
       drawCenteredText(page, "ACADEMIC CREDENTIAL", width / 2, 438, sansBold, 10.5, gold);
@@ -420,13 +447,21 @@ export async function GET(request: Request, context: RouteContext) {
       drawCenteredText(page, "SEAL", sealCenterX, sealCenterY - 55, sansBold, 7.2, gold);
 
       if (secondSignature) {
-        page.drawImage(secondSignature, { x: 168, y: 77, width: 178, height: 42, opacity: 0.96 });
+        drawNaturalSignatureImage({
+          page,
+          image: secondSignature,
+          x: 150,
+          y: 83,
+          maxWidth: 232,
+          maxHeight: 38,
+          opacity: 0.92
+        });
       } else {
         drawFittedText({
           page,
           text: secondName,
           x: 185,
-          y: 85,
+          y: 91,
           maxWidth: 180,
           font: script,
           preferredSize: 20,
