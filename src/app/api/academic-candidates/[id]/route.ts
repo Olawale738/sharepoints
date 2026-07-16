@@ -130,12 +130,24 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const actor = await requireUser();
     await requireAcademicCertificateIssuer(actor.id);
     const { id } = await context.params;
+    const existing = await prisma.academicCandidate.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+    if (!existing) throw new ApiError(404, "Registered graduand not found.");
+
     const certificateCount = await prisma.memberCertificationBadge.count({ where: { academicCandidateId: id } });
     if (certificateCount > 0) {
       throw new ApiError(409, "This candidate has certificate history. Mark the candidate inactive instead of deleting.");
     }
-    await prisma.academicCourseRecord.deleteMany({ where: { candidateId: id } });
-    await prisma.academicCandidate.delete({ where: { id } });
+
+    await prisma.$transaction([
+      prisma.academicBoardApprovalCandidate.deleteMany({ where: { candidateId: id } }),
+      prisma.certificateCorrectionRequest.deleteMany({ where: { academicCandidateId: id } }),
+      prisma.academicCourseRecord.deleteMany({ where: { candidateId: id } }),
+      prisma.academicCandidate.delete({ where: { id } })
+    ]);
+
     return ok({ deleted: true });
   } catch (error) {
     return handleRouteError(error);

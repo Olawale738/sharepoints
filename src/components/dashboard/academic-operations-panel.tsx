@@ -328,6 +328,14 @@ export function AcademicOperationsPanel({
     });
   }
 
+  async function deleteAcademicCandidate(candidate: Candidate) {
+    if (!window.confirm(`Delete ${candidate.fullName} from registered graduands? This is permanent unless the record has certificate history.`)) return;
+    await runAction(`candidate-delete-${candidate.id}`, async () => {
+      await jsonRequest(`/api/academic-candidates/${candidate.id}`, "DELETE");
+      setNotice("Registered graduand deleted.");
+    });
+  }
+
   async function boardAction(id: string, action: "SUBMIT" | "APPROVE" | "REJECT") {
     const reviewNote = action === "SUBMIT" ? null : window.prompt(action === "APPROVE" ? "Approval note optional" : "Why is this graduation list rejected?");
     if (action === "REJECT" && !reviewNote?.trim()) return;
@@ -538,6 +546,12 @@ export function AcademicOperationsPanel({
                         Update ID expiry
                       </Button>
                     </form>
+                    <div className="mt-2">
+                      <Button className="h-8 px-3 text-xs text-clay" disabled={busy === `candidate-delete-${candidate.id}`} type="button" variant="ghost" onClick={() => deleteAcademicCandidate(candidate)}>
+                        {busy === `candidate-delete-${candidate.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        Delete graduand
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
