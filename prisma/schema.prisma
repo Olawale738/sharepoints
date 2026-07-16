@@ -4343,6 +4343,31 @@ model CertificateBatchJob {
   @@index([createdById, createdAt])
 }
 
+model CertificateCorrectionRequest {
+  id                       String    @id @default(cuid())
+  certificateId            String
+  academicCandidateId       String?
+  requesterId              String?
+  requesterName            String?
+  requesterEmail           String?
+  correctionType           String
+  requestedChanges         Json
+  reason                   String?   @db.Text
+  status                   String    @default("PENDING")
+  reviewedById             String?
+  reviewedAt               DateTime?
+  reviewNote               String?   @db.Text
+  replacementCertificateId String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([certificateId, status, createdAt])
+  @@index([academicCandidateId, status])
+  @@index([requesterId, status, createdAt])
+  @@index([requesterEmail, status, createdAt])
+  @@index([status, createdAt])
+}
+
 model CertificateEvent {
   id            String   @id @default(cuid())
   certificateId String

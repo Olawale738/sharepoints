@@ -125,6 +125,37 @@ type CertificateBatchJobRow = {
   createdAt: string | Date;
 };
 
+type CertificateCorrectionRequestRow = {
+  id: string;
+  certificateId: string;
+  academicCandidateId?: string | null;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+  correctionType: string;
+  requestedChanges: Record<string, unknown>;
+  reason?: string | null;
+  status: string;
+  reviewNote?: string | null;
+  replacementCertificateId?: string | null;
+  createdAt: string | Date;
+  reviewedAt?: string | Date | null;
+  certificate?: {
+    id: string;
+    title: string;
+    certificateNumber?: string | null;
+    status: string;
+    recipientName?: string | null;
+    recipientEmail?: string | null;
+  } | null;
+  candidate?: {
+    id: string;
+    fullName: string;
+    email?: string | null;
+    educationLevel: string;
+    programName: string;
+  } | null;
+};
+
 function displayName(user: CertificateUser) {
   return user.name ?? user.email ?? "LETW Member";
 }
@@ -152,6 +183,26 @@ function defaultPresetForCategory(category: "MINISTRY" | "EDUCATION" | "MARRIAGE
   if (category === "EDUCATION") return "THEOLOGY_DEGREE";
   if (category === "MARRIAGE") return "MARRIAGE_COVENANT";
   return "MEMBERSHIP_COVENANT";
+}
+
+function correctionChangeSummary(changes: Record<string, unknown>) {
+  const labels: Record<string, string> = {
+    recipientName: "Name",
+    completionDate: "Date",
+    recipientPhotoUrl: "Photo",
+    educationLevel: "Level",
+    programName: "Program",
+    fieldOfStudy: "Field",
+    gradeOrHonors: "Grade",
+    secondSignatoryName: "Signatory",
+    secondSignatoryTitle: "Signatory title",
+    secondSignatorySignatureUrl: "Signature image",
+    signatureNote: "Signature note"
+  };
+  const parts = Object.entries(changes)
+    .filter(([, value]) => typeof value === "string" && value.trim())
+    .map(([key, value]) => `${labels[key] ?? key}: ${String(value)}`);
+  return parts.length ? parts.join(" | ") : "No correction details recorded.";
 }
 
 function SignaturePad({ label, name, resetKey }: { label: string; name: string; resetKey: number }) {
@@ -249,7 +300,8 @@ export function CertificateGeneratorPanel({
   academicOnly = false,
   academicCandidates = [],
   signatureProfiles = [],
-  batchJobs = []
+  batchJobs = [],
+  correctionRequests = []
 }: {
   users: CertificateUser[];
   certificates: CertificateRow[];
@@ -258,6 +310,7 @@ export function CertificateGeneratorPanel({
   academicCandidates?: AcademicCandidateRow[];
   signatureProfiles?: SignatureProfileRow[];
   batchJobs?: CertificateBatchJobRow[];
+  correctionRequests?: CertificateCorrectionRequestRow[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -708,6 +761,31 @@ export function CertificateGeneratorPanel({
     router.refresh();
   }
 
+  async function reviewCorrectionRequest(id: string, action: "APPROVE" | "REJECT") {
+    const reviewNote = window.prompt(action === "APPROVE" ? "Optional approval note for this correction" : "Why is this correction being rejected?");
+    if (action === "REJECT" && !reviewNote?.trim()) return;
+    setBusy(`correction-${action}-${id}`);
+    setNotice("");
+    setError("");
+    const response = await fetch(`/api/certificates/corrections/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, reviewNote })
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string; replacement?: { certificateNumber?: string | null } } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(body?.error ?? "Correction review failed.");
+      return;
+    }
+    setNotice(
+      action === "APPROVE"
+        ? `Correction approved. Replacement certificate ${body?.replacement?.certificateNumber ?? "record"} was created and signed.`
+        : "Correction request rejected."
+    );
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
@@ -887,6 +965,61 @@ export function CertificateGeneratorPanel({
                   ))}
                 </div>
               ) : null}
+            </div>
+
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-ink">Certificate correction requests</p>
+                  <p className="mt-1 text-xs text-ink/55">Approve a corrected replacement or reject with a note.</p>
+                </div>
+                <Badge>{correctionRequests.filter((request) => request.status === "PENDING").length} pending</Badge>
+              </div>
+              <div className="mt-4 space-y-3">
+                {correctionRequests.length === 0 ? <p className="rounded-md bg-paper px-3 py-3 text-sm text-ink/55">No correction requests yet.</p> : null}
+                {correctionRequests.slice(0, 8).map((request) => (
+                  <div className="rounded-md border border-ink/10 bg-paper p-3" key={request.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-ink">
+                          {request.certificate?.certificateNumber ?? request.certificate?.title ?? "Certificate correction"}
+                        </p>
+                        <p className="mt-1 text-xs text-ink/55">
+                          {request.candidate?.fullName ?? request.certificate?.recipientName ?? request.requesterName ?? "Candidate"} - {request.correctionType.toLowerCase()}
+                        </p>
+                      </div>
+                      <Badge className={request.status === "PENDING" ? "bg-[#fff6d8] text-[#7c5d00]" : request.status === "APPROVED" ? "bg-mint text-moss" : "bg-clay/10 text-clay"}>
+                        {request.status.toLowerCase()}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-ink/60">{correctionChangeSummary(request.requestedChanges)}</p>
+                    {request.reason ? <p className="mt-2 text-xs text-ink/50">Reason: {request.reason}</p> : null}
+                    {request.reviewNote ? <p className="mt-2 text-xs text-ink/50">Review note: {request.reviewNote}</p> : null}
+                    {request.status === "PENDING" ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          className="h-8 px-3 text-xs"
+                          disabled={busy === `correction-APPROVE-${request.id}`}
+                          type="button"
+                          onClick={() => reviewCorrectionRequest(request.id, "APPROVE")}
+                        >
+                          {busy === `correction-APPROVE-${request.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <BadgeCheck className="h-4 w-4" />}
+                          Approve
+                        </Button>
+                        <Button
+                          className="h-8 px-3 text-xs"
+                          disabled={busy === `correction-REJECT-${request.id}`}
+                          type="button"
+                          variant="ghost"
+                          onClick={() => reviewCorrectionRequest(request.id, "REJECT")}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>

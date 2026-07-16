@@ -14,7 +14,8 @@ const allowedKinds = new Set([
   "rector-signature",
   "president-signature",
   "second-signature",
-  "certificate-image"
+  "certificate-image",
+  "correction-photo"
 ]);
 
 function extensionFor(contentType: string) {
@@ -27,14 +28,14 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser();
     const authority = await getOfficialIssuanceAuthority(user.id);
-    if (!authority.canIssueCertificates && !authority.canIssueAcademicCertificates) {
+    const formData = await request.formData();
+    const kind = String(formData.get("kind") ?? "certificate-image");
+    if (!allowedKinds.has(kind)) throw new ApiError(422, "Invalid certificate image type.");
+    if (kind !== "correction-photo" && !authority.canIssueCertificates && !authority.canIssueAcademicCertificates) {
       throw new ApiError(403, "Only certificate issuers or president-assigned rectors can upload certificate images.");
     }
 
-    const formData = await request.formData();
     const file = formData.get("file");
-    const kind = String(formData.get("kind") ?? "certificate-image");
-    if (!allowedKinds.has(kind)) throw new ApiError(422, "Invalid certificate image type.");
     if (!(file instanceof File)) throw new ApiError(422, "Choose an image to upload.");
     if (file.size <= 0) throw new ApiError(422, "The selected image is empty.");
     if (file.size > MAX_PROFILE_PHOTO_BYTES) throw new ApiError(413, "Certificate images must be 5 MB or smaller.");

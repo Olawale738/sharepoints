@@ -20,7 +20,7 @@ export default async function RectorDashboardPage() {
     redirect("/dashboard/certificates");
   }
 
-  const [users, certificateRows, academicCandidates, signatureProfiles, batchJobs] = await Promise.all([
+  const [users, certificateRows, academicCandidates, signatureProfiles, batchJobs, correctionRequests] = await Promise.all([
     prisma.user.findMany({
       where: {
         deletedAt: null,
@@ -61,6 +61,10 @@ export default async function RectorDashboardPage() {
       where: { certificateCategory: "EDUCATION" },
       orderBy: { createdAt: "desc" },
       take: 30
+    }),
+    prisma.certificateCorrectionRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 200
     })
   ]);
   const [candidateCourses, candidateCertificates] = await Promise.all([
@@ -76,6 +80,24 @@ export default async function RectorDashboardPage() {
       take: 1000
     })
   ]);
+  const correctionCertificateIds = Array.from(new Set(correctionRequests.map((request) => request.certificateId)));
+  const correctionCandidateIds = Array.from(new Set(correctionRequests.map((request) => request.academicCandidateId).filter(Boolean))) as string[];
+  const [correctionCertificates, correctionCandidates] = await Promise.all([
+    correctionCertificateIds.length
+      ? prisma.memberCertificationBadge.findMany({
+          where: { id: { in: correctionCertificateIds }, certificateCategory: "EDUCATION" },
+          select: { id: true, title: true, certificateNumber: true, status: true, recipientName: true, recipientEmail: true }
+        })
+      : [],
+    correctionCandidateIds.length
+      ? prisma.academicCandidate.findMany({
+          where: { id: { in: correctionCandidateIds } },
+          select: { id: true, fullName: true, email: true, educationLevel: true, programName: true }
+        })
+      : []
+  ]);
+  const correctionCertificatesById = new Map(correctionCertificates.map((certificate) => [certificate.id, certificate]));
+  const correctionCandidatesById = new Map(correctionCandidates.map((candidate) => [candidate.id, candidate]));
 
   const certificateUsers = await prisma.user.findMany({
     where: {
@@ -153,6 +175,16 @@ export default async function RectorDashboardPage() {
         batchJobs={batchJobs}
         canManage
         certificates={certificates}
+        correctionRequests={correctionRequests
+          .filter((request) => correctionCertificatesById.has(request.certificateId))
+          .map((request) => ({
+            ...request,
+            requestedChanges: request.requestedChanges && typeof request.requestedChanges === "object" && !Array.isArray(request.requestedChanges)
+              ? request.requestedChanges as Record<string, unknown>
+              : {},
+            certificate: correctionCertificatesById.get(request.certificateId) ?? null,
+            candidate: request.academicCandidateId ? correctionCandidatesById.get(request.academicCandidateId) ?? null : null
+          }))}
         signatureProfiles={signatureProfiles}
         users={users}
       />
