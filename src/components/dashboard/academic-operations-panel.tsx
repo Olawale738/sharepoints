@@ -230,13 +230,19 @@ export function AcademicOperationsPanel({
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const candidateIds = formData.getAll("candidateIds").map(String);
+    if (candidateIds.length === 0) {
+      setNotice("");
+      setError("Select at least one academic candidate before creating a graduation list.");
+      return;
+    }
     await runAction("board-create", async () => {
       await jsonRequest("/api/academic-board", "POST", {
         title: formText(formData, "title"),
         programName: formText(formData, "programName") || null,
         educationLevel: formText(formData, "educationLevel") || null,
         boardDate: dateIso(formData, "boardDate"),
-        candidateIds: formData.getAll("candidateIds").map(String),
+        candidateIds,
         notes: formText(formData, "notes") || null,
         submit: formData.get("submit") === "on"
       });
@@ -399,6 +405,11 @@ export function AcademicOperationsPanel({
                     </span>
                   </label>
                 ))}
+                {candidates.length === 0 ? (
+                  <p className="rounded-md border border-ink/10 bg-white p-3 text-xs leading-5 text-ink/60">
+                    No academic candidates are available yet. Add a student or candidate record before creating a graduation list.
+                  </p>
+                ) : null}
               </div>
               <label className="flex items-center gap-2 text-xs text-ink/60">
                 <input name="submit" type="checkbox" />

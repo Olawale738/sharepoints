@@ -13,7 +13,7 @@ const createSchema = z.object({
   educationLevel: z.string().trim().max(120).optional().nullable(),
   fieldOfStudy: z.string().trim().max(120).optional().nullable(),
   boardDate: z.string().datetime().optional().nullable(),
-  candidateIds: z.array(z.string().cuid()).min(1),
+  candidateIds: z.array(z.string().cuid()).min(1, "Select at least one academic candidate before creating a graduation list."),
   notes: z.string().trim().max(2000).optional().nullable(),
   submit: z.boolean().optional()
 });
@@ -44,7 +44,10 @@ export async function POST(request: Request) {
     const actor = await requireUser();
     await requireAcademicCertificateIssuer(actor.id);
     const parsed = createSchema.safeParse(await request.json());
-    if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid graduation approval list.");
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new ApiError(422, issue?.message ?? "Invalid graduation approval list.");
+    }
     const data = parsed.data;
     const candidateCount = await prisma.academicCandidate.count({ where: { id: { in: data.candidateIds } } });
     if (candidateCount !== data.candidateIds.length) throw new ApiError(404, "One or more academic candidates were not found.");
