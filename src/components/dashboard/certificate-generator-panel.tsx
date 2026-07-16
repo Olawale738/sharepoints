@@ -33,6 +33,7 @@ type CertificateUser = {
 type CertificateRow = {
   id: string;
   userId: string | null;
+  academicCandidateId?: string | null;
   title: string;
   issuer: string;
   certificateNumber?: string | null;
@@ -78,6 +79,52 @@ type CertificateRow = {
   user: CertificateUser;
 };
 
+type AcademicCandidateRow = {
+  id: string;
+  userId?: string | null;
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  photoUrl?: string | null;
+  organization?: string | null;
+  programName: string;
+  educationLevel: string;
+  fieldOfStudy: string;
+  studyMode?: string | null;
+  admissionDate?: string | Date | null;
+  graduationDate?: string | Date | null;
+  status: string;
+  paymentStatus: string;
+  feesCleared: boolean;
+  coursesCompleted: boolean;
+  rectorApproved: boolean;
+  photoUploaded: boolean;
+  nameVerified: boolean;
+  clearanceStatus: string;
+  clearanceNotes?: string | null;
+  certificates?: Array<{ id: string; title: string; certificateNumber?: string | null; status: string; issuedAt: string | Date }>;
+  courses?: Array<{ id: string; courseCode?: string | null; courseTitle: string; grade?: string | null; status: string }>;
+};
+
+type SignatureProfileRow = {
+  id: string;
+  name: string;
+  title: string;
+  role: string;
+  imageUrl: string;
+  active: boolean;
+};
+
+type CertificateBatchJobRow = {
+  id: string;
+  title: string;
+  status: string;
+  totalRows: number;
+  issuedCount: number;
+  failedCount: number;
+  createdAt: string | Date;
+};
+
 function displayName(user: CertificateUser) {
   return user.name ?? user.email ?? "LETW Member";
 }
@@ -95,6 +142,10 @@ function initials(user: CertificateUser) {
 function formatDate(value: string | Date | null | undefined) {
   if (!value) return "No expiry";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function academicCandidateReady(candidate: AcademicCandidateRow) {
+  return candidate.feesCleared && candidate.coursesCompleted && candidate.rectorApproved && candidate.photoUploaded && candidate.nameVerified;
 }
 
 function defaultPresetForCategory(category: "MINISTRY" | "EDUCATION" | "MARRIAGE") {
@@ -195,12 +246,18 @@ export function CertificateGeneratorPanel({
   users,
   certificates,
   canManage,
-  academicOnly = false
+  academicOnly = false,
+  academicCandidates = [],
+  signatureProfiles = [],
+  batchJobs = []
 }: {
   users: CertificateUser[];
   certificates: CertificateRow[];
   canManage: boolean;
   academicOnly?: boolean;
+  academicCandidates?: AcademicCandidateRow[];
+  signatureProfiles?: SignatureProfileRow[];
+  batchJobs?: CertificateBatchJobRow[];
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -335,6 +392,8 @@ export function CertificateGeneratorPanel({
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const intent = submitter?.value ?? "issue";
     setBusy("create");
     setNotice("");
     setError("");
@@ -356,6 +415,9 @@ export function CertificateGeneratorPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: formText(formData, "userId") || null,
+          academicCandidateId: formText(formData, "academicCandidateId") || null,
+          signatureProfileId: formText(formData, "signatureProfileId") || null,
+          previewOnly: intent === "preview",
           title,
           certificateCategory: selectedCategory,
           recipientName: formText(formData, "recipientName") || undefined,
@@ -407,7 +469,7 @@ export function CertificateGeneratorPanel({
 
       form.reset();
       setSignatureResetKey((value) => value + 1);
-      setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : academicOnly ? "Academic certificate created." : "Certificate created.");
+      setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : intent === "preview" ? "Preview draft created. Open its PDF, check it, then issue it when approved." : academicOnly ? "Academic certificate created." : "Certificate created.");
       router.refresh();
     } catch (uploadError) {
       setBusy("");
@@ -416,7 +478,7 @@ export function CertificateGeneratorPanel({
     }
   }
 
-  async function updateCertificate(id: string, action: "REVOKE" | "RESTORE" | "REISSUE") {
+  async function updateCertificate(id: string, action: "REVOKE" | "RESTORE" | "REISSUE" | "ISSUE") {
     const reason = action === "REISSUE" ? window.prompt("Why is this certificate being reissued or replaced?") : null;
     if (action === "REISSUE" && !reason?.trim()) return;
     setBusy(`${action}-${id}`);
@@ -435,7 +497,7 @@ export function CertificateGeneratorPanel({
       return;
     }
 
-    setNotice(body?.pendingApproval ? "Certificate action sent to the president for approval." : action === "REVOKE" ? "Certificate revoked." : action === "REISSUE" ? "Certificate reissued and old certificate replaced." : "Certificate restored.");
+    setNotice(body?.pendingApproval ? "Certificate action sent to the president for approval." : action === "REVOKE" ? "Certificate revoked." : action === "REISSUE" ? "Certificate reissued and old certificate replaced." : action === "ISSUE" ? "Preview approved and certificate issued." : "Certificate restored.");
     router.refresh();
   }
 
@@ -459,10 +521,376 @@ export function CertificateGeneratorPanel({
     router.refresh();
   }
 
+  async function createAcademicCandidate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setBusy("candidate");
+    setNotice("");
+    setError("");
+    try {
+      const photoUrl = await uploadCertificateAsset(formData.get("photoFile"), "recipient-photo");
+      const response = await fetch("/api/academic-candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: formText(formData, "fullName"),
+          email: formText(formData, "email") || null,
+          phone: formText(formData, "phone") || null,
+          photoUrl,
+          organization: formText(formData, "organization") || null,
+          programName: formText(formData, "programName"),
+          educationLevel: formText(formData, "educationLevel"),
+          fieldOfStudy: formText(formData, "fieldOfStudy") || "Theology",
+          studyMode: formText(formData, "studyMode") || null,
+          admissionDate: formText(formData, "admissionDate") ? new Date(formText(formData, "admissionDate")).toISOString() : null,
+          graduationDate: formText(formData, "graduationDate") ? new Date(formText(formData, "graduationDate")).toISOString() : null,
+          paymentStatus: formData.get("feesCleared") === "on" ? "CLEARED" : "PENDING",
+          feesCleared: formData.get("feesCleared") === "on",
+          coursesCompleted: formData.get("coursesCompleted") === "on",
+          rectorApproved: formData.get("rectorApproved") === "on",
+          photoUploaded: Boolean(photoUrl) || formData.get("photoUploaded") === "on",
+          nameVerified: formData.get("nameVerified") === "on",
+          clearanceNotes: formText(formData, "clearanceNotes") || null
+        })
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setBusy("");
+      if (!response.ok) {
+        setError(body?.error ?? "Academic candidate could not be created.");
+        return;
+      }
+      form.reset();
+      setNotice("Academic candidate added to the student registry.");
+      router.refresh();
+    } catch (candidateError) {
+      setBusy("");
+      setError(candidateError instanceof Error ? candidateError.message : "Academic candidate could not be created.");
+    }
+  }
+
+  async function updateAcademicCandidate(candidate: AcademicCandidateRow, patch: Partial<AcademicCandidateRow>) {
+    setBusy(`candidate-${candidate.id}`);
+    setNotice("");
+    setError("");
+    const response = await fetch(`/api/academic-candidates/${candidate.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(body?.error ?? "Academic candidate could not be updated.");
+      return;
+    }
+    setNotice("Academic clearance updated.");
+    router.refresh();
+  }
+
+  async function addAcademicCourse(event: FormEvent<HTMLFormElement>, candidateId: string) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setBusy(`course-${candidateId}`);
+    setNotice("");
+    setError("");
+    const response = await fetch(`/api/academic-candidates/${candidateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        course: {
+          courseCode: formText(formData, "courseCode") || null,
+          courseTitle: formText(formData, "courseTitle"),
+          credits: formText(formData, "credits") || null,
+          grade: formText(formData, "grade") || null,
+          status: "COMPLETED",
+          completedAt: formText(formData, "completedAt") ? new Date(formText(formData, "completedAt")).toISOString() : null
+        }
+      })
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(body?.error ?? "Course record could not be added.");
+      return;
+    }
+    form.reset();
+    setNotice("Academic course record added.");
+    router.refresh();
+  }
+
+  async function createSignatureProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setBusy("signature");
+    setNotice("");
+    setError("");
+    try {
+      const imageUrl =
+        (await uploadCertificateSignatureData(formText(formData, "signatureDrawn"), "rector-signature")) ??
+        (await uploadCertificateAsset(formData.get("signatureFile"), "rector-signature"));
+      if (!imageUrl) {
+        setBusy("");
+        setError("Draw or upload a signature before saving it.");
+        return;
+      }
+      const response = await fetch("/api/certificates/signatures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formText(formData, "name"),
+          title: formText(formData, "title"),
+          role: formText(formData, "role") || "RECTOR",
+          imageUrl
+        })
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      setBusy("");
+      if (!response.ok) {
+        setError(body?.error ?? "Signature profile could not be saved.");
+        return;
+      }
+      form.reset();
+      setSignatureResetKey((value) => value + 1);
+      setNotice("Official signature saved to the library.");
+      router.refresh();
+    } catch (signatureError) {
+      setBusy("");
+      setError(signatureError instanceof Error ? signatureError.message : "Signature profile could not be saved.");
+    }
+  }
+
+  async function deleteSignatureProfile(id: string) {
+    setBusy(`signature-${id}`);
+    setNotice("");
+    setError("");
+    const response = await fetch(`/api/certificates/signatures/${id}`, { method: "DELETE" });
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(body?.error ?? "Signature profile could not be deactivated.");
+      return;
+    }
+    setNotice("Signature profile deactivated.");
+    router.refresh();
+  }
+
+  async function createBatchCertificates(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setBusy("batch");
+    setNotice("");
+    setError("");
+    const response = await fetch("/api/certificates/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: formText(formData, "title"),
+        signatureProfileId: formText(formData, "signatureProfileId") || null,
+        csv: formText(formData, "csv") || null,
+        candidateIds: Array.from(formData.getAll("candidateIds")).map(String),
+        expiresAt: formText(formData, "expiresAt") ? new Date(formText(formData, "expiresAt")).toISOString() : null
+      })
+    });
+    const body = (await response.json().catch(() => null)) as { error?: string; results?: Array<{ status: string }> } | null;
+    setBusy("");
+    if (!response.ok) {
+      setError(body?.error ?? "Batch issuing failed.");
+      return;
+    }
+    const issued = body?.results?.filter((result) => result.status === "ISSUED").length ?? 0;
+    const failed = body?.results?.filter((result) => result.status === "FAILED").length ?? 0;
+    form.reset();
+    setNotice(`Batch completed: ${issued} issued, ${failed} failed.`);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
       {error ? <p className="rounded-md bg-clay/10 px-4 py-3 text-sm text-clay">{error}</p> : null}
+
+      {canManage && (academicOnly || certificateCategory === "EDUCATION") ? (
+        <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-lg border border-ink/10 bg-white p-4">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-ink">Student academic registry</p>
+              <p className="mt-1 text-xs text-ink/55">Register theology candidates and clear them before certificate issuing.</p>
+            </div>
+            <form className="grid gap-3 lg:grid-cols-3" onSubmit={createAcademicCandidate}>
+              <Input name="fullName" placeholder="Candidate full name" required />
+              <Input name="email" placeholder="Email optional" type="email" />
+              <Input name="phone" placeholder="Phone optional" />
+              <Input name="programName" placeholder="Program name" required />
+              <Input name="educationLevel" placeholder="Certificate / Diploma / BSc / MSc / PhD" required />
+              <Input name="fieldOfStudy" placeholder="Field of study" defaultValue="Theology" />
+              <Input name="organization" placeholder="Church / school / ministry optional" />
+              <Input name="studyMode" placeholder="Study mode" />
+              <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                Candidate photo
+                <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="photoFile" type="file" />
+              </label>
+              <Input name="admissionDate" type="date" />
+              <Input name="graduationDate" type="date" />
+              <Textarea className="lg:col-span-1" name="clearanceNotes" placeholder="Clearance notes optional" />
+              <div className="flex flex-wrap gap-3 rounded-md bg-paper p-3 text-xs text-ink/65 lg:col-span-3">
+                {[
+                  ["feesCleared", "fees cleared"],
+                  ["coursesCompleted", "courses completed"],
+                  ["rectorApproved", "rector approved"],
+                  ["photoUploaded", "photo uploaded"],
+                  ["nameVerified", "name verified"]
+                ].map(([name, label]) => (
+                  <label className="flex items-center gap-2" key={name}>
+                    <input name={name} type="checkbox" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <Button className="lg:col-span-3" disabled={busy === "candidate"} type="submit">
+                {busy === "candidate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+                Add candidate
+              </Button>
+            </form>
+
+            <div className="mt-5 grid gap-3">
+              {academicCandidates.length === 0 ? <p className="rounded-md bg-paper px-4 py-4 text-sm text-ink/55">No academic candidates yet.</p> : null}
+              {academicCandidates.slice(0, 12).map((candidate) => {
+                const ready = academicCandidateReady(candidate);
+                return (
+                  <div className="rounded-lg border border-ink/10 bg-paper p-3" key={candidate.id}>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="font-semibold text-ink">{candidate.fullName}</p>
+                        <p className="mt-1 text-xs text-ink/55">{candidate.educationLevel} - {candidate.programName}</p>
+                        <p className="mt-1 text-xs text-ink/55">{candidate.email ?? "No email"} - {candidate.certificates?.length ?? 0} certificates - {candidate.courses?.length ?? 0} courses</p>
+                      </div>
+                      <Badge className={ready ? "bg-mint text-moss" : "bg-[#fff6d8] text-[#7c5d00]"}>
+                        {ready ? "cleared" : "pending clearance"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      {[
+                        ["feesCleared", "Fees", candidate.feesCleared],
+                        ["coursesCompleted", "Courses", candidate.coursesCompleted],
+                        ["rectorApproved", "Rector", candidate.rectorApproved],
+                        ["photoUploaded", "Photo", candidate.photoUploaded],
+                        ["nameVerified", "Name", candidate.nameVerified]
+                      ].map(([key, label, checked]) => (
+                        <button
+                          className={`rounded-full border px-3 py-1 ${checked ? "border-moss/20 bg-mint text-moss" : "border-ink/10 bg-white text-ink/55"}`}
+                          key={String(key)}
+                          type="button"
+                          onClick={() => updateAcademicCandidate(candidate, { [String(key)]: !checked })}
+                        >
+                          {label}: {checked ? "yes" : "no"}
+                        </button>
+                      ))}
+                    </div>
+                    <form className="mt-3 grid gap-2 lg:grid-cols-[0.7fr_1.4fr_0.5fr_0.5fr_0.8fr_auto]" onSubmit={(event) => addAcademicCourse(event, candidate.id)}>
+                      <Input name="courseCode" placeholder="Code" />
+                      <Input name="courseTitle" placeholder="Course title" required />
+                      <Input name="credits" placeholder="Credits" type="number" />
+                      <Input name="grade" placeholder="Grade" />
+                      <Input name="completedAt" type="date" />
+                      <Button disabled={busy === `course-${candidate.id}`} type="submit" variant="secondary">
+                        Add course
+                      </Button>
+                    </form>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="text-sm font-semibold text-ink">Official signature library</p>
+              <p className="mt-1 text-xs text-ink/55">Store rector, registrar, president, and secretary signatures once.</p>
+              <form className="mt-3 space-y-3" onSubmit={createSignatureProfile}>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Input name="name" placeholder="Signatory name" required />
+                  <Input name="title" placeholder="Title, e.g. Rector" required />
+                  <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="role" defaultValue="RECTOR">
+                    <option value="RECTOR">Rector</option>
+                    <option value="REGISTRAR">Registrar</option>
+                    <option value="PRESIDENT">President</option>
+                    <option value="SECRETARY">Secretary</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                  <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                    Signature image
+                    <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="signatureFile" type="file" />
+                  </label>
+                </div>
+                <SignaturePad label="Draw signature on screen" name="signatureDrawn" resetKey={signatureResetKey} />
+                <Button disabled={busy === "signature"} type="submit">
+                  {busy === "signature" ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Save signature
+                </Button>
+              </form>
+              <div className="mt-4 space-y-2">
+                {signatureProfiles.length === 0 ? <p className="rounded-md bg-paper px-3 py-3 text-sm text-ink/55">No stored signatures yet.</p> : null}
+                {signatureProfiles.map((signature) => (
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-ink/10 bg-paper p-2" key={signature.id}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img alt={`${signature.name} signature`} className="h-8 w-24 rounded bg-white object-contain" src={signature.imageUrl} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ink">{signature.name}</p>
+                        <p className="text-xs text-ink/55">{signature.title} - {signature.role.toLowerCase()}</p>
+                      </div>
+                    </div>
+                    <Button className="h-8 px-2 text-xs" disabled={busy === `signature-${signature.id}`} type="button" variant="ghost" onClick={() => deleteSignatureProfile(signature.id)}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-ink/10 bg-white p-4">
+              <p className="text-sm font-semibold text-ink">Batch issuing</p>
+              <p className="mt-1 text-xs text-ink/55">Issue certificates only for cleared academic candidates.</p>
+              <form className="mt-3 space-y-3" onSubmit={createBatchCertificates}>
+                <Input name="title" placeholder="Certificate title" defaultValue="Certificate in Theology" required />
+                <select className="h-10 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" name="signatureProfileId">
+                  <option value="">Use default rector signature</option>
+                  {signatureProfiles.map((signature) => (
+                    <option key={signature.id} value={signature.id}>{signature.name} - {signature.title}</option>
+                  ))}
+                </select>
+                <Textarea name="csv" placeholder={"CSV rows: candidate id or name,email,program,level,completion date\nExample: Grace,grace@example.com,LETW School of Theology,Certificate in Theology,2026-07-16"} />
+                <div className="max-h-40 space-y-1 overflow-auto rounded-md bg-paper p-2">
+                  {academicCandidates.filter(academicCandidateReady).slice(0, 30).map((candidate) => (
+                    <label className="flex items-center gap-2 text-xs text-ink/65" key={candidate.id}>
+                      <input name="candidateIds" type="checkbox" value={candidate.id} />
+                      {candidate.fullName} - {candidate.educationLevel}
+                    </label>
+                  ))}
+                </div>
+                <Input name="expiresAt" type="date" />
+                <Button disabled={busy === "batch"} type="submit" variant="secondary">
+                  {busy === "batch" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+                  Issue batch
+                </Button>
+              </form>
+              {batchJobs.length ? (
+                <div className="mt-4 space-y-2">
+                  {batchJobs.slice(0, 5).map((job) => (
+                    <p className="rounded-md bg-paper px-3 py-2 text-xs text-ink/60" key={job.id}>
+                      {job.title}: {job.issuedCount} issued, {job.failedCount} failed - {job.status.toLowerCase()}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {canManage ? (
         <section className="rounded-lg border border-ink/10 bg-white p-4">
@@ -619,6 +1047,22 @@ export function CertificateGeneratorPanel({
               <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0b1b3d]">Theology education details</p>
                 <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="academicCandidateId" required>
+                    <option value="">Select cleared academic candidate</option>
+                    {academicCandidates.map((candidate) => (
+                      <option key={candidate.id} value={candidate.id}>
+                        {candidate.fullName} - {candidate.educationLevel} - {academicCandidateReady(candidate) ? "cleared" : "pending"}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="signatureProfileId">
+                    <option value="">Use uploaded/drawn/default rector signature</option>
+                    {signatureProfiles.map((signature) => (
+                      <option key={signature.id} value={signature.id}>
+                        {signature.name} - {signature.title}
+                      </option>
+                    ))}
+                  </select>
                   <Input name="educationLevel" placeholder="Level, e.g. Diploma" />
                   <Input name="programName" placeholder="Program name, e.g. LETW School of Theology" />
                   <Input name="fieldOfStudy" placeholder="Field of study, e.g. Theology" defaultValue="Theology" />
@@ -673,10 +1117,18 @@ export function CertificateGeneratorPanel({
               </div>
             ) : null}
 
-            <Button disabled={busy === "create"} type="submit">
-              {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
-              {academicOnly ? "Generate academic certificate" : "Generate secure certificate"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {certificateCategory === "EDUCATION" ? (
+                <Button disabled={busy === "create"} name="intent" type="submit" value="preview" variant="secondary">
+                  {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                  Create approval preview
+                </Button>
+              ) : null}
+              <Button disabled={busy === "create"} name="intent" type="submit" value="issue">
+                {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
+                {academicOnly ? "Issue academic certificate" : "Generate secure certificate"}
+              </Button>
+            </div>
           </form>
         </section>
       ) : null}
@@ -874,7 +1326,16 @@ export function CertificateGeneratorPanel({
                       Verify
                     </a>
                     {canManage ? (
-                      valid ? (
+                      certificate.status === "DRAFT" ? (
+                        <Button
+                          className="h-9"
+                          disabled={busy === `ISSUE-${certificate.id}`}
+                          onClick={() => updateCertificate(certificate.id, "ISSUE")}
+                        >
+                          {busy === `ISSUE-${certificate.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                          Issue preview
+                        </Button>
+                      ) : valid ? (
                         <Button
                           className="h-9"
                           disabled={busy === `REVOKE-${certificate.id}`}
@@ -925,7 +1386,7 @@ export function CertificateGeneratorPanel({
                   </div>
                   {!valid ? (
                     <div className="certificate-invalid-stamp" aria-hidden="true">
-                      Not valid
+                      {certificate.status === "DRAFT" ? "Preview draft" : "Not valid"}
                     </div>
                   ) : null}
                 </div>

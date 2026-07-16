@@ -3,7 +3,8 @@ import { PresidentialApprovalTargetType } from "@prisma/client";
 
 import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { recordCertificateEvent, reissueCertificate } from "@/lib/certificate-lifecycle";
+import { requireClearedAcademicCandidate } from "@/lib/academic-certificates";
+import { recordCertificateEvent, reissueCertificate, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { restoredCertificateData } from "@/lib/certificates";
 import { requireAcademicCertificateIssuer, requireCertificateIssuer } from "@/lib/official-issuance";
 import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
@@ -14,7 +15,7 @@ type RouteContext = {
 };
 
 const updateSchema = z.object({
-  action: z.enum(["REVOKE", "RESTORE", "REISSUE"]),
+  action: z.enum(["REVOKE", "RESTORE", "REISSUE", "ISSUE"]),
   reason: z.string().trim().max(1000).optional().nullable()
 });
 
@@ -34,6 +35,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       await requireAcademicCertificateIssuer(actor.id);
     } else {
       await requireCertificateIssuer(actor.id);
+    }
+    if (parsed.data.action === "ISSUE") {
+      if (existing.status !== "DRAFT") throw new ApiError(409, "Only preview draft certificates can be issued.");
+      if (existing.certificateCategory !== "EDUCATION") throw new ApiError(422, "Preview approval issuing is available for academic certificates.");
+      await requireClearedAcademicCandidate(existing.academicCandidateId);
     }
     const pendingApproval = await maybeQueuePresidentialApproval({
       requesterId: actor.id,
@@ -61,6 +67,27 @@ export async function PATCH(request: Request, context: RouteContext) {
         metadata: { replacementOfId: id, certificateNumber: replacement.certificateNumber }
       });
       return ok({ certificate: replacement });
+    }
+
+    if (parsed.data.action === "ISSUE") {
+      const issued = await prisma.memberCertificationBadge.update({
+        where: { id },
+        data: { status: "ACTIVE", revokedAt: null, issuedAt: new Date() }
+      });
+      const certificate = await signStoredCertificate(issued);
+      await logActivity({
+        userId: actor.id,
+        action: "certificate.preview_approved",
+        targetId: certificate.id,
+        metadata: { title: certificate.title, certificateNumber: certificate.certificateNumber }
+      });
+      await recordCertificateEvent({
+        certificateId: certificate.id,
+        actorId: actor.id,
+        eventType: "PREVIEW_APPROVED",
+        summary: "Academic certificate preview approved and issued."
+      });
+      return ok({ certificate });
     }
 
     const certificate = await prisma.memberCertificationBadge.update({

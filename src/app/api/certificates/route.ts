@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { createAcademicCertificate, requireClearedAcademicCandidate } from "@/lib/academic-certificates";
 import { CERTIFICATE_PRESET_VALUES, certificatePresetDefaults, inferCertificatePreset } from "@/lib/certificate-presets";
 import { generateCertificateNumber, generateSealNumber, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-security";
 import { recordCertificateEvent, signStoredCertificate } from "@/lib/certificate-lifecycle";
@@ -23,6 +24,9 @@ const certificateImageRefSchema = z
 
 const certificateSchema = z.object({
   userId: z.string().cuid().optional().nullable(),
+  academicCandidateId: z.string().cuid().optional().nullable(),
+  signatureProfileId: z.string().cuid().optional().nullable(),
+  previewOnly: z.boolean().optional(),
   title: z.string().trim().min(3).max(160),
   certificateCategory: z.enum(["MINISTRY", "EDUCATION", "MARRIAGE"]).default("MINISTRY"),
   recipientName: z.string().trim().max(180).optional().nullable(),
@@ -152,6 +156,25 @@ export async function POST(request: Request) {
       await requireCertificateIssuer(actor.id);
     }
     const isMarriage = data.certificateCategory === "MARRIAGE";
+    const academicCandidate = isEducation
+      ? data.academicCandidateId
+        ? await prisma.academicCandidate.findUnique({ where: { id: data.academicCandidateId } })
+        : null
+      : null;
+    if (isEducation && !academicCandidate) {
+      throw new ApiError(422, "Select an academic candidate from the student registry before creating a theology certificate.");
+    }
+    if (isEducation && academicCandidate && !data.previewOnly) {
+      await requireClearedAcademicCandidate(academicCandidate.id);
+    }
+    const signatureProfile = data.signatureProfileId
+      ? await prisma.certificateSignatureProfile.findFirst({
+          where: { id: data.signatureProfileId, active: true }
+        })
+      : null;
+    if (data.signatureProfileId && !signatureProfile) {
+      throw new ApiError(404, "The selected signature profile is inactive or was not found.");
+    }
     const certificatePreset = inferCertificatePreset({
       certificatePreset: data.certificatePreset,
       certificateCategory: data.certificateCategory,
@@ -176,11 +199,48 @@ export async function POST(request: Request) {
     if (isMarriage && (!normalizeNullableText(data.spouseOneName) || !normalizeNullableText(data.spouseTwoName))) {
       throw new ApiError(422, "Marriage certificates require both spouse names.");
     }
-    if (!recipient && !normalizeNullableText(data.recipientName) && !marriageHolderName) {
+    if (!recipient && !academicCandidate && !normalizeNullableText(data.recipientName) && !marriageHolderName) {
       throw new ApiError(422, "Enter the external candidate name or select a LETW member.");
     }
     if (isEducation && !THEOLOGY_CERTIFICATE_TYPES.includes(normalizedTitle as (typeof THEOLOGY_CERTIFICATE_TYPES)[number]) && !normalizeNullableText(data.programName)) {
       throw new ApiError(422, "Educational certificates need a theology program name or one of the theology certificate levels.");
+    }
+
+    if (isEducation && academicCandidate && data.previewOnly) {
+      const preview = await createAcademicCertificate({
+        actorId: actor.id,
+        candidate: academicCandidate,
+        title: normalizedTitle,
+        issuer: data.issuer,
+        recipientName: normalizeNullableText(data.recipientName),
+        recipientEmail: normalizeNullableText(data.recipientEmail),
+        recipientPhone: normalizeNullableText(data.recipientPhone),
+        recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl),
+        recipientOrganization: normalizeNullableText(data.recipientOrganization),
+        educationLevel: normalizeNullableText(data.educationLevel) ?? normalizedTitle,
+        programName: normalizeNullableText(data.programName) ?? normalizedTitle,
+        fieldOfStudy: normalizeNullableText(data.fieldOfStudy) ?? "Theology",
+        gradeOrHonors: normalizeNullableText(data.gradeOrHonors),
+        studyMode: normalizeNullableText(data.studyMode),
+        studyStartDate: nullableDate(data.studyStartDate),
+        studyEndDate: nullableDate(data.studyEndDate),
+        completionDate: nullableDate(data.completionDate),
+        customBody: normalizeNullableText(data.customBody),
+        certificatePreset,
+        templateStyle: data.templateStyle ?? presetDefaults.templateStyle,
+        templateAccent: data.templateAccent ?? presetDefaults.templateAccent,
+        sealStyle: data.sealStyle ?? presetDefaults.sealStyle,
+        signatureLayout: data.signatureLayout ?? presetDefaults.signatureLayout,
+        watermarkStrength: data.watermarkStrength ?? presetDefaults.watermarkStrength,
+        secondSignatoryName: normalizeNullableText(data.secondSignatoryName) ?? signatureProfile?.name ?? null,
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? signatureProfile?.title ?? presetDefaults.secondSignatoryTitle,
+        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl) ?? signatureProfile?.imageUrl ?? null,
+        certificateNumber: data.certificateNumber ?? null,
+        expiresAt: data.expiresAt ?? null,
+        status: "DRAFT"
+      });
+
+      return ok({ certificate: preview, preview: true }, { status: 201 });
     }
 
     const pendingApproval = await maybeQueuePresidentialApproval({
@@ -191,16 +251,17 @@ export async function POST(request: Request) {
       summary: `Approve issuing ${normalizedTitle} to ${recipient?.name ?? data.recipientName ?? data.recipientEmail ?? "external candidate"}.`,
       payload: {
         userId: recipient?.id ?? null,
+        academicCandidateId: academicCandidate?.id ?? null,
         title: normalizedTitle,
         certificateCategory: data.certificateCategory,
-        recipientName: normalizeNullableText(data.recipientName) ?? marriageHolderName ?? recipient?.name ?? null,
-        recipientEmail: normalizeNullableText(data.recipientEmail) ?? recipient?.email ?? null,
-        recipientPhone: normalizeNullableText(data.recipientPhone),
-        recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl),
-        recipientOrganization: normalizeNullableText(data.recipientOrganization),
-        educationLevel: normalizeNullableText(data.educationLevel) ?? (isEducation ? normalizedTitle : null),
-        programName: normalizeNullableText(data.programName) ?? (isEducation ? normalizedTitle : null),
-        fieldOfStudy: normalizeNullableText(data.fieldOfStudy) ?? (isEducation ? "Theology" : null),
+        recipientName: normalizeNullableText(data.recipientName) ?? marriageHolderName ?? recipient?.name ?? academicCandidate?.fullName ?? null,
+        recipientEmail: normalizeNullableText(data.recipientEmail) ?? recipient?.email ?? academicCandidate?.email ?? null,
+        recipientPhone: normalizeNullableText(data.recipientPhone) ?? academicCandidate?.phone ?? null,
+        recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl) ?? academicCandidate?.photoUrl ?? null,
+        recipientOrganization: normalizeNullableText(data.recipientOrganization) ?? academicCandidate?.organization ?? null,
+        educationLevel: normalizeNullableText(data.educationLevel) ?? (isEducation ? normalizedTitle : null) ?? academicCandidate?.educationLevel ?? null,
+        programName: normalizeNullableText(data.programName) ?? (isEducation ? normalizedTitle : null) ?? academicCandidate?.programName ?? null,
+        fieldOfStudy: normalizeNullableText(data.fieldOfStudy) ?? (isEducation ? "Theology" : null) ?? academicCandidate?.fieldOfStudy ?? null,
         gradeOrHonors: normalizeNullableText(data.gradeOrHonors),
         studyMode: normalizeNullableText(data.studyMode),
         studyStartDate: data.studyStartDate ?? null,
@@ -214,9 +275,9 @@ export async function POST(request: Request) {
         signatureLayout: data.signatureLayout ?? presetDefaults.signatureLayout,
         watermarkStrength: data.watermarkStrength ?? presetDefaults.watermarkStrength,
         presidentSignatureUrl: isEducation ? null : normalizeNullableText(data.presidentSignatureUrl),
-        secondSignatoryName: normalizeNullableText(data.secondSignatoryName),
-        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? presetDefaults.secondSignatoryTitle,
-        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl),
+        secondSignatoryName: normalizeNullableText(data.secondSignatoryName) ?? signatureProfile?.name ?? null,
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? signatureProfile?.title ?? presetDefaults.secondSignatoryTitle,
+        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl) ?? signatureProfile?.imageUrl ?? null,
         spouseOneName: normalizeNullableText(data.spouseOneName),
         spouseOneEmail: normalizeNullableText(data.spouseOneEmail),
         spouseOnePhotoUrl: normalizeNullableText(data.spouseOnePhotoUrl),
@@ -236,9 +297,60 @@ export async function POST(request: Request) {
     if (pendingApproval) return ok({ pendingApproval }, { status: 202 });
 
     const issuedAt = new Date();
+    if (isEducation && academicCandidate) {
+      const signedCertificate = await createAcademicCertificate({
+        actorId: actor.id,
+        candidate: academicCandidate,
+        title: normalizedTitle,
+        issuer: data.issuer,
+        recipientName: normalizeNullableText(data.recipientName),
+        recipientEmail: normalizeNullableText(data.recipientEmail),
+        recipientPhone: normalizeNullableText(data.recipientPhone),
+        recipientPhotoUrl: normalizeNullableText(data.recipientPhotoUrl),
+        recipientOrganization: normalizeNullableText(data.recipientOrganization),
+        educationLevel: normalizeNullableText(data.educationLevel) ?? normalizedTitle,
+        programName: normalizeNullableText(data.programName) ?? normalizedTitle,
+        fieldOfStudy: normalizeNullableText(data.fieldOfStudy) ?? "Theology",
+        gradeOrHonors: normalizeNullableText(data.gradeOrHonors),
+        studyMode: normalizeNullableText(data.studyMode),
+        studyStartDate: nullableDate(data.studyStartDate),
+        studyEndDate: nullableDate(data.studyEndDate),
+        completionDate: nullableDate(data.completionDate),
+        customBody: normalizeNullableText(data.customBody),
+        certificatePreset,
+        templateStyle: data.templateStyle ?? presetDefaults.templateStyle,
+        templateAccent: data.templateAccent ?? presetDefaults.templateAccent,
+        sealStyle: data.sealStyle ?? presetDefaults.sealStyle,
+        signatureLayout: data.signatureLayout ?? presetDefaults.signatureLayout,
+        watermarkStrength: data.watermarkStrength ?? presetDefaults.watermarkStrength,
+        secondSignatoryName: normalizeNullableText(data.secondSignatoryName) ?? signatureProfile?.name ?? null,
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? signatureProfile?.title ?? presetDefaults.secondSignatoryTitle,
+        secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl) ?? signatureProfile?.imageUrl ?? null,
+        certificateNumber: data.certificateNumber ?? null,
+        expiresAt: data.expiresAt ?? null
+      });
+
+      await logActivity({
+        userId: actor.id,
+        action: activityActions.certificationBadgeCreated,
+        targetId: signedCertificate.id,
+        metadata: {
+          academicCandidateId: academicCandidate.id,
+          recipientName: signedCertificate.recipientName,
+          title: signedCertificate.title,
+          certificateCategory: signedCertificate.certificateCategory,
+          certificateNumber: signedCertificate.certificateNumber,
+          sealNumber: signedCertificate.sealNumber
+        }
+      });
+
+      return ok({ certificate: signedCertificate }, { status: 201 });
+    }
+
     const certificate = await prisma.memberCertificationBadge.create({
       data: {
         userId: recipient?.id ?? null,
+        academicCandidateId: null,
         title: normalizedTitle,
         issuer: data.issuer || "Light Encounter Tabernacle Worldwide",
         certificateCategory: data.certificateCategory,

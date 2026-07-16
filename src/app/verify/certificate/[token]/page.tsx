@@ -19,6 +19,19 @@ export default async function CertificateVerificationPage(context: PageContext) 
   const certificate = await prisma.memberCertificationBadge.findUnique({
     where: { verifyToken: token }
   });
+  const academicCandidate = certificate?.academicCandidateId
+    ? await prisma.academicCandidate.findUnique({
+        where: { id: certificate.academicCandidateId },
+        select: {
+          fullName: true,
+          programName: true,
+          educationLevel: true,
+          fieldOfStudy: true,
+          clearanceStatus: true,
+          graduationDate: true
+        }
+      })
+    : null;
   const user = certificate?.userId
     ? await prisma.user.findUnique({
         where: { id: certificate.userId },
@@ -75,8 +88,8 @@ export default async function CertificateVerificationPage(context: PageContext) 
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10">
-      <section className="mx-auto max-w-3xl overflow-hidden rounded-lg border border-ink/10 bg-white shadow-soft">
-        <div className="bg-[#0b1b3d] px-6 py-6 text-white">
+      <section className="mx-auto max-w-4xl overflow-hidden rounded-xl border border-[#d4af37]/35 bg-white shadow-soft">
+        <div className="bg-[#0b1b3d] px-6 py-7 text-white">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white p-2">
@@ -84,11 +97,12 @@ export default async function CertificateVerificationPage(context: PageContext) 
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4af37]">Light Encounter Tabernacle Worldwide</p>
-                <h1 className="mt-2 text-2xl font-semibold">Certificate Verification</h1>
+                <h1 className="mt-2 text-2xl font-semibold">Official Certificate Verification Portal</h1>
+                <p className="mt-1 text-sm text-white/70">Scan result from the live LETW credential register.</p>
               </div>
             </div>
             <Badge className={valid ? "border-white/20 bg-white/10 text-white" : "bg-clay text-white"}>
-              {valid ? "verified active" : statusLabel}
+              {valid ? "official and active" : statusLabel}
             </Badge>
           </div>
         </div>
@@ -97,6 +111,15 @@ export default async function CertificateVerificationPage(context: PageContext) 
           {certificate ? (
             <div className="grid gap-5 lg:grid-cols-[1fr_15rem]">
               <div>
+                <div className={`mb-5 rounded-lg border p-4 ${valid ? "border-moss/20 bg-mint text-moss" : "border-clay/20 bg-clay/10 text-clay"}`}>
+                  <p className="text-sm font-semibold">{valid ? "This credential is active in the LETW official register." : "Do not accept this credential as active."}</p>
+                  <p className="mt-1 text-xs leading-5">
+                    Status: {statusLabel.toUpperCase()}.
+                    {certificate.replacedById ? " This credential has been replaced by a newer record." : ""}
+                    {certificate.revokedAt ? ` Revoked on ${formatDate(certificate.revokedAt)}.` : ""}
+                    {certificate.expiresAt && new Date(certificate.expiresAt) <= new Date() ? ` Expired on ${formatDate(certificate.expiresAt)}.` : ""}
+                  </p>
+                </div>
                 <div className="flex items-start gap-3">
                   {valid ? <ShieldCheck className="mt-1 h-6 w-6 text-moss" /> : <ShieldAlert className="mt-1 h-6 w-6 text-clay" />}
                   <div>
@@ -129,6 +152,11 @@ export default async function CertificateVerificationPage(context: PageContext) 
                   </div>
                   {certificate.certificateCategory === "EDUCATION" ? (
                     <>
+                      <div className="rounded-md bg-paper p-3">
+                        <p className="text-xs uppercase tracking-wide text-ink/45">Academic register</p>
+                        <p className="mt-1 font-semibold text-ink">{valid ? academicCandidate?.programName ?? certificate.programName ?? "LETW School of Theology" : "Hidden"}</p>
+                        {valid ? <p className="mt-1 text-xs text-ink/55">{academicCandidate?.educationLevel ?? certificate.educationLevel ?? certificate.title}</p> : null}
+                      </div>
                       <div className="rounded-md bg-paper p-3">
                         <p className="text-xs uppercase tracking-wide text-ink/45">Seal number</p>
                         <p className="mt-1 font-semibold text-ink">{certificate.sealNumber ?? "Pending"}</p>

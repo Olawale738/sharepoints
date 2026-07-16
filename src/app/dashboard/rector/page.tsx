@@ -20,7 +20,7 @@ export default async function RectorDashboardPage() {
     redirect("/dashboard/certificates");
   }
 
-  const [users, certificateRows] = await Promise.all([
+  const [users, certificateRows, academicCandidates, signatureProfiles, batchJobs] = await Promise.all([
     prisma.user.findMany({
       where: {
         deletedAt: null,
@@ -47,6 +47,33 @@ export default async function RectorDashboardPage() {
       where: { certificateCategory: "EDUCATION" },
       orderBy: { issuedAt: "desc" },
       take: 500
+    }),
+    prisma.academicCandidate.findMany({
+      orderBy: [{ updatedAt: "desc" }],
+      take: 1000
+    }),
+    prisma.certificateSignatureProfile.findMany({
+      where: { active: true },
+      orderBy: [{ role: "asc" }, { name: "asc" }],
+      take: 500
+    }),
+    prisma.certificateBatchJob.findMany({
+      where: { certificateCategory: "EDUCATION" },
+      orderBy: { createdAt: "desc" },
+      take: 30
+    })
+  ]);
+  const [candidateCourses, candidateCertificates] = await Promise.all([
+    prisma.academicCourseRecord.findMany({
+      where: { candidateId: { in: academicCandidates.map((candidate) => candidate.id) } },
+      orderBy: { createdAt: "desc" },
+      take: 2000
+    }),
+    prisma.memberCertificationBadge.findMany({
+      where: { academicCandidateId: { in: academicCandidates.map((candidate) => candidate.id) } },
+      select: { id: true, academicCandidateId: true, title: true, certificateNumber: true, status: true, issuedAt: true },
+      orderBy: { issuedAt: "desc" },
+      take: 1000
     })
   ]);
 
@@ -116,7 +143,19 @@ export default async function RectorDashboardPage() {
         </div>
       </section>
 
-      <CertificateGeneratorPanel academicOnly canManage certificates={certificates} users={users} />
+      <CertificateGeneratorPanel
+        academicOnly
+        academicCandidates={academicCandidates.map((candidate) => ({
+          ...candidate,
+          courses: candidateCourses.filter((course) => course.candidateId === candidate.id),
+          certificates: candidateCertificates.filter((certificate) => certificate.academicCandidateId === candidate.id)
+        }))}
+        batchJobs={batchJobs}
+        canManage
+        certificates={certificates}
+        signatureProfiles={signatureProfiles}
+        users={users}
+      />
     </div>
   );
 }

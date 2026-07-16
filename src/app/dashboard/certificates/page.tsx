@@ -22,7 +22,7 @@ export default async function CertificatesPage() {
   ]);
   const canManage = authority.canIssueCertificates || authority.canIssueAcademicCertificates;
   const academicOnly = authority.canIssueAcademicCertificates && !authority.canIssueCertificates && !isAdmin;
-  const [users, certificateRows] = await Promise.all([
+  const [users, certificateRows, academicCandidates, signatureProfiles, batchJobs] = await Promise.all([
     canManage
       ? prisma.user.findMany({
           where: {
@@ -51,8 +51,43 @@ export default async function CertificatesPage() {
       where: isAdmin ? undefined : canManage ? (academicOnly ? { certificateCategory: "EDUCATION" } : undefined) : { userId: session.user.id },
       orderBy: { issuedAt: "desc" },
       take: isAdmin ? 500 : 100
-    })
+    }),
+    canManage
+      ? prisma.academicCandidate.findMany({
+          orderBy: [{ updatedAt: "desc" }],
+          take: 1000
+        })
+      : [],
+    canManage
+      ? prisma.certificateSignatureProfile.findMany({
+          where: { active: true },
+          orderBy: [{ role: "asc" }, { name: "asc" }],
+          take: 500
+        })
+      : [],
+    canManage
+      ? prisma.certificateBatchJob.findMany({
+          where: { certificateCategory: "EDUCATION" },
+          orderBy: { createdAt: "desc" },
+          take: 30
+        })
+      : []
   ]);
+  const [candidateCourses, candidateCertificates] = canManage
+    ? await Promise.all([
+        prisma.academicCourseRecord.findMany({
+          where: { candidateId: { in: academicCandidates.map((candidate) => candidate.id) } },
+          orderBy: { createdAt: "desc" },
+          take: 2000
+        }),
+        prisma.memberCertificationBadge.findMany({
+          where: { academicCandidateId: { in: academicCandidates.map((candidate) => candidate.id) } },
+          select: { id: true, academicCandidateId: true, title: true, certificateNumber: true, status: true, issuedAt: true },
+          orderBy: { issuedAt: "desc" },
+          take: 1000
+        })
+      ])
+    : [[], []];
   const certificateUsers = await prisma.user.findMany({
     where: {
       id: {
@@ -115,7 +150,19 @@ export default async function CertificatesPage() {
         </div>
       </section>
 
-      <CertificateGeneratorPanel academicOnly={academicOnly} canManage={canManage} certificates={certificates} users={users} />
+      <CertificateGeneratorPanel
+        academicCandidates={academicCandidates.map((candidate) => ({
+          ...candidate,
+          courses: candidateCourses.filter((course) => course.candidateId === candidate.id),
+          certificates: candidateCertificates.filter((certificate) => certificate.academicCandidateId === candidate.id)
+        }))}
+        academicOnly={academicOnly}
+        batchJobs={batchJobs}
+        canManage={canManage}
+        certificates={certificates}
+        signatureProfiles={signatureProfiles}
+        users={users}
+      />
     </div>
   );
 }

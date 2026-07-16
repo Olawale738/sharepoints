@@ -13,6 +13,7 @@ type SignableCertificate = {
   recipientName?: string | null;
   recipientEmail?: string | null;
   userId?: string | null;
+  academicCandidateId?: string | null;
   educationLevel?: string | null;
   programName?: string | null;
   fieldOfStudy?: string | null;
@@ -59,6 +60,7 @@ export function certificateSignaturePayload(certificate: SignableCertificate) {
     recipientName: certificate.recipientName ?? null,
     recipientEmail: certificate.recipientEmail ?? null,
     userId: certificate.userId ?? null,
+    academicCandidateId: certificate.academicCandidateId ?? null,
     certificateCategory: certificate.certificateCategory ?? null,
     certificatePreset: certificate.certificatePreset ?? null,
     educationLevel: certificate.educationLevel ?? null,

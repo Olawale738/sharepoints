@@ -4,6 +4,7 @@ import { ApprovalStatus, OfficialLetterStatus, OfficialLetterType, PresidentialA
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
+import { requireClearedAcademicCandidate } from "@/lib/academic-certificates";
 import { certificatePresetDefaults, inferCertificatePreset } from "@/lib/certificate-presets";
 import { generateCertificateNumber, generateSealNumber } from "@/lib/certificate-security";
 import { recordCertificateEvent, reissueCertificate, signStoredCertificate } from "@/lib/certificate-lifecycle";
@@ -291,13 +292,15 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
       return;
     }
     if (payload.action === "UPDATE_STATUS" && typeof item.targetId === "string" && typeof payload.status === "string") {
+      const existing = await prisma.memberCertificationBadge.findUnique({ where: { id: item.targetId } });
       const updated = await prisma.memberCertificationBadge.update({
         where: { id: item.targetId },
         data:
           payload.status === "REVOKED"
             ? { status: "REVOKED", revokedAt: new Date() }
-            : { status: "ACTIVE", revokedAt: null }
+            : { status: "ACTIVE", revokedAt: null, issuedAt: existing?.status === "DRAFT" ? new Date() : undefined }
       });
+      if (payload.status === "ACTIVE") await signStoredCertificate(updated);
       await recordCertificateEvent({
         certificateId: updated.id,
         actorId: item.reviewerId,
@@ -311,6 +314,7 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
       return;
     }
     const userId = payloadText(payload, "userId");
+    const academicCandidateId = payloadText(payload, "academicCandidateId");
     const title = String(payload.title ?? "Membership Certificate");
     const category = payloadText(payload, "certificateCategory") ?? "MINISTRY";
     const certificatePreset = inferCertificatePreset({
@@ -320,10 +324,14 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
     });
     const presetDefaults = certificatePresetDefaults(certificatePreset);
     const isEducationCertificate = category === "EDUCATION" || certificatePreset === "THEOLOGY_DEGREE";
+    if (isEducationCertificate) {
+      await requireClearedAcademicCandidate(academicCandidateId);
+    }
     const issuedAt = new Date();
     const certificate = await prisma.memberCertificationBadge.create({
       data: {
         userId,
+        academicCandidateId,
         title,
         issuer: String(payload.issuer ?? "Light Encounter Tabernacle Worldwide"),
         certificateCategory: category,

@@ -51,6 +51,7 @@ export async function reissueCertificate(input: {
     const replacement = await tx.memberCertificationBadge.create({
       data: {
         userId: existing.userId,
+        academicCandidateId: existing.academicCandidateId,
         title: existing.title,
         issuer: existing.issuer,
         certificateCategory: existing.certificateCategory,

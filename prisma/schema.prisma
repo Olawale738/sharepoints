@@ -4189,6 +4189,7 @@ model MemberOnboardingItem {
 model MemberCertificationBadge {
   id                String    @id @default(cuid())
   userId            String?
+  academicCandidateId String?
   title             String
   issuer            String    @default("Light Encounter Tabernacle Worldwide")
   certificateNumber String?   @unique
@@ -4244,6 +4245,7 @@ model MemberCertificationBadge {
   updatedAt         DateTime  @updatedAt
 
   @@index([userId, status, issuedAt])
+  @@index([academicCandidateId, status, issuedAt])
   @@index([certificateCategory, status, issuedAt])
   @@index([certificatePreset, status, issuedAt])
   @@index([educationLevel, status])
@@ -4252,6 +4254,93 @@ model MemberCertificationBadge {
   @@index([replacedById])
   @@index([sealNumber])
   @@index([status, expiresAt])
+}
+
+model AcademicCandidate {
+  id                String    @id @default(cuid())
+  userId            String?
+  fullName          String
+  email             String?
+  phone             String?
+  photoUrl          String?
+  organization      String?
+  programName       String
+  educationLevel    String
+  fieldOfStudy      String    @default("Theology")
+  studyMode         String?
+  admissionDate     DateTime?
+  graduationDate    DateTime?
+  status            String    @default("ACTIVE")
+  paymentStatus     String    @default("PENDING")
+  feesCleared       Boolean   @default(false)
+  coursesCompleted  Boolean   @default(false)
+  rectorApproved    Boolean   @default(false)
+  photoUploaded     Boolean   @default(false)
+  nameVerified      Boolean   @default(false)
+  clearanceStatus   String    @default("PENDING")
+  clearanceNotes    String?   @db.Text
+  createdById       String
+  reviewedById      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([email])
+  @@index([status, clearanceStatus])
+  @@index([educationLevel, clearanceStatus])
+  @@index([createdById, createdAt])
+}
+
+model AcademicCourseRecord {
+  id          String   @id @default(cuid())
+  candidateId String
+  courseCode  String?
+  courseTitle String
+  credits     Float?
+  grade       String?
+  status      String   @default("COMPLETED")
+  completedAt DateTime?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([candidateId, status])
+  @@index([createdById, createdAt])
+}
+
+model CertificateSignatureProfile {
+  id          String   @id @default(cuid())
+  ownerUserId String?
+  name        String
+  title       String
+  role        String   @default("RECTOR")
+  imageUrl    String
+  active      Boolean  @default(true)
+  approvedById String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([role, active])
+  @@index([ownerUserId, active])
+  @@index([createdById, createdAt])
+}
+
+model CertificateBatchJob {
+  id              String   @id @default(cuid())
+  title           String
+  certificateCategory String @default("EDUCATION")
+  status          String   @default("COMPLETED")
+  totalRows       Int      @default(0)
+  issuedCount     Int      @default(0)
+  failedCount     Int      @default(0)
+  createdById     String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([certificateCategory, createdAt])
+  @@index([createdById, createdAt])
 }
 
 model CertificateEvent {
