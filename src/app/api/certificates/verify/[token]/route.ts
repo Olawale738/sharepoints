@@ -42,6 +42,7 @@ export async function GET(request: Request, context: RouteContext) {
         certificateNumber: badge.certificateNumber,
         sealNumber: badge.sealNumber,
         category: badge.certificateCategory,
+        preset: badge.certificatePreset,
         educationLevel: badge.educationLevel,
         programName: badge.programName,
         fieldOfStudy: badge.fieldOfStudy,

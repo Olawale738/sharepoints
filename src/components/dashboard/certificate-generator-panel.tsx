@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  CERTIFICATE_PRESET_OPTIONS,
+  MARRIAGE_CERTIFICATE_TYPES,
+  MINISTRY_CERTIFICATE_TYPES,
+  THEOLOGY_CERTIFICATE_TYPES,
+  certificatePresetDefaults,
+  type CertificatePreset
+} from "@/lib/certificate-presets";
 import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 
 type CertificateUser = {
@@ -41,13 +49,16 @@ type CertificateRow = {
   studyEndDate?: string | Date | null;
   completionDate?: string | Date | null;
   customBody?: string | null;
+  certificatePreset?: string | null;
   templateStyle?: string | null;
   templateAccent?: string | null;
   sealStyle?: string | null;
   signatureLayout?: string | null;
   watermarkStrength?: string | null;
+  presidentSignatureUrl?: string | null;
   secondSignatoryName?: string | null;
   secondSignatoryTitle?: string | null;
+  secondSignatorySignatureUrl?: string | null;
   spouseOneName?: string | null;
   spouseTwoName?: string | null;
   marriageDate?: string | Date | null;
@@ -66,31 +77,6 @@ type CertificateRow = {
   revokedAt?: string | Date | null;
   user: CertificateUser;
 };
-
-const certificateTypes = [
-  "Baptism Certificate",
-  "Membership Certificate",
-  "Training Completion Certificate",
-  "Ordination Certificate",
-  "Conference Certificate",
-  "Volunteer Service Certificate"
-] as const;
-
-const theologyCertificateTypes = [
-  "Certificate in Theology",
-  "Diploma in Theology",
-  "Advanced Diploma in Theology",
-  "Bachelor of Science in Theology",
-  "Master of Science in Theology",
-  "Doctor of Philosophy in Theology"
-] as const;
-
-const marriageCertificateTypes = [
-  "Marriage Certificate",
-  "Certificate of Holy Matrimony",
-  "Marriage Blessing Certificate",
-  "Marriage Dedication Certificate"
-] as const;
 
 function displayName(user: CertificateUser) {
   return user.name ?? user.email ?? "LETW Member";
@@ -111,6 +97,12 @@ function formatDate(value: string | Date | null | undefined) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
+function defaultPresetForCategory(category: "MINISTRY" | "EDUCATION" | "MARRIAGE") {
+  if (category === "EDUCATION") return "THEOLOGY_DEGREE";
+  if (category === "MARRIAGE") return "MARRIAGE_COVENANT";
+  return "MEMBERSHIP_COVENANT";
+}
+
 export function CertificateGeneratorPanel({
   users,
   certificates,
@@ -126,6 +118,8 @@ export function CertificateGeneratorPanel({
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION" | "MARRIAGE">("MINISTRY");
+  const [certificatePreset, setCertificatePreset] = useState<CertificatePreset>("MEMBERSHIP_COVENANT");
+  const activePresetDefaults = certificatePresetDefaults(certificatePreset);
 
   const filteredCertificates = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -246,11 +240,13 @@ export function CertificateGeneratorPanel({
         studyEndDate: payload.studyEndDate ? new Date(payload.studyEndDate).toISOString() : null,
         completionDate: payload.completionDate ? new Date(payload.completionDate).toISOString() : null,
         customBody: payload.customBody || undefined,
+        certificatePreset: payload.certificatePreset || certificatePreset,
         templateStyle: payload.templateStyle || undefined,
         templateAccent: payload.templateAccent || undefined,
         sealStyle: payload.sealStyle || undefined,
         signatureLayout: payload.signatureLayout || undefined,
         watermarkStrength: payload.watermarkStrength || undefined,
+        presidentSignatureUrl: payload.presidentSignatureUrl || undefined,
         secondSignatoryName: payload.secondSignatoryName || undefined,
         secondSignatoryTitle: payload.secondSignatoryTitle || undefined,
         secondSignatorySignatureUrl: payload.secondSignatorySignatureUrl || undefined,
@@ -340,19 +336,40 @@ export function CertificateGeneratorPanel({
             <p className="mt-1 text-xs text-ink/55">Generate official LETW certificates with public verification links.</p>
           </div>
           <form className="space-y-4" onSubmit={createCertificate}>
-            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]">
+            <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_1.2fr]">
+              <select
+                className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
+                name="certificatePreset"
+                value={certificatePreset}
+                onChange={(event) => {
+                  const nextPreset = event.target.value as CertificatePreset;
+                  const defaults = certificatePresetDefaults(nextPreset);
+                  setCertificatePreset(nextPreset);
+                  setCertificateCategory(defaults.certificateCategory);
+                }}
+              >
+                {CERTIFICATE_PRESET_OPTIONS.map((preset) => (
+                  <option key={preset.value} value={preset.value}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
               <select
                 className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
                 name="certificateCategory"
                 value={certificateCategory}
-                onChange={(event) => setCertificateCategory(event.target.value as "MINISTRY" | "EDUCATION" | "MARRIAGE")}
+                onChange={(event) => {
+                  const nextCategory = event.target.value as "MINISTRY" | "EDUCATION" | "MARRIAGE";
+                  setCertificateCategory(nextCategory);
+                  setCertificatePreset(defaultPresetForCategory(nextCategory) as CertificatePreset);
+                }}
               >
                 <option value="MINISTRY">Ministry certificate</option>
                 <option value="EDUCATION">Theology education certificate</option>
                 <option value="MARRIAGE">Marriage certificate</option>
               </select>
               <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="title" required>
-                {(certificateCategory === "EDUCATION" ? theologyCertificateTypes : certificateCategory === "MARRIAGE" ? marriageCertificateTypes : certificateTypes).map((type) => (
+                {(certificateCategory === "EDUCATION" ? THEOLOGY_CERTIFICATE_TYPES : certificateCategory === "MARRIAGE" ? MARRIAGE_CERTIFICATE_TYPES : MINISTRY_CERTIFICATE_TYPES).map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -377,45 +394,50 @@ export function CertificateGeneratorPanel({
               <Input name="recipientOrganization" placeholder="Candidate church/ministry/school optional" />
             </div>
 
-            <div className="rounded-lg border border-ink/10 bg-paper p-3">
+            <div className="rounded-lg border border-ink/10 bg-paper p-3" key={certificatePreset}>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink">Certificate template designer</p>
               <div className="mt-3 grid gap-3 lg:grid-cols-5">
-                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateStyle" defaultValue={certificateCategory === "MARRIAGE" ? "MARRIAGE_ELEGANT" : certificateCategory === "EDUCATION" ? "ACADEMIC" : "CLASSIC"}>
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateStyle" defaultValue={activePresetDefaults.templateStyle}>
                   <option value="CLASSIC">Classic official</option>
                   <option value="ACADEMIC">Academic</option>
                   <option value="MARRIAGE_ELEGANT">Marriage elegant</option>
                   <option value="MODERN">Modern clean</option>
                   <option value="ROYAL">Royal ceremonial</option>
                 </select>
-                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateAccent" defaultValue="NAVY_GOLD">
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="templateAccent" defaultValue={activePresetDefaults.templateAccent}>
                   <option value="NAVY_GOLD">Navy and gold</option>
                   <option value="BLUE_GOLD">Blue and gold</option>
                   <option value="BURGUNDY_GOLD">Burgundy and gold</option>
                   <option value="GREEN_GOLD">Green and gold</option>
                   <option value="MONOCHROME">Monochrome</option>
                 </select>
-                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="sealStyle" defaultValue="CHIP">
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="sealStyle" defaultValue={activePresetDefaults.sealStyle}>
                   <option value="CHIP">Seal chip</option>
                   <option value="EMBOSSED">Embossed seal</option>
                   <option value="ROUND">Round seal</option>
                   <option value="SCRIPTURE">Scripture seal</option>
                 </select>
-                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="signatureLayout" defaultValue="DUAL">
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="signatureLayout" defaultValue={activePresetDefaults.signatureLayout}>
                   <option value="DUAL">Dual signature</option>
                   <option value="PRESIDENT_LEFT">President left</option>
                   <option value="PRESIDENT_RIGHT">President right</option>
                 </select>
-                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="watermarkStrength" defaultValue="STANDARD">
+                <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="watermarkStrength" defaultValue={activePresetDefaults.watermarkStrength}>
                   <option value="SUBTLE">Subtle watermark</option>
                   <option value="STANDARD">Standard watermark</option>
                   <option value="STRONG">Strong watermark</option>
                 </select>
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              <div className="mt-3 grid gap-3 lg:grid-cols-4">
+                <Input name="presidentSignatureUrl" placeholder="President signature image URL optional" />
                 <Input name="secondSignatoryName" placeholder="Second signatory name, e.g. Registrar" />
-                <Input name="secondSignatoryTitle" placeholder="Registrar / Academic Dean / Rector / Officiant" />
+                <Input name="secondSignatoryTitle" placeholder="Registrar / Academic Dean / Rector / Officiant" defaultValue={activePresetDefaults.secondSignatoryTitle} />
                 <Input name="secondSignatorySignatureUrl" placeholder="Second signature image URL optional" />
               </div>
+              <p className="mt-2 text-xs leading-5 text-ink/55">
+                For theology certificates, add the president signature URL and registrar signature URL here. If left blank, LETW can use server
+                defaults from <span className="font-semibold">LETW_PRESIDENT_SIGNATURE_URL</span> and <span className="font-semibold">LETW_REGISTRAR_SIGNATURE_URL</span>.
+              </p>
             </div>
 
             {certificateCategory === "EDUCATION" ? (
@@ -504,6 +526,7 @@ export function CertificateGeneratorPanel({
             const certificateCode = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
             const isEducation = certificate.certificateCategory === "EDUCATION";
             const isMarriage = certificate.certificateCategory === "MARRIAGE";
+            const presetClass = certificate.certificatePreset ? `certificate-preset-${certificate.certificatePreset.toLowerCase().replaceAll("_", "-")}` : "";
             const position = isMarriage
               ? "Holy Matrimony"
               : isEducation
@@ -519,7 +542,7 @@ export function CertificateGeneratorPanel({
               : "has been officially recorded and recognized by Light Encounter Tabernacle Worldwide. This certificate is valid only when the QR verification page confirms an active status.");
 
             return (
-              <article className={`official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft ${isEducation ? "education-certificate" : ""} ${isMarriage ? "marriage-certificate" : ""}`} key={certificate.id}>
+              <article className={`official-certificate overflow-hidden rounded-xl border border-ink/10 bg-white shadow-soft ${presetClass} ${isEducation ? "education-certificate" : ""} ${isMarriage ? "marriage-certificate" : ""}`} key={certificate.id}>
                 <div className="official-certificate-inner">
                   <div className="certificate-watermark" aria-hidden="true" />
                   <header className="certificate-header">
@@ -606,13 +629,23 @@ export function CertificateGeneratorPanel({
 
                   <footer className="certificate-footer">
                     <div className="certificate-signature">
-                      <PenLine className="h-4 w-4" />
+                      {certificate.presidentSignatureUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img alt="President signature" src={certificate.presidentSignatureUrl} />
+                      ) : (
+                        <PenLine className="h-4 w-4" />
+                      )}
                       <p>Olawale N Sanni</p>
-                      <span>President / Authorized Signature</span>
+                      <span>{certificate.presidentSignatureUrl ? "President / Original Signature" : "President / Authorized Signature"}</span>
                     </div>
                     {certificate.secondSignatoryName || certificate.secondSignatoryTitle || isEducation || isMarriage ? (
                       <div className="certificate-signature">
-                        <PenLine className="h-4 w-4" />
+                        {certificate.secondSignatorySignatureUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt="Second signatory signature" src={certificate.secondSignatorySignatureUrl} />
+                        ) : (
+                          <PenLine className="h-4 w-4" />
+                        )}
                         <p>{certificate.secondSignatoryName ?? (isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Registrar")}</p>
                         <span>{certificate.secondSignatoryTitle ?? (isMarriage ? "Officiating Minister" : "Registrar / Academic Dean / Rector")}</span>
                       </div>

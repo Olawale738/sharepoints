@@ -4,6 +4,7 @@ import { ApprovalStatus, OfficialLetterStatus, OfficialLetterType, PresidentialA
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
+import { certificatePresetDefaults, inferCertificatePreset } from "@/lib/certificate-presets";
 import { generateCertificateNumber, generateSealNumber } from "@/lib/certificate-security";
 import { recordCertificateEvent, reissueCertificate, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
@@ -312,6 +313,12 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
     const userId = payloadText(payload, "userId");
     const title = String(payload.title ?? "Membership Certificate");
     const category = payloadText(payload, "certificateCategory") ?? "MINISTRY";
+    const certificatePreset = inferCertificatePreset({
+      certificatePreset: payloadText(payload, "certificatePreset"),
+      certificateCategory: category,
+      title
+    });
+    const presetDefaults = certificatePresetDefaults(certificatePreset);
     const issuedAt = new Date();
     const certificate = await prisma.memberCertificationBadge.create({
       data: {
@@ -333,13 +340,15 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
         studyEndDate: payloadDate(payload, "studyEndDate"),
         completionDate: payloadDate(payload, "completionDate"),
         customBody: payloadText(payload, "customBody"),
-        templateStyle: payloadText(payload, "templateStyle") ?? "CLASSIC",
-        templateAccent: payloadText(payload, "templateAccent") ?? "NAVY_GOLD",
-        sealStyle: payloadText(payload, "sealStyle") ?? "CHIP",
-        signatureLayout: payloadText(payload, "signatureLayout") ?? "DUAL",
-        watermarkStrength: payloadText(payload, "watermarkStrength") ?? "STANDARD",
+        certificatePreset,
+        templateStyle: payloadText(payload, "templateStyle") ?? presetDefaults.templateStyle,
+        templateAccent: payloadText(payload, "templateAccent") ?? presetDefaults.templateAccent,
+        sealStyle: payloadText(payload, "sealStyle") ?? presetDefaults.sealStyle,
+        signatureLayout: payloadText(payload, "signatureLayout") ?? presetDefaults.signatureLayout,
+        watermarkStrength: payloadText(payload, "watermarkStrength") ?? presetDefaults.watermarkStrength,
+        presidentSignatureUrl: payloadText(payload, "presidentSignatureUrl"),
         secondSignatoryName: payloadText(payload, "secondSignatoryName"),
-        secondSignatoryTitle: payloadText(payload, "secondSignatoryTitle"),
+        secondSignatoryTitle: payloadText(payload, "secondSignatoryTitle") ?? presetDefaults.secondSignatoryTitle,
         secondSignatorySignatureUrl: payloadText(payload, "secondSignatorySignatureUrl"),
         spouseOneName: payloadText(payload, "spouseOneName"),
         spouseOneEmail: payloadText(payload, "spouseOneEmail"),
@@ -370,7 +379,8 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
       metadata: {
         certificateNumber: signedCertificate.certificateNumber,
         sealNumber: signedCertificate.sealNumber,
-        category: signedCertificate.certificateCategory
+        category: signedCertificate.certificateCategory,
+        preset: signedCertificate.certificatePreset
       }
     });
     return;

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { CERTIFICATE_PRESET_VALUES, certificatePresetDefaults, inferCertificatePreset } from "@/lib/certificate-presets";
 import { generateCertificateNumber, generateSealNumber, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-security";
 import { recordCertificateEvent, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
@@ -30,11 +31,13 @@ const certificateSchema = z.object({
   studyEndDate: z.string().datetime().optional().nullable(),
   completionDate: z.string().datetime().optional().nullable(),
   customBody: z.string().trim().max(1200).optional().nullable(),
-  templateStyle: z.enum(["CLASSIC", "ACADEMIC", "MARRIAGE_ELEGANT", "MODERN", "ROYAL"]).default("CLASSIC"),
-  templateAccent: z.enum(["NAVY_GOLD", "BLUE_GOLD", "BURGUNDY_GOLD", "GREEN_GOLD", "MONOCHROME"]).default("NAVY_GOLD"),
-  sealStyle: z.enum(["CHIP", "EMBOSSED", "ROUND", "SCRIPTURE"]).default("CHIP"),
-  signatureLayout: z.enum(["DUAL", "PRESIDENT_LEFT", "PRESIDENT_RIGHT"]).default("DUAL"),
-  watermarkStrength: z.enum(["SUBTLE", "STANDARD", "STRONG"]).default("STANDARD"),
+  certificatePreset: z.enum(CERTIFICATE_PRESET_VALUES).optional().nullable(),
+  templateStyle: z.enum(["CLASSIC", "ACADEMIC", "MARRIAGE_ELEGANT", "MODERN", "ROYAL"]).optional().nullable(),
+  templateAccent: z.enum(["NAVY_GOLD", "BLUE_GOLD", "BURGUNDY_GOLD", "GREEN_GOLD", "MONOCHROME"]).optional().nullable(),
+  sealStyle: z.enum(["CHIP", "EMBOSSED", "ROUND", "SCRIPTURE"]).optional().nullable(),
+  signatureLayout: z.enum(["DUAL", "PRESIDENT_LEFT", "PRESIDENT_RIGHT"]).optional().nullable(),
+  watermarkStrength: z.enum(["SUBTLE", "STANDARD", "STRONG"]).optional().nullable(),
+  presidentSignatureUrl: z.string().trim().url().optional().nullable(),
   secondSignatoryName: z.string().trim().max(160).optional().nullable(),
   secondSignatoryTitle: z.string().trim().max(120).optional().nullable(),
   secondSignatorySignatureUrl: z.string().trim().url().optional().nullable(),
@@ -134,6 +137,12 @@ export async function POST(request: Request) {
     const normalizedTitle = normalizeNullableText(data.title) ?? "Membership Certificate";
     const isEducation = data.certificateCategory === "EDUCATION";
     const isMarriage = data.certificateCategory === "MARRIAGE";
+    const certificatePreset = inferCertificatePreset({
+      certificatePreset: data.certificatePreset,
+      certificateCategory: data.certificateCategory,
+      title: normalizedTitle
+    });
+    const presetDefaults = certificatePresetDefaults(certificatePreset);
     const marriageHolderName = isMarriage && data.spouseOneName && data.spouseTwoName ? `${data.spouseOneName} and ${data.spouseTwoName}` : null;
     const recipient = data.userId
       ? await prisma.user.findFirst({
@@ -183,13 +192,15 @@ export async function POST(request: Request) {
         studyEndDate: data.studyEndDate ?? null,
         completionDate: data.completionDate ?? null,
         customBody: normalizeNullableText(data.customBody),
-        templateStyle: data.templateStyle,
-        templateAccent: data.templateAccent,
-        sealStyle: data.sealStyle,
-        signatureLayout: data.signatureLayout,
-        watermarkStrength: data.watermarkStrength,
+        certificatePreset,
+        templateStyle: data.templateStyle ?? presetDefaults.templateStyle,
+        templateAccent: data.templateAccent ?? presetDefaults.templateAccent,
+        sealStyle: data.sealStyle ?? presetDefaults.sealStyle,
+        signatureLayout: data.signatureLayout ?? presetDefaults.signatureLayout,
+        watermarkStrength: data.watermarkStrength ?? presetDefaults.watermarkStrength,
+        presidentSignatureUrl: normalizeNullableText(data.presidentSignatureUrl),
         secondSignatoryName: normalizeNullableText(data.secondSignatoryName),
-        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle),
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? presetDefaults.secondSignatoryTitle,
         secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl),
         spouseOneName: normalizeNullableText(data.spouseOneName),
         spouseOneEmail: normalizeNullableText(data.spouseOneEmail),
@@ -230,13 +241,15 @@ export async function POST(request: Request) {
         studyEndDate: nullableDate(data.studyEndDate),
         completionDate: nullableDate(data.completionDate),
         customBody: normalizeNullableText(data.customBody),
-        templateStyle: data.templateStyle,
-        templateAccent: data.templateAccent,
-        sealStyle: data.sealStyle,
-        signatureLayout: data.signatureLayout,
-        watermarkStrength: data.watermarkStrength,
+        certificatePreset,
+        templateStyle: data.templateStyle ?? presetDefaults.templateStyle,
+        templateAccent: data.templateAccent ?? presetDefaults.templateAccent,
+        sealStyle: data.sealStyle ?? presetDefaults.sealStyle,
+        signatureLayout: data.signatureLayout ?? presetDefaults.signatureLayout,
+        watermarkStrength: data.watermarkStrength ?? presetDefaults.watermarkStrength,
+        presidentSignatureUrl: normalizeNullableText(data.presidentSignatureUrl),
         secondSignatoryName: normalizeNullableText(data.secondSignatoryName),
-        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle),
+        secondSignatoryTitle: normalizeNullableText(data.secondSignatoryTitle) ?? presetDefaults.secondSignatoryTitle,
         secondSignatorySignatureUrl: normalizeNullableText(data.secondSignatorySignatureUrl),
         spouseOneName: normalizeNullableText(data.spouseOneName),
         spouseOneEmail: normalizeNullableText(data.spouseOneEmail),
@@ -266,7 +279,8 @@ export async function POST(request: Request) {
       metadata: {
         certificateNumber: signedCertificate.certificateNumber,
         sealNumber: signedCertificate.sealNumber,
-        category: signedCertificate.certificateCategory
+        category: signedCertificate.certificateCategory,
+        preset: signedCertificate.certificatePreset
       }
     });
 

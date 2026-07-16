@@ -4206,11 +4206,13 @@ model MemberCertificationBadge {
   studyEndDate      DateTime?
   completionDate    DateTime?
   customBody        String?   @db.Text
+  certificatePreset String    @default("MEMBERSHIP_COVENANT")
   templateStyle     String    @default("CLASSIC")
   templateAccent    String    @default("NAVY_GOLD")
   sealStyle         String    @default("CHIP")
   signatureLayout   String    @default("DUAL")
   watermarkStrength String    @default("STANDARD")
+  presidentSignatureUrl String?
   secondSignatoryName String?
   secondSignatoryTitle String?
   secondSignatorySignatureUrl String?
@@ -4242,6 +4244,7 @@ model MemberCertificationBadge {
 
   @@index([userId, status, issuedAt])
   @@index([certificateCategory, status, issuedAt])
+  @@index([certificatePreset, status, issuedAt])
   @@index([educationLevel, status])
   @@index([recipientEmail, status])
   @@index([replacementOfId])

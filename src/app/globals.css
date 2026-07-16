@@ -3127,6 +3127,36 @@ select {
   background: linear-gradient(180deg, #fffdf6, #fff8df);
 }
 
+.certificate-preset-ordination-ministry .certificate-header {
+  background: linear-gradient(135deg, #07172e, #1d2a4f 58%, #96711f);
+}
+
+.certificate-preset-baptism-water .certificate-header {
+  background: linear-gradient(135deg, #06355f, #0f5f9a 58%, #d4af37);
+}
+
+.certificate-preset-membership-covenant .certificate-header {
+  background: linear-gradient(135deg, #0b1b3d, #14315f 64%, #d4af37);
+}
+
+.certificate-preset-leadership-appointment .certificate-header {
+  background: linear-gradient(135deg, #052e24, #0b4d39 58%, #c8a13a);
+}
+
+.certificate-preset-training-completion .certificate-header {
+  background: linear-gradient(135deg, #092b5c, #125998 58%, #d4af37);
+}
+
+.certificate-preset-theology-degree .certificate-main-copy h3,
+.certificate-preset-training-completion .certificate-main-copy h3 {
+  color: #0b3f75;
+}
+
+.certificate-preset-ordination-ministry .certificate-main-copy h3,
+.certificate-preset-leadership-appointment .certificate-main-copy h3 {
+  color: #0b3d2f;
+}
+
 .certificate-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 14rem;
@@ -3356,6 +3386,13 @@ select {
   font-family: "Brush Script MT", "Segoe Script", cursive;
   font-size: 1.55rem;
   line-height: 1;
+}
+
+.certificate-signature img {
+  display: block;
+  width: min(100%, 9.25rem);
+  height: 2.25rem;
+  object-fit: contain;
 }
 
 .certificate-signature span,

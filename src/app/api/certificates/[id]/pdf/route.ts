@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
+import { certificatePresetDisplay, inferCertificatePreset } from "@/lib/certificate-presets";
 import { certificateCredentialHash, shortHash, signCertificate } from "@/lib/certificate-security";
 import { certificateIsLive } from "@/lib/certificates";
 import { getObjectBuffer } from "@/lib/storage";
@@ -268,13 +269,32 @@ export async function GET(request: Request, context: RouteContext) {
     const script = await pdf.embedFont(StandardFonts.TimesRomanItalic);
     const logoBytes = await readFile(path.join(process.cwd(), "public", "letw-logo.png"));
     const logo = await pdf.embedPng(logoBytes);
+    const isEducation = certificate.certificateCategory === "EDUCATION";
+    const isMarriage = certificate.certificateCategory === "MARRIAGE";
+    const certificatePreset = inferCertificatePreset({
+      certificatePreset: certificate.certificatePreset,
+      certificateCategory: certificate.certificateCategory,
+      title: certificate.title
+    });
+    const presetDisplay = certificatePresetDisplay(certificatePreset);
     const photoBytes = certificate.recipientPhotoUrl || certificate.spouseOnePhotoUrl
       ? await loadExternalPhoto(certificate.recipientPhotoUrl ?? certificate.spouseOnePhotoUrl)
       : certificateUser
         ? await loadProfilePhoto(certificateUser.id, certificateUser.image)
         : null;
     const photo = await embedImage(pdf, photoBytes ?? Buffer.alloc(0));
-    const secondSignature = await embedImage(pdf, (await loadExternalPhoto(certificate.secondSignatorySignatureUrl)) ?? Buffer.alloc(0));
+    const presidentSignature = await embedImage(
+      pdf,
+      (await loadExternalPhoto(certificate.presidentSignatureUrl ?? process.env.LETW_PRESIDENT_SIGNATURE_URL ?? process.env.PRESIDENT_SIGNATURE_URL)) ??
+        Buffer.alloc(0)
+    );
+    const secondSignature = await embedImage(
+      pdf,
+      (await loadExternalPhoto(
+        certificate.secondSignatorySignatureUrl ??
+          (isEducation ? process.env.LETW_REGISTRAR_SIGNATURE_URL ?? process.env.ACADEMIC_REGISTRAR_SIGNATURE_URL : null)
+      )) ?? Buffer.alloc(0)
+    );
     const origin = new URL(request.url).origin;
     const verifyUrl = `${origin}/verify/certificate/${certificate.verifyToken}`;
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
@@ -286,8 +306,6 @@ export async function GET(request: Request, context: RouteContext) {
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
     const holderName = certificate.recipientName || (certificateUser ? displayName(certificateUser) : "LETW Certificate Holder");
     const certificateNumber = certificate.certificateNumber ?? `LETW-CERT-${certificate.id.slice(-8).toUpperCase()}`;
-    const isEducation = certificate.certificateCategory === "EDUCATION";
-    const isMarriage = certificate.certificateCategory === "MARRIAGE";
     const position = isMarriage
       ? "Holy Matrimony"
       : isEducation
@@ -306,7 +324,7 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawRectangle({ x: 48, y: height - 121, width: width - 96, height: 5, color: gold });
     page.drawImage(logo, { x: 64, y: height - 105, width: 52, height: 52 });
     page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 130, y: height - 82, size: 14, font: sansBold, color: white });
-    page.drawText(isEducation ? "LETW School of Theology | cryptographically verified academic credential" : "Official certificate | letw.org", { x: 130, y: height - 101, size: 8.4, font: sansBold, color: gold });
+    page.drawText(`${presetDisplay.label} | cryptographically verified LETW credential`, { x: 130, y: height - 101, size: 8.4, font: sansBold, color: gold });
     page.drawRectangle({
       x: width - 205,
       y: height - 101,
@@ -327,7 +345,21 @@ export async function GET(request: Request, context: RouteContext) {
     const mainX = 84;
     const mainWidth = 500;
     const mainCenter = mainX + mainWidth / 2;
-    drawCenteredText(page, isMarriage ? "CERTIFICATE OF HOLY MATRIMONY" : isEducation ? "ACADEMIC CERTIFICATE OF THEOLOGY" : "CERTIFICATE OF LETW RECOGNITION", mainCenter, 430, sansBold, 11, gold);
+    const kicker =
+      certificatePreset === "THEOLOGY_DEGREE"
+        ? "ACADEMIC CERTIFICATE OF THEOLOGY"
+        : certificatePreset === "MARRIAGE_COVENANT"
+          ? "CERTIFICATE OF HOLY MATRIMONY"
+          : certificatePreset === "ORDINATION_MINISTRY"
+            ? "ORDINATION AND MINISTRY CREDENTIAL"
+            : certificatePreset === "BAPTISM_WATER"
+              ? "CERTIFICATE OF WATER BAPTISM"
+              : certificatePreset === "LEADERSHIP_APPOINTMENT"
+                ? "LEADERSHIP APPOINTMENT CREDENTIAL"
+                : certificatePreset === "TRAINING_COMPLETION"
+                  ? "TRAINING COMPLETION CREDENTIAL"
+                  : "CERTIFICATE OF LETW RECOGNITION";
+    drawCenteredText(page, kicker, mainCenter, 430, sansBold, 11, gold);
     const titleSize = fittedFontSize(serif, certificate.title, mainWidth, 34, 24);
     drawCenteredText(page, certificate.title, mainCenter, 384, serif, titleSize, navy);
     drawCenteredText(page, "This certifies that the certificate holder is", mainCenter, 346, sansBold, 12.5, muted);
@@ -430,7 +462,12 @@ export async function GET(request: Request, context: RouteContext) {
       });
     });
 
-    page.drawText("Olawale N Sanni", { x: 98, y: 82, size: 22, font: script, color: navy });
+    if (presidentSignature) {
+      page.drawImage(presidentSignature, { x: 96, y: 82, width: 146, height: 34, opacity: 0.96 });
+      page.drawText("Olawale N Sanni", { x: 104, y: 82, size: 10, font: sansBold, color: navy });
+    } else {
+      page.drawText("Olawale N Sanni", { x: 98, y: 82, size: 22, font: script, color: navy });
+    }
     page.drawLine({ start: { x: 86, y: 76 }, end: { x: 276, y: 76 }, thickness: 0.7, color: navy });
     page.drawText("President / Digitally Authorized Signature", { x: 96, y: 61, size: 8, font: sansBold, color: muted });
     const secondName = certificate.secondSignatoryName ?? (isEducation ? "Registrar" : isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer");

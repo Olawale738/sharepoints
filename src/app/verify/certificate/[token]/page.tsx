@@ -5,6 +5,7 @@ import { Award, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { recordCertificateEvent } from "@/lib/certificate-lifecycle";
+import { certificatePresetDisplay, inferCertificatePreset } from "@/lib/certificate-presets";
 import { certificateIsLive, certificatePublicStatus } from "@/lib/certificates";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
@@ -44,6 +45,13 @@ export default async function CertificateVerificationPage(context: PageContext) 
   const holderPosition = isMarriage ? "Holy Matrimony" : user?.memberProfile?.organizationPosition ?? certificate?.educationLevel ?? certificate?.programName ?? "Certificate holder";
   const holderNumber = user?.memberProfile?.membershipNumber ?? (certificate?.certificateCategory === "EDUCATION" ? "Education candidate" : "Pending");
   const photoSrc = certificate?.recipientPhotoUrl || certificate?.spouseOnePhotoUrl || (user && certificate ? `/api/profile/photo/${user.id}?certificateToken=${encodeURIComponent(certificate.verifyToken)}` : null);
+  const presetDisplay = certificate
+    ? certificatePresetDisplay(inferCertificatePreset({
+        certificatePreset: certificate.certificatePreset,
+        certificateCategory: certificate.certificateCategory,
+        title: certificate.title
+      }))
+    : null;
   if (certificate) {
     const requestHeaders = await headers();
     await recordCertificateEvent({
@@ -106,6 +114,7 @@ export default async function CertificateVerificationPage(context: PageContext) 
                   <div className="rounded-md bg-paper p-3">
                     <p className="text-xs uppercase tracking-wide text-ink/45">{isMarriage ? "Certificate type" : certificate.certificateCategory === "EDUCATION" ? "Candidate register" : "Member number"}</p>
                     <p className="mt-1 font-semibold text-ink">{valid ? (isMarriage ? "Marriage register" : holderNumber) : "Hidden"}</p>
+                    {valid && presetDisplay ? <p className="mt-1 text-xs text-ink/55">{presetDisplay.label}</p> : null}
                   </div>
                   <div className="rounded-md bg-paper p-3">
                     <p className="text-xs uppercase tracking-wide text-ink/45">{certificate.certificateCategory === "EDUCATION" ? "Program / level" : "Position"}</p>

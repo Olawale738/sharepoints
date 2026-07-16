@@ -2,6 +2,8 @@ import "server-only";
 
 import { createHash, createHmac, randomBytes } from "node:crypto";
 
+export { MARRIAGE_CERTIFICATE_TYPES, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-presets";
+
 type SignableCertificate = {
   id: string;
   title: string;
@@ -15,35 +17,22 @@ type SignableCertificate = {
   programName?: string | null;
   fieldOfStudy?: string | null;
   certificateCategory?: string | null;
+  certificatePreset?: string | null;
   templateStyle?: string | null;
   templateAccent?: string | null;
   sealStyle?: string | null;
   signatureLayout?: string | null;
   watermarkStrength?: string | null;
+  presidentSignatureUrl?: string | null;
   secondSignatoryName?: string | null;
   secondSignatoryTitle?: string | null;
+  secondSignatorySignatureUrl?: string | null;
   spouseOneName?: string | null;
   spouseTwoName?: string | null;
   marriageDate?: Date | string | null;
   replacementOfId?: string | null;
   issuedAt?: Date | string | null;
 };
-
-export const THEOLOGY_CERTIFICATE_TYPES = [
-  "Certificate in Theology",
-  "Diploma in Theology",
-  "Advanced Diploma in Theology",
-  "Bachelor of Science in Theology",
-  "Master of Science in Theology",
-  "Doctor of Philosophy in Theology"
-] as const;
-
-export const MARRIAGE_CERTIFICATE_TYPES = [
-  "Marriage Certificate",
-  "Certificate of Holy Matrimony",
-  "Marriage Blessing Certificate",
-  "Marriage Dedication Certificate"
-] as const;
 
 export function certificatePrefix(category?: string | null) {
   if (category === "EDUCATION") return "LETW-THEO";
@@ -71,6 +60,7 @@ export function certificateSignaturePayload(certificate: SignableCertificate) {
     recipientEmail: certificate.recipientEmail ?? null,
     userId: certificate.userId ?? null,
     certificateCategory: certificate.certificateCategory ?? null,
+    certificatePreset: certificate.certificatePreset ?? null,
     educationLevel: certificate.educationLevel ?? null,
     programName: certificate.programName ?? null,
     fieldOfStudy: certificate.fieldOfStudy ?? null,
@@ -79,8 +69,10 @@ export function certificateSignaturePayload(certificate: SignableCertificate) {
     sealStyle: certificate.sealStyle ?? null,
     signatureLayout: certificate.signatureLayout ?? null,
     watermarkStrength: certificate.watermarkStrength ?? null,
+    presidentSignatureUrl: certificate.presidentSignatureUrl ?? null,
     secondSignatoryName: certificate.secondSignatoryName ?? null,
     secondSignatoryTitle: certificate.secondSignatoryTitle ?? null,
+    secondSignatorySignatureUrl: certificate.secondSignatorySignatureUrl ?? null,
     spouseOneName: certificate.spouseOneName ?? null,
     spouseTwoName: certificate.spouseTwoName ?? null,
     marriageDate: certificate.marriageDate ? new Date(certificate.marriageDate).toISOString() : null,
