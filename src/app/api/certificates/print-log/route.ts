@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { ApiError, ok, requireUser } from "@/lib/api";
+import { handleAcademicOpsRouteError } from "@/lib/academic-ops-db";
 import { requireAcademicCertificateIssuer, requireCertificateIssuer } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
@@ -44,7 +45,7 @@ export async function GET() {
     ]);
     return ok({ logs, certificates });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
     });
     return ok({ log }, { status: 201 });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -95,7 +96,7 @@ export async function PATCH(request: Request) {
     });
     return ok({ log });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -109,6 +110,6 @@ export async function DELETE(request: Request) {
     await prisma.certificatePrintLog.delete({ where: { id } });
     return ok({ deleted: true });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }

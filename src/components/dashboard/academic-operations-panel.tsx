@@ -185,7 +185,8 @@ export function AcademicOperationsPanel({
   workspaces,
   units,
   auditRuns,
-  auditFindings
+  auditFindings,
+  setupWarning
 }: {
   canAcademic: boolean;
   canMinistryLicense: boolean;
@@ -202,6 +203,7 @@ export function AcademicOperationsPanel({
   units: UnitOption[];
   auditRuns: AuditRun[];
   auditFindings: AuditFinding[];
+  setupWarning?: string | null;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
@@ -350,6 +352,12 @@ export function AcademicOperationsPanel({
 
   return (
     <div className="space-y-6">
+      {setupWarning ? (
+        <div className="rounded-lg border border-[#d4af37]/40 bg-[#fff8df] p-4 text-sm text-ink shadow-soft">
+          <p className="flex items-center gap-2 font-semibold text-[#7c5d00]"><ShieldAlert className="h-4 w-4" />Academic operations setup pending</p>
+          <p className="mt-1 text-ink/70">{setupWarning}</p>
+        </div>
+      ) : null}
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
       {error ? <p className="rounded-md bg-clay/10 px-4 py-3 text-sm text-clay">{error}</p> : null}
 

@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import type { AcademicCandidate, MemberCertificationBadge, Prisma } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
+import { isAcademicOpsSchemaNotReady, ACADEMIC_OPS_SETUP_MESSAGE } from "@/lib/academic-ops-db";
 import { prisma } from "@/lib/prisma";
 
 export const DEGREE_CERTIFICATE_TITLES = [
@@ -49,18 +50,25 @@ export function generateMinistryLicenseNumber(type: string) {
 }
 
 export async function hasApprovedAcademicBoard(candidateId: string) {
-  const approval = await prisma.academicBoardApprovalCandidate.findFirst({
-    where: {
-      candidateId,
-      status: "APPROVED"
+  try {
+    const approval = await prisma.academicBoardApprovalCandidate.findFirst({
+      where: {
+        candidateId,
+        status: "APPROVED"
+      }
+    });
+    if (!approval) return false;
+    const board = await prisma.academicBoardApproval.findFirst({
+      where: { id: approval.boardId, status: "APPROVED" },
+      select: { id: true }
+    });
+    return Boolean(board);
+  } catch (error) {
+    if (isAcademicOpsSchemaNotReady(error)) {
+      throw new ApiError(503, ACADEMIC_OPS_SETUP_MESSAGE);
     }
-  });
-  if (!approval) return false;
-  const board = await prisma.academicBoardApproval.findFirst({
-    where: { id: approval.boardId, status: "APPROVED" },
-    select: { id: true }
-  });
-  return Boolean(board);
+    throw error;
+  }
 }
 
 export async function requireAcademicBoardApproval(candidate: AcademicCandidate, title?: string | null) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
+import { ApiError, ok, requireUser } from "@/lib/api";
+import { handleAcademicOpsRouteError } from "@/lib/academic-ops-db";
 import { requireAcademicCertificateIssuer } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
@@ -34,7 +35,7 @@ export async function GET() {
     ]);
     return ok({ boards, boardCandidates, candidates });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
 
     return ok({ board }, { status: 201 });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -113,7 +114,7 @@ export async function PATCH(request: Request) {
 
     return ok({ board });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
 
@@ -128,6 +129,6 @@ export async function DELETE(request: Request) {
     });
     return ok({ deleted: true });
   } catch (error) {
-    return handleRouteError(error);
+    return handleAcademicOpsRouteError(error);
   }
 }
