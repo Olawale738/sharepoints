@@ -319,6 +319,7 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
       title
     });
     const presetDefaults = certificatePresetDefaults(certificatePreset);
+    const isEducationCertificate = category === "EDUCATION" || certificatePreset === "THEOLOGY_DEGREE";
     const issuedAt = new Date();
     const certificate = await prisma.memberCertificationBadge.create({
       data: {
@@ -346,7 +347,7 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
         sealStyle: payloadText(payload, "sealStyle") ?? presetDefaults.sealStyle,
         signatureLayout: payloadText(payload, "signatureLayout") ?? presetDefaults.signatureLayout,
         watermarkStrength: payloadText(payload, "watermarkStrength") ?? presetDefaults.watermarkStrength,
-        presidentSignatureUrl: payloadText(payload, "presidentSignatureUrl"),
+        presidentSignatureUrl: isEducationCertificate ? null : payloadText(payload, "presidentSignatureUrl"),
         secondSignatoryName: payloadText(payload, "secondSignatoryName"),
         secondSignatoryTitle: payloadText(payload, "secondSignatoryTitle") ?? presetDefaults.secondSignatoryTitle,
         secondSignatorySignatureUrl: payloadText(payload, "secondSignatorySignatureUrl"),

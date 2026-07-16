@@ -119,7 +119,7 @@ export function certificatePresetDefaults(preset: CertificatePreset) {
         sealStyle: "EMBOSSED",
         signatureLayout: "DUAL",
         watermarkStrength: "STANDARD",
-        secondSignatoryTitle: "Registrar / Academic Dean / Rector"
+        secondSignatoryTitle: "Rector"
       } as const;
     case "MARRIAGE_COVENANT":
       return {
@@ -188,4 +188,3 @@ export function certificatePresetDefaults(preset: CertificatePreset) {
 export function certificatePresetDisplay(preset: CertificatePreset) {
   return CERTIFICATE_PRESET_OPTIONS.find((option) => option.value === preset) ?? CERTIFICATE_PRESET_OPTIONS[4];
 }
-

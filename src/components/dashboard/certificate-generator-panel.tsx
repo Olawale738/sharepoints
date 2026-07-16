@@ -429,14 +429,15 @@ export function CertificateGeneratorPanel({
                 </select>
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-4">
-                <Input name="presidentSignatureUrl" placeholder="President signature image URL optional" />
-                <Input name="secondSignatoryName" placeholder="Second signatory name, e.g. Registrar" />
-                <Input name="secondSignatoryTitle" placeholder="Registrar / Academic Dean / Rector / Officiant" defaultValue={activePresetDefaults.secondSignatoryTitle} />
-                <Input name="secondSignatorySignatureUrl" placeholder="Second signature image URL optional" />
+                {certificateCategory !== "EDUCATION" ? <Input name="presidentSignatureUrl" placeholder="President signature image URL optional" /> : null}
+                <Input name="secondSignatoryName" placeholder={certificateCategory === "EDUCATION" ? "Rector name optional" : "Second signatory name optional"} />
+                <Input name="secondSignatoryTitle" placeholder={certificateCategory === "EDUCATION" ? "Rector" : "Second signatory title"} defaultValue={activePresetDefaults.secondSignatoryTitle} />
+                <Input name="secondSignatorySignatureUrl" placeholder={certificateCategory === "EDUCATION" ? "Rector signature image URL optional" : "Second signature image URL optional"} />
               </div>
               <p className="mt-2 text-xs leading-5 text-ink/55">
-                For theology certificates, add the president signature URL and registrar signature URL here. If left blank, LETW can use server
-                defaults from <span className="font-semibold">LETW_PRESIDENT_SIGNATURE_URL</span> and <span className="font-semibold">LETW_REGISTRAR_SIGNATURE_URL</span>.
+                {certificateCategory === "EDUCATION"
+                  ? "Education certificates use rector signature only. If the rector signature URL is left blank, LETW can use LETW_RECTOR_SIGNATURE_URL or LETW_REGISTRAR_SIGNATURE_URL from the server."
+                  : "For non-education certificates, add the president and second-signatory signature image URLs when original image signatures are required."}
               </p>
             </div>
 
@@ -628,16 +629,18 @@ export function CertificateGeneratorPanel({
                   </section>
 
                   <footer className="certificate-footer">
-                    <div className="certificate-signature">
-                      {certificate.presidentSignatureUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img alt="President signature" src={certificate.presidentSignatureUrl} />
-                      ) : (
-                        <PenLine className="h-4 w-4" />
-                      )}
-                      <p>Olawale N Sanni</p>
-                      <span>{certificate.presidentSignatureUrl ? "President / Original Signature" : "President / Authorized Signature"}</span>
-                    </div>
+                    {!isEducation ? (
+                      <div className="certificate-signature">
+                        {certificate.presidentSignatureUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img alt="President signature" src={certificate.presidentSignatureUrl} />
+                        ) : (
+                          <PenLine className="h-4 w-4" />
+                        )}
+                        <p>Olawale N Sanni</p>
+                        <span>{certificate.presidentSignatureUrl ? "President / Original Signature" : "President / Authorized Signature"}</span>
+                      </div>
+                    ) : null}
                     {certificate.secondSignatoryName || certificate.secondSignatoryTitle || isEducation || isMarriage ? (
                       <div className="certificate-signature">
                         {certificate.secondSignatorySignatureUrl ? (
@@ -646,8 +649,8 @@ export function CertificateGeneratorPanel({
                         ) : (
                           <PenLine className="h-4 w-4" />
                         )}
-                        <p>{certificate.secondSignatoryName ?? (isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Registrar")}</p>
-                        <span>{certificate.secondSignatoryTitle ?? (isMarriage ? "Officiating Minister" : "Registrar / Academic Dean / Rector")}</span>
+                        <p>{isEducation ? certificate.secondSignatoryName && certificate.secondSignatoryName !== "Registrar" ? certificate.secondSignatoryName : "Rector" : certificate.secondSignatoryName ?? (isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer")}</p>
+                        <span>{isEducation ? "Rector" : certificate.secondSignatoryTitle ?? (isMarriage ? "Officiating Minister" : "Second Signatory")}</span>
                       </div>
                     ) : null}
                     <div className="certificate-chip">

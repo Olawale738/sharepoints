@@ -285,14 +285,16 @@ export async function GET(request: Request, context: RouteContext) {
     const photo = await embedImage(pdf, photoBytes ?? Buffer.alloc(0));
     const presidentSignature = await embedImage(
       pdf,
-      (await loadExternalPhoto(certificate.presidentSignatureUrl ?? process.env.LETW_PRESIDENT_SIGNATURE_URL ?? process.env.PRESIDENT_SIGNATURE_URL)) ??
+      (await loadExternalPhoto(
+        isEducation ? null : certificate.presidentSignatureUrl ?? process.env.LETW_PRESIDENT_SIGNATURE_URL ?? process.env.PRESIDENT_SIGNATURE_URL
+      )) ??
         Buffer.alloc(0)
     );
     const secondSignature = await embedImage(
       pdf,
       (await loadExternalPhoto(
         certificate.secondSignatorySignatureUrl ??
-          (isEducation ? process.env.LETW_REGISTRAR_SIGNATURE_URL ?? process.env.ACADEMIC_REGISTRAR_SIGNATURE_URL : null)
+          (isEducation ? process.env.LETW_RECTOR_SIGNATURE_URL ?? process.env.LETW_REGISTRAR_SIGNATURE_URL ?? process.env.ACADEMIC_REGISTRAR_SIGNATURE_URL : null)
       )) ?? Buffer.alloc(0)
     );
     const origin = new URL(request.url).origin;
@@ -462,23 +464,33 @@ export async function GET(request: Request, context: RouteContext) {
       });
     });
 
-    if (presidentSignature) {
-      page.drawImage(presidentSignature, { x: 96, y: 82, width: 146, height: 34, opacity: 0.96 });
-      page.drawText("Olawale N Sanni", { x: 104, y: 82, size: 10, font: sansBold, color: navy });
-    } else {
-      page.drawText("Olawale N Sanni", { x: 98, y: 82, size: 22, font: script, color: navy });
+    const secondName = isEducation
+      ? certificate.secondSignatoryName && certificate.secondSignatoryName !== "Registrar"
+        ? certificate.secondSignatoryName
+        : "Rector"
+      : certificate.secondSignatoryName ?? (isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer");
+    const secondTitle = isEducation ? "Rector" : certificate.secondSignatoryTitle ?? (isMarriage ? "Officiating Minister" : "Second Signatory");
+    const secondSignatureX = isEducation ? mainCenter - 72 : 316;
+    const secondTextX = isEducation ? mainCenter - 86 : 318;
+    const secondLineStartX = isEducation ? mainCenter - 112 : 306;
+    const secondLineEndX = isEducation ? mainCenter + 112 : 506;
+    if (!isEducation) {
+      if (presidentSignature) {
+        page.drawImage(presidentSignature, { x: 96, y: 82, width: 146, height: 34, opacity: 0.96 });
+        page.drawText("Olawale N Sanni", { x: 104, y: 82, size: 10, font: sansBold, color: navy });
+      } else {
+        page.drawText("Olawale N Sanni", { x: 98, y: 82, size: 22, font: script, color: navy });
+      }
+      page.drawLine({ start: { x: 86, y: 76 }, end: { x: 276, y: 76 }, thickness: 0.7, color: navy });
+      page.drawText("President / Digitally Authorized Signature", { x: 96, y: 61, size: 8, font: sansBold, color: muted });
     }
-    page.drawLine({ start: { x: 86, y: 76 }, end: { x: 276, y: 76 }, thickness: 0.7, color: navy });
-    page.drawText("President / Digitally Authorized Signature", { x: 96, y: 61, size: 8, font: sansBold, color: muted });
-    const secondName = certificate.secondSignatoryName ?? (isEducation ? "Registrar" : isMarriage ? certificate.officiantName ?? "Officiating Minister" : "Authorized Officer");
-    const secondTitle = certificate.secondSignatoryTitle ?? (isEducation ? "Registrar / Academic Dean / Rector" : isMarriage ? "Officiating Minister" : "Second Signatory");
     if (secondSignature) {
-      page.drawImage(secondSignature, { x: 316, y: 80, width: 140, height: 34, opacity: 0.95 });
+      page.drawImage(secondSignature, { x: secondSignatureX, y: 80, width: 140, height: 34, opacity: 0.95 });
     } else {
       drawFittedText({
         page,
         text: secondName,
-        x: 318,
+        x: secondTextX,
         y: 82,
         maxWidth: 180,
         font: script,
@@ -487,11 +499,11 @@ export async function GET(request: Request, context: RouteContext) {
         color: navy
       });
     }
-    page.drawLine({ start: { x: 306, y: 76 }, end: { x: 506, y: 76 }, thickness: 0.7, color: navy });
+    page.drawLine({ start: { x: secondLineStartX, y: 76 }, end: { x: secondLineEndX, y: 76 }, thickness: 0.7, color: navy });
     drawFittedText({
       page,
       text: secondTitle,
-      x: 318,
+      x: secondTextX,
       y: 61,
       maxWidth: 180,
       font: sansBold,
