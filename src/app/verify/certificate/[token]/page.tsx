@@ -45,6 +45,9 @@ export default async function CertificateVerificationPage(context: PageContext) 
   const holderPosition = isMarriage ? "Holy Matrimony" : user?.memberProfile?.organizationPosition ?? certificate?.educationLevel ?? certificate?.programName ?? "Certificate holder";
   const holderNumber = user?.memberProfile?.membershipNumber ?? (certificate?.certificateCategory === "EDUCATION" ? "Education candidate" : "Pending");
   const photoSrc = certificate?.recipientPhotoUrl || certificate?.spouseOnePhotoUrl || (user && certificate ? `/api/profile/photo/${user.id}?certificateToken=${encodeURIComponent(certificate.verifyToken)}` : null);
+  const verifiedPhotoSrc = photoSrc && certificate && photoSrc.startsWith("/api/certificates/assets/")
+    ? `${photoSrc}?certificateToken=${encodeURIComponent(certificate.verifyToken)}`
+    : photoSrc;
   const presetDisplay = certificate
     ? certificatePresetDisplay(inferCertificatePreset({
         certificatePreset: certificate.certificatePreset,
@@ -195,13 +198,13 @@ export default async function CertificateVerificationPage(context: PageContext) 
               </div>
 
               <div className="rounded-lg border border-[#d4af37]/40 bg-[#fffaf0] p-4 text-center">
-                {valid && photoSrc ? (
+                {valid && verifiedPhotoSrc ? (
                   <div className="mx-auto mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-[#d4af37] bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       alt={`${holderName} profile`}
                       className="h-full w-full object-cover"
-                      src={photoSrc}
+                      src={verifiedPhotoSrc}
                     />
                   </div>
                 ) : null}

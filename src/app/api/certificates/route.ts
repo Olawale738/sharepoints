@@ -8,10 +8,18 @@ import { CERTIFICATE_PRESET_VALUES, certificatePresetDefaults, inferCertificateP
 import { generateCertificateNumber, generateSealNumber, THEOLOGY_CERTIFICATE_TYPES } from "@/lib/certificate-security";
 import { recordCertificateEvent, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
-import { getOfficialIssuanceAuthority, requireCertificateIssuer } from "@/lib/official-issuance";
+import { getOfficialIssuanceAuthority, requireAcademicCertificateIssuer, requireCertificateIssuer } from "@/lib/official-issuance";
 import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
+
+const certificateImageRefSchema = z
+  .string()
+  .trim()
+  .max(600)
+  .refine((value) => value.startsWith("/api/certificates/assets/") || value.startsWith("https://") || value.startsWith("http://"), {
+    message: "Certificate images must be uploaded in LETW or use a valid URL."
+  });
 
 const certificateSchema = z.object({
   userId: z.string().cuid().optional().nullable(),
@@ -20,7 +28,7 @@ const certificateSchema = z.object({
   recipientName: z.string().trim().max(180).optional().nullable(),
   recipientEmail: z.string().trim().email().optional().nullable(),
   recipientPhone: z.string().trim().max(60).optional().nullable(),
-  recipientPhotoUrl: z.string().trim().url().optional().nullable(),
+  recipientPhotoUrl: certificateImageRefSchema.optional().nullable(),
   recipientOrganization: z.string().trim().max(180).optional().nullable(),
   educationLevel: z.string().trim().max(120).optional().nullable(),
   programName: z.string().trim().max(180).optional().nullable(),
@@ -37,16 +45,16 @@ const certificateSchema = z.object({
   sealStyle: z.enum(["CHIP", "EMBOSSED", "ROUND", "SCRIPTURE"]).optional().nullable(),
   signatureLayout: z.enum(["DUAL", "PRESIDENT_LEFT", "PRESIDENT_RIGHT"]).optional().nullable(),
   watermarkStrength: z.enum(["SUBTLE", "STANDARD", "STRONG"]).optional().nullable(),
-  presidentSignatureUrl: z.string().trim().url().optional().nullable(),
+  presidentSignatureUrl: certificateImageRefSchema.optional().nullable(),
   secondSignatoryName: z.string().trim().max(160).optional().nullable(),
   secondSignatoryTitle: z.string().trim().max(120).optional().nullable(),
-  secondSignatorySignatureUrl: z.string().trim().url().optional().nullable(),
+  secondSignatorySignatureUrl: certificateImageRefSchema.optional().nullable(),
   spouseOneName: z.string().trim().max(180).optional().nullable(),
   spouseOneEmail: z.string().trim().email().optional().nullable(),
-  spouseOnePhotoUrl: z.string().trim().url().optional().nullable(),
+  spouseOnePhotoUrl: certificateImageRefSchema.optional().nullable(),
   spouseTwoName: z.string().trim().max(180).optional().nullable(),
   spouseTwoEmail: z.string().trim().email().optional().nullable(),
-  spouseTwoPhotoUrl: z.string().trim().url().optional().nullable(),
+  spouseTwoPhotoUrl: certificateImageRefSchema.optional().nullable(),
   marriageDate: z.string().datetime().optional().nullable(),
   marriageLocation: z.string().trim().max(220).optional().nullable(),
   officiantName: z.string().trim().max(160).optional().nullable(),
@@ -71,9 +79,10 @@ export async function GET() {
     const user = await requireUser();
     const isAdmin = await hasAnyWorkspaceAdminRole(user.id);
     const authority = await getOfficialIssuanceAuthority(user.id);
-    const canSeeRegistry = isAdmin || authority.canIssueCertificates;
+    const canSeeRegistry = isAdmin || authority.canIssueCertificates || authority.canIssueAcademicCertificates;
+    const academicOnly = authority.canIssueAcademicCertificates && !authority.canIssueCertificates && !isAdmin;
     const certificateRows = await prisma.memberCertificationBadge.findMany({
-      where: canSeeRegistry ? undefined : { userId: user.id },
+      where: canSeeRegistry ? (academicOnly ? { certificateCategory: "EDUCATION" } : undefined) : { userId: user.id },
       orderBy: { issuedAt: "desc" },
       take: canSeeRegistry ? 500 : 50
     });
@@ -116,7 +125,9 @@ export async function GET() {
           memberProfile: null
         }
       })),
-      canManage: authority.canIssueCertificates
+      canManage: authority.canIssueCertificates || authority.canIssueAcademicCertificates,
+      canManageAcademic: authority.canIssueAcademicCertificates,
+      canManageMinistry: authority.canIssueCertificates
     });
   } catch (error) {
     return handleRouteError(error);
@@ -126,7 +137,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireUser();
-    await requireCertificateIssuer(actor.id);
     const parsed = certificateSchema.safeParse(await request.json());
 
     if (!parsed.success) {
@@ -136,6 +146,11 @@ export async function POST(request: Request) {
     const data = parsed.data;
     const normalizedTitle = normalizeNullableText(data.title) ?? "Membership Certificate";
     const isEducation = data.certificateCategory === "EDUCATION";
+    if (isEducation) {
+      await requireAcademicCertificateIssuer(actor.id);
+    } else {
+      await requireCertificateIssuer(actor.id);
+    }
     const isMarriage = data.certificateCategory === "MARRIAGE";
     const certificatePreset = inferCertificatePreset({
       certificatePreset: data.certificatePreset,

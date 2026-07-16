@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 type OfficialIssuanceInput = {
   userId: string;
   canIssueCertificates: boolean;
+  canIssueAcademicCertificates: boolean;
   canIssueIdCards: boolean;
   canIssueLetters: boolean;
   expiresAt?: Date | null;
@@ -25,6 +26,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
     return {
       isPresident: true,
       canIssueCertificates: true,
+      canIssueAcademicCertificates: true,
       canIssueIdCards: true,
       canIssueLetters: true,
       grant: null
@@ -36,6 +38,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
     select: {
       id: true,
       canIssueCertificates: true,
+      canIssueAcademicCertificates: true,
       canIssueIdCards: true,
       canIssueLetters: true,
       expiresAt: true,
@@ -48,6 +51,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
   return {
     isPresident: false,
     canIssueCertificates: Boolean(active && grant?.canIssueCertificates),
+    canIssueAcademicCertificates: Boolean(active && grant?.canIssueAcademicCertificates),
     canIssueIdCards: Boolean(active && grant?.canIssueIdCards),
     canIssueLetters: Boolean(active && grant?.canIssueLetters),
     grant
@@ -65,6 +69,15 @@ export async function requireCertificateIssuer(actorId: string) {
   const authority = await getOfficialIssuanceAuthority(actorId);
   if (!authority.canIssueCertificates) {
     throw new ApiError(403, "Only the LETW president or a president-approved certificate issuer can issue certificates.");
+  }
+  return authority;
+}
+
+export async function requireAcademicCertificateIssuer(actorId: string) {
+  await assertEmergencyLockdownAllows("OFFICIAL_ISSUING", actorId);
+  const authority = await getOfficialIssuanceAuthority(actorId);
+  if (!authority.canIssueAcademicCertificates) {
+    throw new ApiError(403, "Only the LETW president or a president-assigned rector can issue academic theology certificates.");
   }
   return authority;
 }
@@ -160,7 +173,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
   });
   if (!target) throw new ApiError(404, "The selected LETW leader or moderator was not found or is inactive.");
 
-  if (!input.canIssueCertificates && !input.canIssueIdCards && !input.canIssueLetters) {
+  if (!input.canIssueCertificates && !input.canIssueAcademicCertificates && !input.canIssueIdCards && !input.canIssueLetters) {
     throw new ApiError(422, "Select at least one issuing permission.");
   }
 
@@ -170,6 +183,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
       userId: target.id,
       grantedById: actorId,
       canIssueCertificates: input.canIssueCertificates,
+      canIssueAcademicCertificates: input.canIssueAcademicCertificates,
       canIssueIdCards: input.canIssueIdCards,
       canIssueLetters: input.canIssueLetters,
       expiresAt: input.expiresAt ?? null,
@@ -178,6 +192,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
     update: {
       grantedById: actorId,
       canIssueCertificates: input.canIssueCertificates,
+      canIssueAcademicCertificates: input.canIssueAcademicCertificates,
       canIssueIdCards: input.canIssueIdCards,
       canIssueLetters: input.canIssueLetters,
       expiresAt: input.expiresAt ?? null,
@@ -195,6 +210,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
       targetUserId: target.id,
       targetEmail: target.email,
       canIssueCertificates: grant.canIssueCertificates,
+      canIssueAcademicCertificates: grant.canIssueAcademicCertificates,
       canIssueIdCards: grant.canIssueIdCards,
       canIssueLetters: grant.canIssueLetters,
       expiresAt: grant.expiresAt?.toISOString() ?? null
@@ -215,6 +231,7 @@ export async function revokeOfficialIssuanceAuthority(actorId: string, userId: s
       revokedAt: new Date(),
       revokedById: actorId,
       canIssueCertificates: false,
+      canIssueAcademicCertificates: false,
       canIssueIdCards: false,
       canIssueLetters: false
     }

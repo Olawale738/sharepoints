@@ -18,6 +18,7 @@ export async function GET(request: Request, context: RouteContext) {
       select: {
         id: true,
         userId: true,
+        certificateCategory: true,
         verifyToken: true
       }
     });
@@ -31,7 +32,9 @@ export async function GET(request: Request, context: RouteContext) {
       getOfficialIssuanceAuthority(user.id)
     ]);
 
-    if (!isAdmin && !authority.canIssueCertificates && certificate.userId !== user.id) {
+    const canManageCertificate =
+      authority.canIssueCertificates || (certificate.certificateCategory === "EDUCATION" && authority.canIssueAcademicCertificates);
+    if (!isAdmin && !canManageCertificate && certificate.userId !== user.id) {
       throw new ApiError(403, "You cannot view this certificate QR code.");
     }
 

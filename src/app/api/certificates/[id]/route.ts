@@ -5,7 +5,7 @@ import { logActivity } from "@/lib/activity";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
 import { recordCertificateEvent, reissueCertificate } from "@/lib/certificate-lifecycle";
 import { restoredCertificateData } from "@/lib/certificates";
-import { requireCertificateIssuer } from "@/lib/official-issuance";
+import { requireAcademicCertificateIssuer, requireCertificateIssuer } from "@/lib/official-issuance";
 import { maybeQueuePresidentialApproval } from "@/lib/president-controls";
 import { prisma } from "@/lib/prisma";
 
@@ -21,7 +21,6 @@ const updateSchema = z.object({
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireCertificateIssuer(actor.id);
     const { id } = await context.params;
     const parsed = updateSchema.safeParse(await request.json());
 
@@ -31,6 +30,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const existing = await prisma.memberCertificationBadge.findUnique({ where: { id } });
     if (!existing) throw new ApiError(404, "Certificate not found.");
+    if (existing.certificateCategory === "EDUCATION") {
+      await requireAcademicCertificateIssuer(actor.id);
+    } else {
+      await requireCertificateIssuer(actor.id);
+    }
     const pendingApproval = await maybeQueuePresidentialApproval({
       requesterId: actor.id,
       targetType: PresidentialApprovalTargetType.CERTIFICATE,
@@ -89,7 +93,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireCertificateIssuer(actor.id);
     const { id } = await context.params;
     const certificate = await prisma.memberCertificationBadge.findUnique({
       where: { id }
@@ -97,6 +100,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     if (!certificate) {
       throw new ApiError(404, "Certificate not found.");
+    }
+    if (certificate.certificateCategory === "EDUCATION") {
+      await requireAcademicCertificateIssuer(actor.id);
+    } else {
+      await requireCertificateIssuer(actor.id);
     }
     const pendingApproval = await maybeQueuePresidentialApproval({
       requesterId: actor.id,

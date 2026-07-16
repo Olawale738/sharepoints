@@ -495,6 +495,7 @@ export async function createPresidentDelegation(actorId: string, input: {
         userId: target.id,
         grantedById: actorId,
         canIssueCertificates: input.canIssueCertificates,
+        canIssueAcademicCertificates: input.canIssueCertificates,
         canIssueIdCards: input.canIssueIdCards,
         canIssueLetters: input.canIssueLetters,
         expiresAt: input.expiresAt,
@@ -503,6 +504,7 @@ export async function createPresidentDelegation(actorId: string, input: {
       update: {
         grantedById: actorId,
         canIssueCertificates: input.canIssueCertificates,
+        canIssueAcademicCertificates: input.canIssueCertificates,
         canIssueIdCards: input.canIssueIdCards,
         canIssueLetters: input.canIssueLetters,
         expiresAt: input.expiresAt,
@@ -572,6 +574,7 @@ export async function activateEmergencySuccession(actorId: string, id: string, r
         userId: existing.delegatedToId,
         grantedById: existing.grantedById,
         canIssueCertificates: existing.canIssueCertificates,
+        canIssueAcademicCertificates: existing.canIssueCertificates,
         canIssueIdCards: existing.canIssueIdCards,
         canIssueLetters: existing.canIssueLetters,
         expiresAt: existing.expiresAt,
@@ -580,6 +583,7 @@ export async function activateEmergencySuccession(actorId: string, id: string, r
       update: {
         grantedById: existing.grantedById,
         canIssueCertificates: existing.canIssueCertificates,
+        canIssueAcademicCertificates: existing.canIssueCertificates,
         canIssueIdCards: existing.canIssueIdCards,
         canIssueLetters: existing.canIssueLetters,
         expiresAt: existing.expiresAt,
@@ -633,7 +637,7 @@ export async function revokePresidentDelegation(actorId: string, id: string) {
     if (grant?.reason?.startsWith("President delegation:") || grant?.reason?.startsWith("Emergency succession activated:")) {
       await prisma.officialIssuanceGrant.update({
         where: { userId: delegation.delegatedToId },
-        data: { revokedAt: new Date(), revokedById: actorId, canIssueCertificates: false, canIssueIdCards: false, canIssueLetters: false }
+        data: { revokedAt: new Date(), revokedById: actorId, canIssueCertificates: false, canIssueAcademicCertificates: false, canIssueIdCards: false, canIssueLetters: false }
       });
     }
   }
@@ -653,7 +657,7 @@ export async function runSystemAccessCleanup(actorId: string) {
         tx.fileShareLink.deleteMany({ where: { expiresAt: { lt: now } } }),
         tx.officialIssuanceGrant.updateMany({
           where: { revokedAt: null, expiresAt: { lt: now } },
-          data: { revokedAt: now, revokedById: actorId, canIssueCertificates: false, canIssueIdCards: false, canIssueLetters: false }
+          data: { revokedAt: now, revokedById: actorId, canIssueCertificates: false, canIssueAcademicCertificates: false, canIssueIdCards: false, canIssueLetters: false }
         }),
         tx.userDevice.updateMany({ where: { revokedAt: null, lastSeenAt: { lt: oldDeviceCutoff } }, data: { revokedAt: now } }),
         tx.presidentDelegation.updateMany({ where: { status: PresidentDelegationStatus.ACTIVE, expiresAt: { lt: now } }, data: { status: PresidentDelegationStatus.EXPIRED } }),

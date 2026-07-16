@@ -11,6 +11,7 @@ import {
   Crown,
   DoorOpen,
   FileLock2,
+  GraduationCap,
   HeartHandshake,
   KeyRound,
   Newspaper,
@@ -168,6 +169,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
               >
                 <Award className="h-4 w-4" />
                 <span className="hidden 2xl:inline">Certificates</span>
+              </Link>
+              <Link
+                aria-label="Rector academic certificates"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/rector"
+              >
+                <GraduationCap className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Rector</span>
               </Link>
               <Link
                 aria-label="Mobile app"

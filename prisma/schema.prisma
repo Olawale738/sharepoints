@@ -3293,6 +3293,7 @@ model OfficialIssuanceGrant {
   userId               String    @unique
   grantedById          String
   canIssueCertificates Boolean   @default(false)
+  canIssueAcademicCertificates Boolean @default(false)
   canIssueIdCards      Boolean   @default(false)
   canIssueLetters      Boolean   @default(false)
   reason               String?   @db.Text

@@ -111,6 +111,7 @@ export const activityActions = {
   onboardingItemCreated: "membership.onboarding_item_created",
   onboardingItemCompleted: "membership.onboarding_item_completed",
   certificationBadgeCreated: "membership.certification_badge_created",
+  certificateAssetUploaded: "certificate.asset_uploaded",
   highSecurityAccessApproved: "access.high_security_approved",
   highSecurityAccessRevoked: "access.high_security_revoked",
   accessRequestCreated: "access_request.created",

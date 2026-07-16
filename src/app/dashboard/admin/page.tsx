@@ -16,6 +16,7 @@ import {
   FileLock2,
   Files,
   Gauge,
+  GraduationCap,
   ShieldCheck,
   SlidersHorizontal,
   Smartphone,
@@ -442,6 +443,12 @@ export default async function AdminControlCenterPage() {
           label: "Certificates",
           detail: "Generate baptism, membership, training, ordination, and service certificates.",
           icon: Award
+        },
+        {
+          href: "/dashboard/rector",
+          label: "Rector academic certificates",
+          detail: "Issue theology certificates with candidate photos, rector signatures, QR verification, and academic seal chips.",
+          icon: GraduationCap
         }
       ]
     },

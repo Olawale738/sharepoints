@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Award, BadgeCheck, FileSignature, IdCard, Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { Award, BadgeCheck, FileSignature, GraduationCap, IdCard, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ type IssuanceGrant = {
   id: string;
   userId: string;
   canIssueCertificates: boolean;
+  canIssueAcademicCertificates: boolean;
   canIssueIdCards: boolean;
   canIssueLetters: boolean;
   reason?: string | null;
@@ -101,6 +102,7 @@ export function OfficialIssuancePanel() {
     const payload = {
       userId,
       canIssueCertificates: formData.get("canIssueCertificates") === "on",
+      canIssueAcademicCertificates: formData.get("canIssueAcademicCertificates") === "on",
       canIssueIdCards: formData.get("canIssueIdCards") === "on",
       canIssueLetters: formData.get("canIssueLetters") === "on",
       expiresAt: expiryFromPreset(expiryPreset),
@@ -152,8 +154,9 @@ export function OfficialIssuancePanel() {
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
       {error ? <p className="rounded-md bg-clay/10 px-4 py-3 text-sm text-clay">{error}</p> : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <Metric icon={<Award className="h-5 w-5" />} label="Certificate issuers" value={activeGrants.filter((grant) => grant.canIssueCertificates).length} />
+        <Metric icon={<GraduationCap className="h-5 w-5" />} label="Assigned rectors" value={activeGrants.filter((grant) => grant.canIssueAcademicCertificates).length} />
         <Metric icon={<IdCard className="h-5 w-5" />} label="ID-card issuers" value={activeGrants.filter((grant) => grant.canIssueIdCards).length} />
         <Metric icon={<FileSignature className="h-5 w-5" />} label="Letter issuers" value={activeGrants.filter((grant) => grant.canIssueLetters).length} />
       </section>
@@ -177,8 +180,9 @@ export function OfficialIssuancePanel() {
                 </option>
               ))}
             </select>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Toggle name="canIssueCertificates" icon={<Award className="h-4 w-4" />} label="Certificates" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Toggle name="canIssueCertificates" icon={<Award className="h-4 w-4" />} label="Ministry certificates" />
+              <Toggle name="canIssueAcademicCertificates" icon={<GraduationCap className="h-4 w-4" />} label="Rector academic certificates" />
               <Toggle name="canIssueIdCards" icon={<IdCard className="h-4 w-4" />} label="ID cards" />
               <Toggle name="canIssueLetters" icon={<FileSignature className="h-4 w-4" />} label="Letters" />
             </div>
@@ -216,6 +220,7 @@ export function OfficialIssuancePanel() {
                     <p className="mt-1 text-xs text-ink/50">{grant.user.email}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {grant.canIssueCertificates ? <Badge className="bg-mint text-moss">certificates</Badge> : null}
+                      {grant.canIssueAcademicCertificates ? <Badge className="bg-mint text-moss">rector academic certificates</Badge> : null}
                       {grant.canIssueIdCards ? <Badge className="bg-mint text-moss">ID cards</Badge> : null}
                       {grant.canIssueLetters ? <Badge className="bg-mint text-moss">letters</Badge> : null}
                       <Badge>{grant.expiresAt ? `expires ${new Date(grant.expiresAt).toLocaleDateString()}` : "never expires"}</Badge>

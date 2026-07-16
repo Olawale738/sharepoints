@@ -106,19 +106,21 @@ function defaultPresetForCategory(category: "MINISTRY" | "EDUCATION" | "MARRIAGE
 export function CertificateGeneratorPanel({
   users,
   certificates,
-  canManage
+  canManage,
+  academicOnly = false
 }: {
   users: CertificateUser[];
   certificates: CertificateRow[];
   canManage: boolean;
+  academicOnly?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION" | "MARRIAGE">("MINISTRY");
-  const [certificatePreset, setCertificatePreset] = useState<CertificatePreset>("MEMBERSHIP_COVENANT");
+  const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION" | "MARRIAGE">(academicOnly ? "EDUCATION" : "MINISTRY");
+  const [certificatePreset, setCertificatePreset] = useState<CertificatePreset>(academicOnly ? "THEOLOGY_DEGREE" : "MEMBERSHIP_COVENANT");
   const activePresetDefaults = certificatePresetDefaults(certificatePreset);
 
   const filteredCertificates = useMemo(() => {
@@ -211,71 +213,109 @@ export function CertificateGeneratorPanel({
     window.print();
   }
 
+  function formText(formData: FormData, name: string) {
+    const value = formData.get(name);
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  async function uploadCertificateAsset(file: FormDataEntryValue | null, kind: string) {
+    if (!(file instanceof File) || file.size <= 0) return undefined;
+    const uploadForm = new FormData();
+    uploadForm.append("kind", kind);
+    uploadForm.append("file", file);
+    const response = await fetch("/api/certificates/assets", {
+      method: "POST",
+      body: uploadForm
+    });
+    const body = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+    if (!response.ok || !body?.imageUrl) {
+      throw new Error(body?.error ?? "Certificate image upload failed.");
+    }
+    return body.imageUrl;
+  }
+
   async function createCertificate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
+    const formData = new FormData(form);
     setBusy("create");
     setNotice("");
     setError("");
 
-    const response = await fetch("/api/certificates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: payload.userId || null,
-        title: payload.customTitle || payload.title,
-        certificateCategory: payload.certificateCategory,
-        recipientName: payload.recipientName || undefined,
-        recipientEmail: payload.recipientEmail || undefined,
-        recipientPhone: payload.recipientPhone || undefined,
-        recipientPhotoUrl: payload.recipientPhotoUrl || undefined,
-        recipientOrganization: payload.recipientOrganization || undefined,
-        educationLevel: payload.educationLevel || undefined,
-        programName: payload.programName || payload.title,
-        fieldOfStudy: payload.fieldOfStudy || (payload.certificateCategory === "EDUCATION" ? "Theology" : undefined),
-        gradeOrHonors: payload.gradeOrHonors || undefined,
-        studyMode: payload.studyMode || undefined,
-        studyStartDate: payload.studyStartDate ? new Date(payload.studyStartDate).toISOString() : null,
-        studyEndDate: payload.studyEndDate ? new Date(payload.studyEndDate).toISOString() : null,
-        completionDate: payload.completionDate ? new Date(payload.completionDate).toISOString() : null,
-        customBody: payload.customBody || undefined,
-        certificatePreset: payload.certificatePreset || certificatePreset,
-        templateStyle: payload.templateStyle || undefined,
-        templateAccent: payload.templateAccent || undefined,
-        sealStyle: payload.sealStyle || undefined,
-        signatureLayout: payload.signatureLayout || undefined,
-        watermarkStrength: payload.watermarkStrength || undefined,
-        presidentSignatureUrl: payload.presidentSignatureUrl || undefined,
-        secondSignatoryName: payload.secondSignatoryName || undefined,
-        secondSignatoryTitle: payload.secondSignatoryTitle || undefined,
-        secondSignatorySignatureUrl: payload.secondSignatorySignatureUrl || undefined,
-        spouseOneName: payload.spouseOneName || undefined,
-        spouseOneEmail: payload.spouseOneEmail || undefined,
-        spouseOnePhotoUrl: payload.spouseOnePhotoUrl || undefined,
-        spouseTwoName: payload.spouseTwoName || undefined,
-        spouseTwoEmail: payload.spouseTwoEmail || undefined,
-        spouseTwoPhotoUrl: payload.spouseTwoPhotoUrl || undefined,
-        marriageDate: payload.marriageDate ? new Date(payload.marriageDate).toISOString() : null,
-        marriageLocation: payload.marriageLocation || undefined,
-        officiantName: payload.officiantName || undefined,
-        witnessOneName: payload.witnessOneName || undefined,
-        witnessTwoName: payload.witnessTwoName || undefined,
-        certificateNumber: payload.certificateNumber || undefined,
-        expiresAt: payload.expiresAt ? new Date(payload.expiresAt).toISOString() : null
-      })
-    });
-    const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
-    setBusy("");
+    try {
+      const selectedCategory = academicOnly ? "EDUCATION" : formText(formData, "certificateCategory");
+      const recipientPhotoUrl = await uploadCertificateAsset(formData.get("recipientPhotoFile"), "recipient-photo");
+      const presidentSignatureUrl = await uploadCertificateAsset(formData.get("presidentSignatureFile"), "president-signature");
+      const secondSignatorySignatureUrl = await uploadCertificateAsset(
+        formData.get("secondSignatorySignatureFile"),
+        selectedCategory === "EDUCATION" ? "rector-signature" : "second-signature"
+      );
+      const spouseOnePhotoUrl = await uploadCertificateAsset(formData.get("spouseOnePhotoFile"), "spouse-photo");
+      const spouseTwoPhotoUrl = await uploadCertificateAsset(formData.get("spouseTwoPhotoFile"), "spouse-photo");
 
-    if (!response.ok) {
-      setError(body?.error ?? "Certificate could not be created.");
+      const title = formText(formData, "customTitle") || formText(formData, "title");
+      const response = await fetch("/api/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: formText(formData, "userId") || null,
+          title,
+          certificateCategory: selectedCategory,
+          recipientName: formText(formData, "recipientName") || undefined,
+          recipientEmail: formText(formData, "recipientEmail") || undefined,
+          recipientPhone: formText(formData, "recipientPhone") || undefined,
+          recipientPhotoUrl,
+          recipientOrganization: formText(formData, "recipientOrganization") || undefined,
+          educationLevel: formText(formData, "educationLevel") || undefined,
+          programName: formText(formData, "programName") || title,
+          fieldOfStudy: formText(formData, "fieldOfStudy") || (selectedCategory === "EDUCATION" ? "Theology" : undefined),
+          gradeOrHonors: formText(formData, "gradeOrHonors") || undefined,
+          studyMode: formText(formData, "studyMode") || undefined,
+          studyStartDate: formText(formData, "studyStartDate") ? new Date(formText(formData, "studyStartDate")).toISOString() : null,
+          studyEndDate: formText(formData, "studyEndDate") ? new Date(formText(formData, "studyEndDate")).toISOString() : null,
+          completionDate: formText(formData, "completionDate") ? new Date(formText(formData, "completionDate")).toISOString() : null,
+          customBody: formText(formData, "customBody") || undefined,
+          certificatePreset: academicOnly ? "THEOLOGY_DEGREE" : formText(formData, "certificatePreset") || certificatePreset,
+          templateStyle: formText(formData, "templateStyle") || undefined,
+          templateAccent: formText(formData, "templateAccent") || undefined,
+          sealStyle: formText(formData, "sealStyle") || undefined,
+          signatureLayout: formText(formData, "signatureLayout") || undefined,
+          watermarkStrength: formText(formData, "watermarkStrength") || undefined,
+          presidentSignatureUrl,
+          secondSignatoryName: formText(formData, "secondSignatoryName") || undefined,
+          secondSignatoryTitle: formText(formData, "secondSignatoryTitle") || undefined,
+          secondSignatorySignatureUrl,
+          spouseOneName: formText(formData, "spouseOneName") || undefined,
+          spouseOneEmail: formText(formData, "spouseOneEmail") || undefined,
+          spouseOnePhotoUrl,
+          spouseTwoName: formText(formData, "spouseTwoName") || undefined,
+          spouseTwoEmail: formText(formData, "spouseTwoEmail") || undefined,
+          spouseTwoPhotoUrl,
+          marriageDate: formText(formData, "marriageDate") ? new Date(formText(formData, "marriageDate")).toISOString() : null,
+          marriageLocation: formText(formData, "marriageLocation") || undefined,
+          officiantName: formText(formData, "officiantName") || undefined,
+          witnessOneName: formText(formData, "witnessOneName") || undefined,
+          witnessTwoName: formText(formData, "witnessTwoName") || undefined,
+          certificateNumber: formText(formData, "certificateNumber") || undefined,
+          expiresAt: formText(formData, "expiresAt") ? new Date(formText(formData, "expiresAt")).toISOString() : null
+        })
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string; pendingApproval?: { id: string } } | null;
+      setBusy("");
+
+      if (!response.ok) {
+        setError(body?.error ?? "Certificate could not be created.");
+        return;
+      }
+
+      form.reset();
+      setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : academicOnly ? "Academic certificate created." : "Certificate created.");
+      router.refresh();
+    } catch (uploadError) {
+      setBusy("");
+      setError(uploadError instanceof Error ? uploadError.message : "Certificate could not be created.");
       return;
     }
-
-    form.reset();
-    setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : "Certificate created.");
-    router.refresh();
   }
 
   async function updateCertificate(id: string, action: "REVOKE" | "RESTORE" | "REISSUE") {
@@ -331,43 +371,60 @@ export function CertificateGeneratorPanel({
           <div className="mb-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-ink">
               <Award className="h-4 w-4 text-moss" />
-              Issue a certificate
+              {academicOnly ? "Issue an academic certificate" : "Issue a certificate"}
             </p>
-            <p className="mt-1 text-xs text-ink/55">Generate official LETW certificates with public verification links.</p>
+            <p className="mt-1 text-xs text-ink/55">
+              {academicOnly
+                ? "Create theology certificates with candidate photo, rector signature, QR verification, and cryptographic protection."
+                : "Generate official LETW certificates with public verification links."}
+            </p>
           </div>
           <form className="space-y-4" onSubmit={createCertificate}>
-            <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_1.2fr]">
-              <select
-                className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
-                name="certificatePreset"
-                value={certificatePreset}
-                onChange={(event) => {
-                  const nextPreset = event.target.value as CertificatePreset;
-                  const defaults = certificatePresetDefaults(nextPreset);
-                  setCertificatePreset(nextPreset);
-                  setCertificateCategory(defaults.certificateCategory);
-                }}
-              >
-                {CERTIFICATE_PRESET_OPTIONS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
-                name="certificateCategory"
-                value={certificateCategory}
-                onChange={(event) => {
-                  const nextCategory = event.target.value as "MINISTRY" | "EDUCATION" | "MARRIAGE";
-                  setCertificateCategory(nextCategory);
-                  setCertificatePreset(defaultPresetForCategory(nextCategory) as CertificatePreset);
-                }}
-              >
-                <option value="MINISTRY">Ministry certificate</option>
-                <option value="EDUCATION">Theology education certificate</option>
-                <option value="MARRIAGE">Marriage certificate</option>
-              </select>
+            <div className={academicOnly ? "grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr]" : "grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr_1.2fr]"}>
+              {academicOnly ? (
+                <>
+                  <input name="certificatePreset" type="hidden" value="THEOLOGY_DEGREE" />
+                  <input name="certificateCategory" type="hidden" value="EDUCATION" />
+                  <div className="rounded-md border border-[#0b1b3d]/10 bg-[#f8fbff] px-3 py-2 text-sm font-medium text-[#0b1b3d]">
+                    Rector academic dashboard
+                    <span className="block text-xs font-normal text-ink/55">Theology certificates only</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <select
+                    className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
+                    name="certificatePreset"
+                    value={certificatePreset}
+                    onChange={(event) => {
+                      const nextPreset = event.target.value as CertificatePreset;
+                      const defaults = certificatePresetDefaults(nextPreset);
+                      setCertificatePreset(nextPreset);
+                      setCertificateCategory(defaults.certificateCategory);
+                    }}
+                  >
+                    {CERTIFICATE_PRESET_OPTIONS.map((preset) => (
+                      <option key={preset.value} value={preset.value}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm"
+                    name="certificateCategory"
+                    value={certificateCategory}
+                    onChange={(event) => {
+                      const nextCategory = event.target.value as "MINISTRY" | "EDUCATION" | "MARRIAGE";
+                      setCertificateCategory(nextCategory);
+                      setCertificatePreset(defaultPresetForCategory(nextCategory) as CertificatePreset);
+                    }}
+                  >
+                    <option value="MINISTRY">Ministry certificate</option>
+                    <option value="EDUCATION">Theology education certificate</option>
+                    <option value="MARRIAGE">Marriage certificate</option>
+                  </select>
+                </>
+              )}
               <select className="h-10 rounded-md border border-ink/10 bg-white px-3 text-sm" name="title" required>
                 {(certificateCategory === "EDUCATION" ? THEOLOGY_CERTIFICATE_TYPES : certificateCategory === "MARRIAGE" ? MARRIAGE_CERTIFICATE_TYPES : MINISTRY_CERTIFICATE_TYPES).map((type) => (
                   <option key={type} value={type}>
@@ -390,7 +447,10 @@ export function CertificateGeneratorPanel({
               <Input name="recipientName" placeholder={certificateCategory === "MARRIAGE" ? "Couple display name optional" : certificateCategory === "EDUCATION" ? "External candidate full name" : "Override holder name optional"} />
               <Input name="recipientEmail" placeholder="Candidate email optional" type="email" />
               <Input name="recipientPhone" placeholder="Candidate phone optional" />
-              <Input name="recipientPhotoUrl" placeholder="Candidate photo URL optional" />
+              <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                Candidate photo
+                <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="recipientPhotoFile" type="file" />
+              </label>
               <Input name="recipientOrganization" placeholder="Candidate church/ministry/school optional" />
             </div>
 
@@ -429,15 +489,23 @@ export function CertificateGeneratorPanel({
                 </select>
               </div>
               <div className="mt-3 grid gap-3 lg:grid-cols-4">
-                {certificateCategory !== "EDUCATION" ? <Input name="presidentSignatureUrl" placeholder="President signature image URL optional" /> : null}
+                {certificateCategory !== "EDUCATION" ? (
+                  <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                    President signature image
+                    <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="presidentSignatureFile" type="file" />
+                  </label>
+                ) : null}
                 <Input name="secondSignatoryName" placeholder={certificateCategory === "EDUCATION" ? "Rector name optional" : "Second signatory name optional"} />
                 <Input name="secondSignatoryTitle" placeholder={certificateCategory === "EDUCATION" ? "Rector" : "Second signatory title"} defaultValue={activePresetDefaults.secondSignatoryTitle} />
-                <Input name="secondSignatorySignatureUrl" placeholder={certificateCategory === "EDUCATION" ? "Rector signature image URL optional" : "Second signature image URL optional"} />
+                <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                  {certificateCategory === "EDUCATION" ? "Rector signature image" : "Second signature image"}
+                  <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="secondSignatorySignatureFile" type="file" />
+                </label>
               </div>
               <p className="mt-2 text-xs leading-5 text-ink/55">
                 {certificateCategory === "EDUCATION"
-                  ? "Education certificates use rector signature only. If the rector signature URL is left blank, LETW can use LETW_RECTOR_SIGNATURE_URL or LETW_REGISTRAR_SIGNATURE_URL from the server."
-                  : "For non-education certificates, add the president and second-signatory signature image URLs when original image signatures are required."}
+                  ? "Education certificates use rector signature only. Upload the original rector signature image or leave it blank to use LETW_RECTOR_SIGNATURE_URL from the server."
+                  : "Upload original signature images when required; the files are stored with the certificate record."}
               </p>
             </div>
 
@@ -467,8 +535,14 @@ export function CertificateGeneratorPanel({
                   <Input name="spouseOneEmail" placeholder="Spouse one email optional" />
                   <Input name="spouseTwoEmail" placeholder="Spouse two email optional" />
                   <Input name="marriageLocation" placeholder="Marriage location" />
-                  <Input name="spouseOnePhotoUrl" placeholder="Spouse one photo URL optional" />
-                  <Input name="spouseTwoPhotoUrl" placeholder="Spouse two photo URL optional" />
+                  <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                    Spouse one photo
+                    <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="spouseOnePhotoFile" type="file" />
+                  </label>
+                  <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
+                    Spouse two photo
+                    <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="spouseTwoPhotoFile" type="file" />
+                  </label>
                   <Input name="officiantName" placeholder="Officiating minister" />
                   <Input name="witnessOneName" placeholder="Witness one" />
                   <Input name="witnessTwoName" placeholder="Witness two" />
@@ -495,7 +569,7 @@ export function CertificateGeneratorPanel({
 
             <Button disabled={busy === "create"} type="submit">
               {busy === "create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
-              Generate secure certificate
+              {academicOnly ? "Generate academic certificate" : "Generate secure certificate"}
             </Button>
           </form>
         </section>
@@ -504,8 +578,12 @@ export function CertificateGeneratorPanel({
       <section className="rounded-lg border border-ink/10 bg-white">
         <div className="flex flex-col gap-3 border-b border-ink/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Certificate register</h2>
-            <p className="mt-1 text-xs text-ink/55">Baptism, membership, training, ordination, conference, and volunteer certificates.</p>
+            <h2 className="text-sm font-semibold text-ink">{academicOnly ? "Academic certificate register" : "Certificate register"}</h2>
+            <p className="mt-1 text-xs text-ink/55">
+              {academicOnly
+                ? "Theology certificates, candidate photos, rector signatures, live QR status, and academic seal records."
+                : "Baptism, membership, training, ordination, conference, and volunteer certificates."}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Input className="w-64" value={query} placeholder="Search certificates" onChange={(event) => setQuery(event.target.value)} />

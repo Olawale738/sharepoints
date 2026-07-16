@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Award, Crown, FileSignature, IdCard } from "lucide-react";
+import { Award, Crown, FileSignature, GraduationCap, IdCard } from "lucide-react";
 
 import { auth } from "@/auth";
 import { OfficialIssuancePanel } from "@/components/dashboard/official-issuance-panel";
@@ -29,12 +29,13 @@ export default async function OfficialIssuancePage() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-ink">Official issuer permissions</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/60">
-              Certificates, digital ID cards, and official LETW letters can be issued only by the president, or by leaders the
-              president explicitly delegates here.
+              Certificates, theology academic credentials, digital ID cards, and official LETW letters can be issued only by the
+              president, or by leaders/rectors the president explicitly delegates here. The president can also serve as rector.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-mint text-moss"><Award className="h-3.5 w-3.5" />Certificates</Badge>
+            <Badge className="bg-mint text-moss"><GraduationCap className="h-3.5 w-3.5" />Rector</Badge>
             <Badge className="bg-mint text-moss"><IdCard className="h-3.5 w-3.5" />ID cards</Badge>
             <Badge className="bg-mint text-moss"><FileSignature className="h-3.5 w-3.5" />Letters</Badge>
           </div>

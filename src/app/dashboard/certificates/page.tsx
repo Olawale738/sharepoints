@@ -20,7 +20,8 @@ export default async function CertificatesPage() {
     hasAnyWorkspaceAdminRole(session.user.id),
     getOfficialIssuanceAuthority(session.user.id)
   ]);
-  const canManage = authority.canIssueCertificates;
+  const canManage = authority.canIssueCertificates || authority.canIssueAcademicCertificates;
+  const academicOnly = authority.canIssueAcademicCertificates && !authority.canIssueCertificates && !isAdmin;
   const [users, certificateRows] = await Promise.all([
     canManage
       ? prisma.user.findMany({
@@ -47,7 +48,7 @@ export default async function CertificatesPage() {
         })
       : [],
     prisma.memberCertificationBadge.findMany({
-      where: isAdmin ? undefined : { userId: session.user.id },
+      where: isAdmin ? undefined : canManage ? (academicOnly ? { certificateCategory: "EDUCATION" } : undefined) : { userId: session.user.id },
       orderBy: { issuedAt: "desc" },
       take: isAdmin ? 500 : 100
     })
@@ -103,8 +104,8 @@ export default async function CertificatesPage() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-ink">Official LETW certificates</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/60">
-              Auto-generate and verify certificates for baptism, membership, training, ordination, conferences, volunteer service, and
-              course completion.
+              Auto-generate and verify certificates for baptism, membership, training, ordination, conferences, volunteer service,
+              course completion, and theology education credentials.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -114,7 +115,7 @@ export default async function CertificatesPage() {
         </div>
       </section>
 
-      <CertificateGeneratorPanel canManage={canManage} certificates={certificates} users={users} />
+      <CertificateGeneratorPanel academicOnly={academicOnly} canManage={canManage} certificates={certificates} users={users} />
     </div>
   );
 }
