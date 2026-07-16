@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Award, BadgeCheck, Download, ExternalLink, Loader2, PenLine, Printer, QrCode, RotateCcw, ShieldCheck, ShieldOff, Stamp, Trash2 } from "lucide-react";
 
@@ -103,6 +103,94 @@ function defaultPresetForCategory(category: "MINISTRY" | "EDUCATION" | "MARRIAGE
   return "MEMBERSHIP_COVENANT";
 }
 
+function SignaturePad({ label, name, resetKey }: { label: string; name: string; resetKey: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const [dataUrl, setDataUrl] = useState("");
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    setDataUrl("");
+  }, [resetKey]);
+
+  function pointFromEvent(event: PointerEvent<HTMLCanvasElement>) {
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((event.clientY - rect.top) / rect.height) * canvas.height
+    };
+  }
+
+  function beginSignature(event: PointerEvent<HTMLCanvasElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drawingRef.current = true;
+    lastPointRef.current = pointFromEvent(event);
+  }
+
+  function drawSignature(event: PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current || !lastPointRef.current) return;
+    const canvas = event.currentTarget;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const nextPoint = pointFromEvent(event);
+    context.strokeStyle = "#061a3a";
+    context.lineWidth = 5.8;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.beginPath();
+    context.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+    context.lineTo(nextPoint.x, nextPoint.y);
+    context.stroke();
+    lastPointRef.current = nextPoint;
+  }
+
+  function endSignature(event: PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDataUrl(event.currentTarget.toDataURL("image/png"));
+  }
+
+  function clearSignature() {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    setDataUrl("");
+  }
+
+  return (
+    <div className="rounded-md border border-ink/10 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-ink">{label}</span>
+        <Button className="h-8 px-3 text-xs" type="button" variant="ghost" onClick={clearSignature}>
+          Clear
+        </Button>
+      </div>
+      <input name={name} type="hidden" value={dataUrl} />
+      <canvas
+        ref={canvasRef}
+        className="h-32 w-full touch-none rounded-md border border-dashed border-[#0b1b3d]/25 bg-[#fbfdff]"
+        height={190}
+        width={760}
+        onPointerCancel={endSignature}
+        onPointerDown={beginSignature}
+        onPointerLeave={endSignature}
+        onPointerMove={drawSignature}
+        onPointerUp={endSignature}
+      />
+    </div>
+  );
+}
+
 export function CertificateGeneratorPanel({
   users,
   certificates,
@@ -121,6 +209,7 @@ export function CertificateGeneratorPanel({
   const [query, setQuery] = useState("");
   const [certificateCategory, setCertificateCategory] = useState<"MINISTRY" | "EDUCATION" | "MARRIAGE">(academicOnly ? "EDUCATION" : "MINISTRY");
   const [certificatePreset, setCertificatePreset] = useState<CertificatePreset>(academicOnly ? "THEOLOGY_DEGREE" : "MEMBERSHIP_COVENANT");
+  const [signatureResetKey, setSignatureResetKey] = useState(0);
   const activePresetDefaults = certificatePresetDefaults(certificatePreset);
 
   const filteredCertificates = useMemo(() => {
@@ -234,6 +323,14 @@ export function CertificateGeneratorPanel({
     return body.imageUrl;
   }
 
+  async function uploadCertificateSignatureData(dataUrl: string, kind: string) {
+    if (!dataUrl.startsWith("data:image/png;base64,")) return undefined;
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    if (blob.size <= 0) return undefined;
+    return uploadCertificateAsset(new File([blob], `${kind}.png`, { type: "image/png" }), kind);
+  }
+
   async function createCertificate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -246,10 +343,10 @@ export function CertificateGeneratorPanel({
       const selectedCategory = academicOnly ? "EDUCATION" : formText(formData, "certificateCategory");
       const recipientPhotoUrl = await uploadCertificateAsset(formData.get("recipientPhotoFile"), "recipient-photo");
       const presidentSignatureUrl = await uploadCertificateAsset(formData.get("presidentSignatureFile"), "president-signature");
-      const secondSignatorySignatureUrl = await uploadCertificateAsset(
-        formData.get("secondSignatorySignatureFile"),
-        selectedCategory === "EDUCATION" ? "rector-signature" : "second-signature"
-      );
+      const secondSignatureKind = selectedCategory === "EDUCATION" ? "rector-signature" : "second-signature";
+      const secondSignatorySignatureUrl =
+        (await uploadCertificateSignatureData(formText(formData, "secondSignatorySignatureDrawn"), secondSignatureKind)) ??
+        (await uploadCertificateAsset(formData.get("secondSignatorySignatureFile"), secondSignatureKind));
       const spouseOnePhotoUrl = await uploadCertificateAsset(formData.get("spouseOnePhotoFile"), "spouse-photo");
       const spouseTwoPhotoUrl = await uploadCertificateAsset(formData.get("spouseTwoPhotoFile"), "spouse-photo");
 
@@ -309,6 +406,7 @@ export function CertificateGeneratorPanel({
       }
 
       form.reset();
+      setSignatureResetKey((value) => value + 1);
       setNotice(body?.pendingApproval ? "Certificate request sent to the president for approval." : academicOnly ? "Academic certificate created." : "Certificate created.");
       router.refresh();
     } catch (uploadError) {
@@ -502,10 +600,18 @@ export function CertificateGeneratorPanel({
                   <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="secondSignatorySignatureFile" type="file" />
                 </label>
               </div>
+              <div className="mt-3">
+                <SignaturePad
+                  key={`${certificateCategory}-${signatureResetKey}`}
+                  label={certificateCategory === "EDUCATION" ? "Draw rector signature on screen" : "Draw second signatory signature on screen"}
+                  name="secondSignatorySignatureDrawn"
+                  resetKey={signatureResetKey}
+                />
+              </div>
               <p className="mt-2 text-xs leading-5 text-ink/55">
                 {certificateCategory === "EDUCATION"
-                  ? "Education certificates use rector signature only. Upload the original rector signature image or leave it blank to use LETW_RECTOR_SIGNATURE_URL from the server."
-                  : "Upload original signature images when required; the files are stored with the certificate record."}
+                  ? "Education certificates use rector signature only. Draw it on screen, upload an original signature image, or leave it blank to use LETW_RECTOR_SIGNATURE_URL from the server."
+                  : "Draw or upload original signature images when required; the files are stored with the certificate record."}
               </p>
             </div>
 

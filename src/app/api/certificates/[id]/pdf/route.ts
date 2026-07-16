@@ -450,11 +450,11 @@ export async function GET(request: Request, context: RouteContext) {
         drawNaturalSignatureImage({
           page,
           image: secondSignature,
-          x: 150,
-          y: 83,
-          maxWidth: 232,
-          maxHeight: 38,
-          opacity: 0.92
+          x: 124,
+          y: 80,
+          maxWidth: 284,
+          maxHeight: 52,
+          opacity: 0.96
         });
       } else {
         drawFittedText({
