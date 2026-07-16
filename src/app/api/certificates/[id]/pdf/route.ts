@@ -344,7 +344,6 @@ export async function GET(request: Request, context: RouteContext) {
     if (isEducation) {
       const academicBlue = rgb(0.03, 0.17, 0.36);
       const softBlue = rgb(0.935, 0.972, 1);
-      const paleGold = rgb(0.992, 0.957, 0.82);
       const body =
         certificate.customBody ||
         `has successfully completed the prescribed studies for ${certificate.programName || certificate.title} in ${certificate.fieldOfStudy || "Theology"} and is duly recorded in the official Light Encounter Tabernacle Worldwide theological education register.`;
@@ -368,18 +367,14 @@ export async function GET(request: Request, context: RouteContext) {
       drawCenteredText(page, "ACADEMIC CREDENTIAL", width / 2, 438, sansBold, 10.5, gold);
       drawCenteredText(page, certificate.title, width / 2, 398, serif, fittedFontSize(serif, certificate.title, 560, 35, 23), academicBlue);
       drawCenteredText(page, "This certifies that", width / 2, 361, sansBold, 12, muted);
-
-      page.drawRectangle({ x: 132, y: 306, width: 442, height: 48, color: softBlue, borderColor: gold, borderWidth: 1.2 });
-      page.drawRectangle({ x: 138, y: 312, width: 430, height: 36, borderColor: rgb(0.72, 0.82, 0.94), borderWidth: 0.45 });
-      drawCenteredText(page, "CANDIDATE / HOLDER NAME", 353, 334, sansBold, 6.8, muted);
-      drawCenteredText(page, holderName, 353, 315, sansBold, fittedFontSize(sansBold, holderName, 400, 24, 15), blue);
-
-      const awardText = `${position}${certificate.gradeOrHonors ? ` - ${certificate.gradeOrHonors}` : ""}`;
-      page.drawRectangle({ x: 246, y: 275, width: 214, height: 22, color: academicBlue });
-      drawCenteredText(page, awardText.toUpperCase().slice(0, 62), 353, 282, sansBold, fittedFontSize(sansBold, awardText.toUpperCase(), 188, 8.2, 5.8), white);
+      drawCenteredText(page, holderName, 353, 321, sansBold, fittedFontSize(sansBold, holderName, 420, 28, 17), blue);
+      page.drawLine({ start: { x: 190, y: 307 }, end: { x: 516, y: 307 }, thickness: 1.1, color: gold });
+      if (certificate.gradeOrHonors) {
+        drawCenteredText(page, certificate.gradeOrHonors, 353, 288, sansBold, fittedFontSize(sansBold, certificate.gradeOrHonors, 350, 10.5, 7), academicBlue);
+      }
 
       wrapText(body, 78).slice(0, 4).forEach((line, index) => {
-        drawCenteredText(page, line, 353, 244 - index * 15, sans, 10.3, ink);
+        drawCenteredText(page, line, 353, 263 - index * 15, sans, 10.3, ink);
       });
 
       const photoX = 638;
@@ -393,45 +388,36 @@ export async function GET(request: Request, context: RouteContext) {
       }
       drawCenteredText(page, "Candidate photo", photoX + 58, photoY - 19, sansBold, 7, muted);
 
+      page.drawText("OFFICIAL ACADEMIC RECORD", { x: 74, y: 186, size: 7.4, font: sansBold, color: gold });
+      page.drawLine({ start: { x: 74, y: 178 }, end: { x: 514, y: 178 }, thickness: 0.8, color: gold });
       const detailRows = [
-        ["Certificate number", certificateNumber],
-        ["Academic seal", sealNumber],
-        ["Field of study", certificate.fieldOfStudy ?? "Theology"],
-        ["Completed", certificate.completionDate ? formatDate(certificate.completionDate) : formatDate(certificate.issuedAt)]
+        { label: "Certificate ID", value: certificateNumber, x: 74, y: 153, width: 218 },
+        { label: "Academic seal", value: sealNumber, x: 74, y: 120, width: 218 },
+        { label: "Field of study", value: certificate.fieldOfStudy ?? "Theology", x: 326, y: 153, width: 168 },
+        { label: "Completed", value: certificate.completionDate ? formatDate(certificate.completionDate) : formatDate(certificate.issuedAt), x: 326, y: 120, width: 168 }
       ];
-      detailRows.forEach(([label, value], index) => {
-        const x = 74 + index * 136;
-        page.drawRectangle({ x, y: 137, width: 126, height: 52, color: softBlue, borderColor: rgb(0.76, 0.86, 0.97), borderWidth: 0.7 });
-        page.drawText(label.toUpperCase(), { x: x + 10, y: 169, size: 6.4, font: sansBold, color: blue });
+      detailRows.forEach((detail) => {
+        page.drawText(detail.label.toUpperCase(), { x: detail.x, y: detail.y + 16, size: 6.4, font: sansBold, color: muted });
         drawFittedText({
           page,
-          text: value,
-          x: x + 10,
-          y: 150,
-          maxWidth: 106,
+          text: detail.value,
+          x: detail.x,
+          y: detail.y,
+          maxWidth: detail.width,
           font: sansBold,
-          preferredSize: 8.5,
-          minimumSize: 5.4,
+          preferredSize: 9.2,
+          minimumSize: 6,
           color: academicBlue
         });
       });
 
-      drawVerificationSealChip({
-        page,
-        logo,
-        x: 600,
-        y: 160,
-        width: 170,
-        height: 92,
-        sans,
-        sansBold,
-        navy: academicBlue,
-        blue,
-        gold,
-        lightBlue: softBlue,
-        white,
-        certificateNumber
-      });
+      const sealCenterX = 574;
+      const sealCenterY = 129;
+      page.drawEllipse({ x: sealCenterX, y: sealCenterY, xScale: 46, yScale: 46, color: softBlue, borderColor: gold, borderWidth: 2.1 });
+      page.drawEllipse({ x: sealCenterX, y: sealCenterY, xScale: 36, yScale: 36, color: white, borderColor: academicBlue, borderWidth: 0.9 });
+      page.drawImage(logo, { x: sealCenterX - 25, y: sealCenterY - 25, width: 50, height: 50, opacity: 0.94 });
+      drawCenteredText(page, "ACADEMIC", sealCenterX, sealCenterY + 49, sansBold, 6.2, academicBlue);
+      drawCenteredText(page, "SEAL", sealCenterX, sealCenterY - 55, sansBold, 7.2, gold);
 
       if (secondSignature) {
         page.drawImage(secondSignature, { x: 168, y: 77, width: 178, height: 42, opacity: 0.96 });
@@ -452,19 +438,14 @@ export async function GET(request: Request, context: RouteContext) {
       drawCenteredText(page, secondName, 266, 55, sansBold, fittedFontSize(sansBold, secondName, 220, 8.4, 6), academicBlue);
       drawCenteredText(page, "Rector / Digitally Authorized Academic Signature", 266, 42, sansBold, 7.4, muted);
 
-      const qrX = 652;
-      const qrY = 57;
-      const qrSize = 100;
-      page.drawRectangle({ x: qrX - 10, y: qrY - 10, width: qrSize + 20, height: qrSize + 20, color: white, borderColor: gold, borderWidth: 1.1 });
-      page.drawRectangle({ x: qrX - 5, y: qrY - 5, width: qrSize + 10, height: qrSize + 10, borderColor: rgb(0.7, 0.84, 0.98), borderWidth: 0.7 });
+      const qrX = 674;
+      const qrY = 82;
+      const qrSize = 98;
+      page.drawRectangle({ x: qrX - 8, y: qrY - 8, width: qrSize + 16, height: qrSize + 16, color: white, borderColor: gold, borderWidth: 1 });
+      page.drawRectangle({ x: qrX - 3, y: qrY - 3, width: qrSize + 6, height: qrSize + 6, borderColor: rgb(0.7, 0.84, 0.98), borderWidth: 0.6 });
       page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-      drawCenteredText(page, "SCAN TO VERIFY", qrX + qrSize / 2, 39, sansBold, 8, academicBlue);
-
-      page.drawRectangle({ x: 422, y: 51, width: 188, height: 46, color: paleGold, borderColor: gold, borderWidth: 0.7 });
-      page.drawText("CRYPTOGRAPHIC PROTECTION", { x: 433, y: 80, size: 6.7, font: sansBold, color: academicBlue });
-      drawFittedText({ page, text: `Hash: ${shortHash(credentialHash, 24)}`, x: 433, y: 66, maxWidth: 165, font: sans, preferredSize: 6.1, minimumSize: 4.8, color: blue });
-      drawFittedText({ page, text: `Signature: ${shortHash(digitalSignature, 24)}`, x: 433, y: 55, maxWidth: 165, font: sans, preferredSize: 6.1, minimumSize: 4.8, color: blue });
-      drawCenteredText(page, certificateNumber, qrX + qrSize / 2, 27, sansBold, fittedFontSize(sansBold, certificateNumber, 150, 6.6, 5), blue);
+      drawCenteredText(page, "SCAN TO VERIFY", qrX + qrSize / 2, 66, sansBold, 8, academicBlue);
+      drawCenteredText(page, "Live status and authenticity", qrX + qrSize / 2, 51, sans, 6.6, muted);
 
       if (!valid) {
         page.drawRectangle({ x: 270, y: 254, width: 302, height: 72, color: white, opacity: 0.76 });
