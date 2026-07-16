@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     const results: Array<{ candidateId: string; name: string; status: string; certificateId?: string; error?: string }> = [];
     for (const candidate of candidates) {
       try {
-        await requireClearedAcademicCandidate(candidate.id);
+        await requireClearedAcademicCandidate(candidate.id, data.title);
         const csvRow = csvSelectors.find((row) => row.nameOrId === candidate.id || row.email?.toLowerCase() === candidate.email?.toLowerCase() || row.nameOrId === candidate.fullName);
         const certificate = await createAcademicCertificate({
           actorId: actor.id,

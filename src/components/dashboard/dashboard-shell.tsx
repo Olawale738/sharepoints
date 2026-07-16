@@ -187,6 +187,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                 <span className="hidden 2xl:inline">Rector</span>
               </Link>
               <Link
+                aria-label="Academic operations"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/academic-operations"
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Academic ops</span>
+              </Link>
+              <Link
                 aria-label="Mobile app"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
                 href="/dashboard/mobile-app"

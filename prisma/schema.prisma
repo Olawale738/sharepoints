@@ -4368,6 +4368,124 @@ model CertificateCorrectionRequest {
   @@index([status, createdAt])
 }
 
+model AcademicBoardApproval {
+  id             String    @id @default(cuid())
+  title          String
+  programName    String?
+  educationLevel String?
+  fieldOfStudy   String    @default("Theology")
+  boardDate      DateTime?
+  status         String    @default("DRAFT")
+  submittedById  String
+  submittedAt    DateTime?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  notes          String?   @db.Text
+  reviewNote     String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, boardDate])
+  @@index([programName, educationLevel, status])
+  @@index([submittedById, createdAt])
+}
+
+model AcademicBoardApprovalCandidate {
+  id             String   @id @default(cuid())
+  boardId        String
+  candidateId    String
+  status         String   @default("PENDING")
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([boardId, candidateId])
+  @@index([candidateId, status])
+  @@index([boardId, status])
+}
+
+model CertificatePrintLog {
+  id            String    @id @default(cuid())
+  certificateId String
+  status        String    @default("READY_FOR_PRINT")
+  method        String?
+  trackingCode  String?
+  handledById   String?
+  handledAt     DateTime?
+  collectedBy   String?
+  notes         String?   @db.Text
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([certificateId, status, createdAt])
+  @@index([status, handledAt])
+  @@index([createdById, createdAt])
+}
+
+model MinistryLicense {
+  id              String    @id @default(cuid())
+  userId          String?
+  holderName      String
+  holderEmail     String?
+  holderPhone     String?
+  licenseType     String
+  licenseNumber   String    @unique
+  scope           String?
+  ministryId      String?
+  workspaceId     String?
+  organizationUnitId String?
+  status          String    @default("ACTIVE")
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime?
+  renewedFromId   String?
+  revokedAt       DateTime?
+  revokedById     String?
+  renewalNote     String?   @db.Text
+  createdById     String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId, status, expiresAt])
+  @@index([licenseType, status, expiresAt])
+  @@index([workspaceId, status])
+  @@index([ministryId, status])
+  @@index([organizationUnitId, status])
+}
+
+model AcademicAuditRun {
+  id          String   @id @default(cuid())
+  title       String
+  status      String   @default("COMPLETED")
+  summary     String?  @db.Text
+  counts      Json?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([createdById, createdAt])
+  @@index([status, createdAt])
+}
+
+model AcademicAuditFinding {
+  id          String   @id @default(cuid())
+  runId       String
+  severity    String   @default("MEDIUM")
+  findingType String
+  title       String
+  detail      String   @db.Text
+  candidateId String?
+  certificateId String?
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedById String?
+
+  @@index([runId, severity])
+  @@index([candidateId, status])
+  @@index([certificateId, status])
+  @@index([findingType, status])
+}
+
 model CertificateEvent {
   id            String   @id @default(cuid())
   certificateId String

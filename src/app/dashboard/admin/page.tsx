@@ -449,6 +449,12 @@ export default async function AdminControlCenterPage() {
           label: "Rector academic certificates",
           detail: "Issue theology certificates with candidate photos, rector signatures, QR verification, and academic seal chips.",
           icon: GraduationCap
+        },
+        {
+          href: "/dashboard/academic-operations",
+          label: "Academic operations",
+          detail: "Board graduation approvals, correction inbox, print logs, ministry licenses, and academic audits.",
+          icon: ClipboardCheck
         }
       ]
     },

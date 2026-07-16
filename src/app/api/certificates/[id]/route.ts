@@ -39,7 +39,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (parsed.data.action === "ISSUE") {
       if (existing.status !== "DRAFT") throw new ApiError(409, "Only preview draft certificates can be issued.");
       if (existing.certificateCategory !== "EDUCATION") throw new ApiError(422, "Preview approval issuing is available for academic certificates.");
-      await requireClearedAcademicCandidate(existing.academicCandidateId);
+      await requireClearedAcademicCandidate(existing.academicCandidateId, existing.title);
     }
     const pendingApproval = await maybeQueuePresidentialApproval({
       requesterId: actor.id,

@@ -165,7 +165,7 @@ export async function POST(request: Request) {
       throw new ApiError(422, "Select an academic candidate from the student registry before creating a theology certificate.");
     }
     if (isEducation && academicCandidate && !data.previewOnly) {
-      await requireClearedAcademicCandidate(academicCandidate.id);
+      await requireClearedAcademicCandidate(academicCandidate.id, normalizedTitle);
     }
     const signatureProfile = data.signatureProfileId
       ? await prisma.certificateSignatureProfile.findFirst({

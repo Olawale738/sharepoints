@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { AcademicCandidate, MemberCertificationBadge, Prisma } from "@prisma/client";
 
 import { ApiError } from "@/lib/api";
+import { requireAcademicBoardApproval } from "@/lib/academic-operations";
 import { generateCertificateNumber, generateSealNumber } from "@/lib/certificate-security";
 import { recordCertificateEvent, signStoredCertificate } from "@/lib/certificate-lifecycle";
 import { normalizeCertificateExpiry } from "@/lib/certificates";
@@ -25,7 +26,7 @@ export function academicClearanceMissing(candidate: Pick<AcademicCandidate, "fee
   ].filter(Boolean) as string[];
 }
 
-export async function requireClearedAcademicCandidate(candidateId?: string | null) {
+export async function requireClearedAcademicCandidate(candidateId?: string | null, title?: string | null) {
   if (!candidateId) {
     throw new ApiError(422, "Select a cleared academic candidate before issuing a theology certificate.");
   }
@@ -38,6 +39,7 @@ export async function requireClearedAcademicCandidate(candidateId?: string | nul
   if (missing.length) {
     throw new ApiError(409, `Academic clearance is incomplete: ${missing.join(", ")}.`);
   }
+  await requireAcademicBoardApproval(candidate, title);
 
   return candidate;
 }
@@ -136,7 +138,7 @@ export function academicCertificateCreateData(input: AcademicCertificateInput): 
 
 export async function createAcademicCertificate(input: AcademicCertificateInput) {
   if (input.status !== "DRAFT") {
-    await requireClearedAcademicCandidate(input.candidate.id);
+    await requireClearedAcademicCandidate(input.candidate.id, input.title);
   }
 
   const certificate = await prisma.memberCertificationBadge.create({

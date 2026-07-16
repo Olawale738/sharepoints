@@ -325,7 +325,7 @@ async function applyApprovedItem(item: Awaited<ReturnType<typeof prisma.presiden
     const presetDefaults = certificatePresetDefaults(certificatePreset);
     const isEducationCertificate = category === "EDUCATION" || certificatePreset === "THEOLOGY_DEGREE";
     if (isEducationCertificate) {
-      await requireClearedAcademicCandidate(academicCandidateId);
+      await requireClearedAcademicCandidate(academicCandidateId, title);
     }
     const issuedAt = new Date();
     const certificate = await prisma.memberCertificationBadge.create({
