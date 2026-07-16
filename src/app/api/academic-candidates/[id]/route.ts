@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
 
 import { academicClearanceStatus } from "@/lib/academic-certificates";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
@@ -23,6 +24,8 @@ const updateSchema = z.object({
   studyMode: z.string().trim().max(80).optional().nullable(),
   admissionDate: z.string().datetime().optional().nullable(),
   graduationDate: z.string().datetime().optional().nullable(),
+  studentIdExpiresAt: z.string().datetime().optional().nullable(),
+  studentIdStatus: z.string().trim().max(40).optional(),
   paymentStatus: z.string().trim().max(40).optional().nullable(),
   feesCleared: z.boolean().optional(),
   coursesCompleted: z.boolean().optional(),
@@ -48,6 +51,10 @@ function nullableDate(value?: string | null) {
 function nullableText(value?: string | null) {
   const text = value?.trim();
   return text || null;
+}
+
+function generateStudentIdNumber() {
+  return `LETW-STU-${new Date().getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -98,6 +105,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         studyMode: data.studyMode === undefined ? undefined : nullableText(data.studyMode),
         admissionDate: data.admissionDate === undefined ? undefined : nullableDate(data.admissionDate),
         graduationDate: data.graduationDate === undefined ? undefined : nullableDate(data.graduationDate),
+        studentIdNumber: data.studentIdExpiresAt !== undefined && !existing.studentIdNumber ? generateStudentIdNumber() : undefined,
+        studentIdIssuedAt: data.studentIdExpiresAt !== undefined && !existing.studentIdIssuedAt ? new Date() : undefined,
+        studentIdExpiresAt: data.studentIdExpiresAt === undefined ? undefined : nullableDate(data.studentIdExpiresAt),
+        studentIdStatus: data.studentIdStatus,
         paymentStatus: data.paymentStatus === undefined ? undefined : nullableText(data.paymentStatus) ?? "PENDING",
         status: data.status,
         ...flags,

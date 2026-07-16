@@ -19,6 +19,10 @@ type Candidate = {
   fieldOfStudy?: string | null;
   studyMode?: string | null;
   graduationDate?: string | Date | null;
+  studentIdNumber?: string | null;
+  studentIdIssuedAt?: string | Date | null;
+  studentIdExpiresAt?: string | Date | null;
+  studentIdStatus?: string | null;
   clearanceStatus: string;
   photoUrl?: string | null;
   feesCleared?: boolean;
@@ -134,6 +138,13 @@ function dateIso(formData: FormData, name: string) {
 function formatDate(value?: string | Date | null) {
   if (!value) return "No date";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function formatDateInput(value?: string | Date | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 function statusClass(status: string) {
@@ -290,6 +301,7 @@ export function AcademicOperationsPanel({
         studyMode: formText(formData, "studyMode") || null,
         admissionDate: dateIso(formData, "admissionDate"),
         graduationDate: dateIso(formData, "graduationDate"),
+        studentIdExpiresAt: dateIso(formData, "studentIdExpiresAt"),
         paymentStatus: formData.get("feesCleared") === "on" ? "CLEARED" : "PENDING",
         feesCleared: formData.get("feesCleared") === "on",
         coursesCompleted: formData.get("coursesCompleted") === "on",
@@ -300,6 +312,19 @@ export function AcademicOperationsPanel({
       });
       form.reset();
       setNotice("Graduand added to the academic candidate registry.");
+    });
+  }
+
+  async function updateStudentIdExpiry(event: FormEvent<HTMLFormElement>, candidateId: string) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    await runAction(`student-id-${candidateId}`, async () => {
+      await jsonRequest(`/api/academic-candidates/${candidateId}`, "PATCH", {
+        studentIdExpiresAt: dateIso(formData, "studentIdExpiresAt"),
+        studentIdStatus: formText(formData, "studentIdStatus") || "ACTIVE"
+      });
+      setNotice("Student ID card expiry updated.");
     });
   }
 
@@ -454,6 +479,7 @@ export function AcademicOperationsPanel({
               </label>
               <Input name="admissionDate" type="date" />
               <Input name="graduationDate" type="date" />
+              <Input name="studentIdExpiresAt" type="date" />
               <Textarea className="lg:col-span-1" name="clearanceNotes" placeholder="Clearance notes optional" />
               <div className="flex flex-wrap gap-3 rounded-md bg-paper p-3 text-xs text-ink/65 lg:col-span-3">
                 {[
@@ -497,6 +523,21 @@ export function AcademicOperationsPanel({
                     </div>
                     <p className="mt-1 text-xs text-ink/55">{candidate.educationLevel} - {candidate.programName}</p>
                     <p className="mt-1 text-xs text-ink/50">{candidate.email ?? "No email"}{candidate.graduationDate ? ` - graduates ${formatDate(candidate.graduationDate)}` : ""}</p>
+                    <p className="mt-1 font-mono text-xs text-ink/50">
+                      Student ID: {candidate.studentIdNumber ?? "Pending"} - expires {candidate.studentIdExpiresAt ? formatDate(candidate.studentIdExpiresAt) : "not set"}
+                    </p>
+                    <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(event) => updateStudentIdExpiry(event, candidate.id)}>
+                      <Input className="h-8 w-40 text-xs" name="studentIdExpiresAt" type="date" defaultValue={formatDateInput(candidate.studentIdExpiresAt)} />
+                      <select className="h-8 rounded-md border border-ink/10 bg-white px-2 text-xs" name="studentIdStatus" defaultValue={candidate.studentIdStatus ?? "ACTIVE"}>
+                        <option value="ACTIVE">Active</option>
+                        <option value="SUSPENDED">Suspended</option>
+                        <option value="EXPIRED">Expired</option>
+                      </select>
+                      <Button className="h-8 px-3 text-xs" disabled={busy === `student-id-${candidate.id}`} type="submit" variant="secondary">
+                        {busy === `student-id-${candidate.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                        Update ID expiry
+                      </Button>
+                    </form>
                   </div>
                 </div>
               ))}

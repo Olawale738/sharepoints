@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
 
 import { academicClearanceStatus } from "@/lib/academic-certificates";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
@@ -20,6 +21,7 @@ const candidateSchema = z.object({
   studyMode: z.string().trim().max(80).optional().nullable(),
   admissionDate: z.string().datetime().optional().nullable(),
   graduationDate: z.string().datetime().optional().nullable(),
+  studentIdExpiresAt: z.string().datetime().optional().nullable(),
   paymentStatus: z.string().trim().max(40).optional().nullable(),
   feesCleared: z.boolean().optional(),
   coursesCompleted: z.boolean().optional(),
@@ -36,6 +38,10 @@ function nullableDate(value?: string | null) {
 function nullableText(value?: string | null) {
   const text = value?.trim();
   return text || null;
+}
+
+function generateStudentIdNumber() {
+  return `LETW-STU-${new Date().getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 export async function GET() {
@@ -107,6 +113,10 @@ export async function POST(request: Request) {
         studyMode: nullableText(data.studyMode),
         admissionDate: nullableDate(data.admissionDate),
         graduationDate: nullableDate(data.graduationDate),
+        studentIdNumber: generateStudentIdNumber(),
+        studentIdIssuedAt: new Date(),
+        studentIdExpiresAt: nullableDate(data.studentIdExpiresAt),
+        studentIdStatus: "ACTIVE",
         paymentStatus: nullableText(data.paymentStatus) ?? (flags.feesCleared ? "CLEARED" : "PENDING"),
         ...flags,
         clearanceStatus: academicClearanceStatus(flags),

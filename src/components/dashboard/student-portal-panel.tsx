@@ -22,6 +22,10 @@ type StudentCandidate = {
   studyMode?: string | null;
   admissionDate?: string | Date | null;
   graduationDate?: string | Date | null;
+  studentIdNumber?: string | null;
+  studentIdIssuedAt?: string | Date | null;
+  studentIdExpiresAt?: string | Date | null;
+  studentIdStatus?: string | null;
   status: string;
   paymentStatus: string;
   feesCleared: boolean;
@@ -97,6 +101,13 @@ function statusClass(status: string) {
   if (["ACTIVE", "CLEARED", "APPROVED"].includes(normalized)) return "bg-mint text-moss";
   if (["PENDING", "DRAFT", "REPLACED"].includes(normalized)) return "bg-[#fff6d8] text-[#7c5d00]";
   return "bg-clay/10 text-clay";
+}
+
+function studentIdStatus(candidate: StudentCandidate) {
+  if (!candidate.studentIdNumber) return "PENDING";
+  if (candidate.studentIdStatus && candidate.studentIdStatus !== "ACTIVE") return candidate.studentIdStatus;
+  if (candidate.studentIdExpiresAt && new Date(candidate.studentIdExpiresAt) <= new Date()) return "EXPIRED";
+  return "ACTIVE";
 }
 
 function valueFromForm(formData: FormData, name: string) {
@@ -307,6 +318,21 @@ export function StudentPortalPanel({
               </div>
 
               <div>
+                <div className="mb-4 rounded-lg border border-ink/10 bg-[#f8fbff] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">Student ID card</p>
+                      <p className="mt-1 font-mono text-sm font-semibold text-moss">{candidate.studentIdNumber ?? "Pending issue"}</p>
+                    </div>
+                    <Badge className={statusClass(studentIdStatus(candidate))}>{studentIdStatus(candidate).toLowerCase()}</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-ink/60 sm:grid-cols-2">
+                    <p>Issued: <span className="font-medium text-ink">{formatDate(candidate.studentIdIssuedAt)}</span></p>
+                    <p>Expires: <span className="font-medium text-ink">{formatDate(candidate.studentIdExpiresAt)}</span></p>
+                    <p>Program: <span className="font-medium text-ink">{candidate.programName}</span></p>
+                    <p>Level: <span className="font-medium text-ink">{candidate.educationLevel}</span></p>
+                  </div>
+                </div>
                 <p className="text-sm font-semibold text-ink">Completed course history</p>
                 <div className="mt-3 divide-y divide-ink/10 rounded-md border border-ink/10">
                   {candidateCourses.map((course) => (

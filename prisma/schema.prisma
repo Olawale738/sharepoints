@@ -4270,6 +4270,10 @@ model AcademicCandidate {
   studyMode         String?
   admissionDate     DateTime?
   graduationDate    DateTime?
+  studentIdNumber   String?   @unique
+  studentIdIssuedAt DateTime?
+  studentIdExpiresAt DateTime?
+  studentIdStatus   String    @default("ACTIVE")
   status            String    @default("ACTIVE")
   paymentStatus     String    @default("PENDING")
   feesCleared       Boolean   @default(false)
@@ -4288,6 +4292,7 @@ model AcademicCandidate {
   @@index([email])
   @@index([status, clearanceStatus])
   @@index([educationLevel, clearanceStatus])
+  @@index([studentIdStatus, studentIdExpiresAt])
   @@index([createdById, createdAt])
 }
 
