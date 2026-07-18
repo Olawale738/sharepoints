@@ -545,6 +545,31 @@ export function AcademicOperationsPanel({
                     <p className="mt-1 font-mono text-xs text-ink/50">
                       Student ID: {candidate.studentIdNumber ?? "Pending"} - expires {candidate.studentIdExpiresAt ? formatDate(candidate.studentIdExpiresAt) : "not set"}
                     </p>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-[#d4af37]/35 bg-white">
+                      <div className="flex items-center justify-between bg-[#0b1b3d] px-3 py-2 text-white">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#d4af37]">Official Student Identity</p>
+                          <p className="mt-0.5 text-xs text-white/70">Light Encounter Tabernacle Worldwide</p>
+                        </div>
+                        <Badge className={statusClass(candidate.studentIdStatus ?? "ACTIVE")}>{(candidate.studentIdStatus ?? "ACTIVE").toLowerCase()}</Badge>
+                      </div>
+                      <div className="grid gap-3 p-3 sm:grid-cols-[1fr_6rem]">
+                        <div>
+                          <p className="text-base font-semibold leading-tight text-[#0b1b3d]">{candidate.fullName}</p>
+                          <p className="mt-1 text-xs text-ink/60">{candidate.educationLevel} - {candidate.programName}</p>
+                          <p className="mt-2 break-all font-mono text-xs font-semibold text-[#0b1b3d]">{candidate.studentIdNumber ?? "Pending issue"}</p>
+                          <p className="mt-1 text-[11px] text-ink/50">Issued {formatDate(candidate.studentIdIssuedAt)} - Expires {candidate.studentIdExpiresAt ? formatDate(candidate.studentIdExpiresAt) : "not set"}</p>
+                        </div>
+                        <div className="flex items-center justify-center rounded-md border border-[#d4af37]/35 bg-[#f8fbff] p-1">
+                          {candidate.studentIdNumber ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt={`${candidate.fullName} Student ID QR`} className="h-20 w-20 rounded bg-white" src={`/api/academic-candidates/${candidate.id}/student-id-qr`} />
+                          ) : (
+                            <p className="px-2 text-center text-[10px] text-ink/45">QR pending</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(event) => updateStudentIdExpiry(event, candidate.id)}>
                       <Input className="h-8 w-40 text-xs" name="studentIdExpiresAt" type="date" defaultValue={formatDateInput(candidate.studentIdExpiresAt)} />
                       <select className="h-8 rounded-md border border-ink/10 bg-white px-2 text-xs" name="studentIdStatus" defaultValue={candidate.studentIdStatus ?? "ACTIVE"}>

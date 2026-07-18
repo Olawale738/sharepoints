@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Award, BadgeCheck, BookOpenCheck, Camera, ClipboardCheck, ExternalLink, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, Award, BadgeCheck, BookOpenCheck, Camera, ClipboardCheck, ExternalLink, Loader2, QrCode, RotateCcw, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,101 @@ function studentIdStatus(candidate: StudentCandidate) {
   if (candidate.studentIdStatus && candidate.studentIdStatus !== "ACTIVE") return candidate.studentIdStatus;
   if (candidate.studentIdExpiresAt && new Date(candidate.studentIdExpiresAt) <= new Date()) return "EXPIRED";
   return "ACTIVE";
+}
+
+function StudentIdCard({ candidate }: { candidate: StudentCandidate }) {
+  const status = studentIdStatus(candidate);
+  const schoolName = candidate.organization?.trim() || "LETW School of Theology";
+
+  return (
+    <div className="mb-4 overflow-hidden rounded-xl border border-[#d4af37]/45 bg-white shadow-soft">
+      <div className="relative overflow-hidden bg-[#0b1b3d] px-5 py-4 text-white">
+        <div className="absolute -right-10 -top-16 h-36 w-36 rounded-full border border-[#d4af37]/25" />
+        <div className="absolute -bottom-12 left-10 h-28 w-28 rounded-full border border-white/10" />
+        <div className="relative flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white p-1.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img alt="LETW logo" className="h-full w-full object-contain" src="/letw-logo.png" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d4af37]">Light Encounter Tabernacle Worldwide</p>
+              <p className="mt-1 text-lg font-semibold leading-tight">Official Student Identity</p>
+              <p className="mt-1 text-xs text-white/70">{schoolName}</p>
+            </div>
+          </div>
+          <Badge className={statusClass(status)}>{status.toLowerCase()}</Badge>
+        </div>
+      </div>
+
+      <div className="grid gap-5 p-5 lg:grid-cols-[11rem_minmax(0,1fr)_10.5rem]">
+        <div className="space-y-3">
+          <div className="flex aspect-[3/3.4] items-center justify-center overflow-hidden rounded-xl border-2 border-[#d4af37]/55 bg-paper">
+            {candidate.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={candidate.fullName} className="h-full w-full object-cover" src={candidate.photoUrl} />
+            ) : (
+              <div className="text-center text-xs text-ink/45">
+                <Camera className="mx-auto h-7 w-7" />
+                <span className="mt-2 block">Photo pending</span>
+              </div>
+            )}
+          </div>
+          <div className="rounded-lg bg-mint px-3 py-2 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-moss">Student status</p>
+            <p className="mt-1 text-sm font-semibold text-moss">{status}</p>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#d4af37]">Student / Candidate</p>
+          <h3 className="mt-1 break-words text-2xl font-semibold leading-tight text-[#0b1b3d]">{candidate.fullName}</h3>
+          <p className="mt-2 text-sm font-medium text-ink/70">{candidate.educationLevel} - {candidate.programName}</p>
+          <p className="mt-1 text-xs text-ink/50">{candidate.fieldOfStudy || "Theology"}{candidate.studyMode ? ` - ${candidate.studyMode}` : ""}</p>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Student ID number</p>
+              <p className="mt-1 break-all font-mono text-sm font-semibold text-[#0b1b3d]">{candidate.studentIdNumber ?? "Pending issue"}</p>
+            </div>
+            <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Program</p>
+              <p className="mt-1 text-sm font-semibold text-[#0b1b3d]">{candidate.programName}</p>
+            </div>
+            <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Issued</p>
+              <p className="mt-1 text-sm font-semibold text-[#0b1b3d]">{formatDate(candidate.studentIdIssuedAt)}</p>
+            </div>
+            <div className="rounded-lg border border-[#0b1b3d]/10 bg-[#f8fbff] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Expires</p>
+              <p className="mt-1 text-sm font-semibold text-[#0b1b3d]">{formatDate(candidate.studentIdExpiresAt)}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-[#d4af37]/35 bg-[#fffaf0] px-3 py-2 text-xs leading-5 text-ink/65">
+            This Student ID is issued at admission and remains valid only when the live LETW verification page confirms an active status.
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-center rounded-xl border border-[#d4af37]/45 bg-[#f8fbff] p-3 text-center">
+          {candidate.studentIdNumber ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt="Student ID QR code" className="h-32 w-32 rounded-md bg-white p-1" src={`/api/academic-candidates/${candidate.id}/student-id-qr`} />
+          ) : (
+            <div className="flex h-32 w-32 items-center justify-center rounded-md border border-dashed border-ink/20 bg-white text-ink/35">
+              <QrCode className="h-10 w-10" />
+            </div>
+          )}
+          <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#0b1b3d]">Scan to verify</p>
+          <p className="mt-1 break-all font-mono text-[10px] text-ink/45">{candidate.studentIdNumber ?? "Admission ID pending"}</p>
+          <div className="mt-3 flex items-center gap-1 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-moss">
+            <ShieldCheck className="h-3 w-3" />
+            Live register
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function valueFromForm(formData: FormData, name: string) {
@@ -318,22 +413,7 @@ export function StudentPortalPanel({
               </div>
 
               <div>
-                <div className="mb-4 rounded-lg border border-ink/10 bg-[#f8fbff] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-ink">Student ID card</p>
-                      <p className="mt-1 font-mono text-sm font-semibold text-moss">{candidate.studentIdNumber ?? "Pending issue"}</p>
-                      <p className="mt-1 text-xs text-ink/50">Issued when admission is given, before graduation.</p>
-                    </div>
-                    <Badge className={statusClass(studentIdStatus(candidate))}>{studentIdStatus(candidate).toLowerCase()}</Badge>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-ink/60 sm:grid-cols-2">
-                    <p>Issued: <span className="font-medium text-ink">{formatDate(candidate.studentIdIssuedAt)}</span></p>
-                    <p>Expires: <span className="font-medium text-ink">{formatDate(candidate.studentIdExpiresAt)}</span></p>
-                    <p>Program: <span className="font-medium text-ink">{candidate.programName}</span></p>
-                    <p>Level: <span className="font-medium text-ink">{candidate.educationLevel}</span></p>
-                  </div>
-                </div>
+                <StudentIdCard candidate={candidate} />
                 <p className="text-sm font-semibold text-ink">Completed course history</p>
                 <div className="mt-3 divide-y divide-ink/10 rounded-md border border-ink/10">
                   {candidateCourses.map((course) => (
