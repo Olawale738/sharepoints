@@ -31,8 +31,9 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const kind = String(formData.get("kind") ?? "certificate-image");
     if (!allowedKinds.has(kind)) throw new ApiError(422, "Invalid certificate image type.");
-    if (kind !== "correction-photo" && !authority.canIssueCertificates && !authority.canIssueAcademicCertificates) {
-      throw new ApiError(403, "Only certificate issuers or president-assigned rectors can upload certificate images.");
+    const canUploadAdmissionPhoto = kind === "recipient-photo" && authority.canManageSchoolAcademics;
+    if (kind !== "correction-photo" && !canUploadAdmissionPhoto && !authority.canIssueCertificates && !authority.canIssueAcademicCertificates) {
+      throw new ApiError(403, "Only certificate issuers, president-assigned rectors, or school secretaries uploading admission photos can upload this image.");
     }
 
     const file = formData.get("file");

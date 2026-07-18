@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { ApiError, ok, requireUser } from "@/lib/api";
 import { handleAcademicOpsRouteError } from "@/lib/academic-ops-db";
-import { requireAcademicCertificateIssuer } from "@/lib/official-issuance";
+import { requireAcademicCertificateIssuer, requireSchoolAcademicManager } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -27,7 +27,7 @@ const patchSchema = z.object({
 export async function GET() {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const [boards, boardCandidates, candidates] = await Promise.all([
       prisma.academicBoardApproval.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
       prisma.academicBoardApprovalCandidate.findMany({ orderBy: { createdAt: "desc" }, take: 1000 }),
@@ -42,7 +42,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const parsed = createSchema.safeParse(await request.json());
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -87,9 +87,13 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
     const parsed = patchSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(422, "Invalid academic board action.");
+    if (parsed.data.action === "SUBMIT") {
+      await requireSchoolAcademicManager(actor.id);
+    } else {
+      await requireAcademicCertificateIssuer(actor.id);
+    }
     const existing = await prisma.academicBoardApproval.findUnique({ where: { id: parsed.data.id } });
     if (!existing) throw new ApiError(404, "Academic board list not found.");
     const now = new Date();
@@ -124,7 +128,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const { id } = z.object({ id: z.string().cuid() }).parse(await request.json());
     await prisma.$transaction(async (tx) => {
       await tx.academicBoardApprovalCandidate.deleteMany({ where: { boardId: id } });

@@ -1,5 +1,3 @@
-import { WorkspaceRole } from "@prisma/client";
-
 import { activityActions, logActivity } from "@/lib/activity";
 import { ApiError } from "@/lib/api";
 import { isPresidentDocumentAuthority } from "@/lib/governance";
@@ -10,6 +8,7 @@ type OfficialIssuanceInput = {
   userId: string;
   canIssueCertificates: boolean;
   canIssueAcademicCertificates: boolean;
+  canManageSchoolAcademics: boolean;
   canIssueIdCards: boolean;
   canIssueLetters: boolean;
   expiresAt?: Date | null;
@@ -27,6 +26,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
       isPresident: true,
       canIssueCertificates: true,
       canIssueAcademicCertificates: true,
+      canManageSchoolAcademics: true,
       canIssueIdCards: true,
       canIssueLetters: true,
       grant: null
@@ -39,6 +39,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
       id: true,
       canIssueCertificates: true,
       canIssueAcademicCertificates: true,
+      canManageSchoolAcademics: true,
       canIssueIdCards: true,
       canIssueLetters: true,
       expiresAt: true,
@@ -52,6 +53,7 @@ export async function getOfficialIssuanceAuthority(userId: string) {
     isPresident: false,
     canIssueCertificates: Boolean(active && grant?.canIssueCertificates),
     canIssueAcademicCertificates: Boolean(active && grant?.canIssueAcademicCertificates),
+    canManageSchoolAcademics: Boolean(active && (grant?.canManageSchoolAcademics || grant?.canIssueAcademicCertificates)),
     canIssueIdCards: Boolean(active && grant?.canIssueIdCards),
     canIssueLetters: Boolean(active && grant?.canIssueLetters),
     grant
@@ -82,6 +84,14 @@ export async function requireAcademicCertificateIssuer(actorId: string) {
   return authority;
 }
 
+export async function requireSchoolAcademicManager(actorId: string) {
+  const authority = await getOfficialIssuanceAuthority(actorId);
+  if (!authority.canManageSchoolAcademics) {
+    throw new ApiError(403, "Only the LETW president, an assigned rector, or a president-approved school secretary can manage theology school admissions.");
+  }
+  return authority;
+}
+
 export async function requireIdCardIssuer(actorId: string) {
   await assertEmergencyLockdownAllows("OFFICIAL_ISSUING", actorId);
   const authority = await getOfficialIssuanceAuthority(actorId);
@@ -108,12 +118,7 @@ export async function listOfficialIssuanceCenter(actorId: string) {
         deletedAt: null,
         suspendedAt: null,
         accessRevokedAt: null,
-        email: { endsWith: "@letw.org" },
-        workspaceMemberships: {
-          some: {
-            role: { in: [WorkspaceRole.ADMIN, WorkspaceRole.LEADER, WorkspaceRole.MODERATOR] }
-          }
-        }
+        email: { endsWith: "@letw.org" }
       },
       select: {
         id: true,
@@ -171,9 +176,9 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
     },
     select: { id: true, email: true, name: true }
   });
-  if (!target) throw new ApiError(404, "The selected LETW leader or moderator was not found or is inactive.");
+  if (!target) throw new ApiError(404, "The selected LETW user was not found or is inactive.");
 
-  if (!input.canIssueCertificates && !input.canIssueAcademicCertificates && !input.canIssueIdCards && !input.canIssueLetters) {
+  if (!input.canIssueCertificates && !input.canIssueAcademicCertificates && !input.canManageSchoolAcademics && !input.canIssueIdCards && !input.canIssueLetters) {
     throw new ApiError(422, "Select at least one issuing permission.");
   }
 
@@ -184,6 +189,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
       grantedById: actorId,
       canIssueCertificates: input.canIssueCertificates,
       canIssueAcademicCertificates: input.canIssueAcademicCertificates,
+      canManageSchoolAcademics: input.canManageSchoolAcademics || input.canIssueAcademicCertificates,
       canIssueIdCards: input.canIssueIdCards,
       canIssueLetters: input.canIssueLetters,
       expiresAt: input.expiresAt ?? null,
@@ -193,6 +199,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
       grantedById: actorId,
       canIssueCertificates: input.canIssueCertificates,
       canIssueAcademicCertificates: input.canIssueAcademicCertificates,
+      canManageSchoolAcademics: input.canManageSchoolAcademics || input.canIssueAcademicCertificates,
       canIssueIdCards: input.canIssueIdCards,
       canIssueLetters: input.canIssueLetters,
       expiresAt: input.expiresAt ?? null,
@@ -211,6 +218,7 @@ export async function grantOfficialIssuanceAuthority(actorId: string, input: Off
       targetEmail: target.email,
       canIssueCertificates: grant.canIssueCertificates,
       canIssueAcademicCertificates: grant.canIssueAcademicCertificates,
+      canManageSchoolAcademics: grant.canManageSchoolAcademics,
       canIssueIdCards: grant.canIssueIdCards,
       canIssueLetters: grant.canIssueLetters,
       expiresAt: grant.expiresAt?.toISOString() ?? null
@@ -232,6 +240,7 @@ export async function revokeOfficialIssuanceAuthority(actorId: string, userId: s
       revokedById: actorId,
       canIssueCertificates: false,
       canIssueAcademicCertificates: false,
+      canManageSchoolAcademics: false,
       canIssueIdCards: false,
       canIssueLetters: false
     }

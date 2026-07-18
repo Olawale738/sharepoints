@@ -203,6 +203,7 @@ async function uploadCertificateAsset(file: FormDataEntryValue | null, kind: str
 
 export function AcademicOperationsPanel({
   canAcademic,
+  canManageSchoolAcademics,
   canMinistryLicense,
   candidates,
   boards,
@@ -220,6 +221,7 @@ export function AcademicOperationsPanel({
   setupWarning
 }: {
   canAcademic: boolean;
+  canManageSchoolAcademics: boolean;
   canMinistryLicense: boolean;
   candidates: Candidate[];
   boards: Board[];
@@ -467,7 +469,7 @@ export function AcademicOperationsPanel({
         ))}
       </section>
 
-      {canAcademic ? (
+      {canManageSchoolAcademics ? (
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Award className="h-4 w-4 text-moss" />Admit Student / Candidate</p>
@@ -570,7 +572,7 @@ export function AcademicOperationsPanel({
         </section>
       ) : null}
 
-      {canAcademic ? (
+      {canManageSchoolAcademics ? (
         <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
             <p className="flex items-center gap-2 text-sm font-semibold text-ink"><GraduationCap className="h-4 w-4 text-moss" />Academic Board Approval</p>
@@ -630,8 +632,8 @@ export function AcademicOperationsPanel({
                     <p className="mt-2 text-xs text-ink/55">{rows.length} candidate(s): {rows.slice(0, 5).map((row) => candidatesById.get(row.candidateId)?.fullName ?? "Candidate").join(", ")}{rows.length > 5 ? "..." : ""}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {board.status === "DRAFT" ? <Button className="h-8 px-3 text-xs" type="button" variant="secondary" onClick={() => boardAction(board.id, "SUBMIT")}>Submit</Button> : null}
-                      {board.status !== "APPROVED" ? <Button className="h-8 px-3 text-xs" type="button" onClick={() => boardAction(board.id, "APPROVE")}>Approve</Button> : null}
-                      {board.status !== "REJECTED" ? <Button className="h-8 px-3 text-xs" type="button" variant="ghost" onClick={() => boardAction(board.id, "REJECT")}>Reject</Button> : null}
+                      {canAcademic && board.status !== "APPROVED" ? <Button className="h-8 px-3 text-xs" type="button" onClick={() => boardAction(board.id, "APPROVE")}>Approve</Button> : null}
+                      {canAcademic && board.status !== "REJECTED" ? <Button className="h-8 px-3 text-xs" type="button" variant="ghost" onClick={() => boardAction(board.id, "REJECT")}>Reject</Button> : null}
                       <Button className="h-8 px-2 text-xs" type="button" variant="ghost" onClick={() => deleteBoard(board.id)}><Trash2 className="h-3.5 w-3.5" />Delete</Button>
                     </div>
                   </div>
@@ -674,6 +676,7 @@ export function AcademicOperationsPanel({
         </section>
       ) : null}
 
+      {canAcademic || canMinistryLicense ? (
       <section className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
           <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Printer className="h-4 w-4 text-moss" />Certificate Print & Collection Log</p>
@@ -726,6 +729,7 @@ export function AcademicOperationsPanel({
           </div>
         </div>
       </section>
+      ) : null}
 
       {canMinistryLicense ? (
         <section className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">

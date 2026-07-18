@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 
 import { academicClearanceStatus } from "@/lib/academic-certificates";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { requireAcademicCertificateIssuer } from "@/lib/official-issuance";
+import { requireSchoolAcademicManager } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -60,7 +60,7 @@ function generateStudentIdNumber(date = new Date()) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const { id } = await context.params;
     const existing = await prisma.academicCandidate.findUnique({ where: { id } });
     if (!existing) throw new ApiError(404, "Academic candidate not found.");
@@ -131,7 +131,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const { id } = await context.params;
     const existing = await prisma.academicCandidate.findUnique({
       where: { id },

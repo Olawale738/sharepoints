@@ -13,6 +13,7 @@ const grantSchema = z.object({
   userId: z.string().cuid(),
   canIssueCertificates: z.boolean().default(false),
   canIssueAcademicCertificates: z.boolean().default(false),
+  canManageSchoolAcademics: z.boolean().default(false),
   canIssueIdCards: z.boolean().default(false),
   canIssueLetters: z.boolean().default(false),
   expiresAt: z.string().datetime().nullable().optional(),

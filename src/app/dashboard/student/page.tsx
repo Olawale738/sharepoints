@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { GraduationCap } from "lucide-react";
 
 import { auth } from "@/auth";
 import { StudentPortalPanel } from "@/components/dashboard/student-portal-panel";
 import { Badge } from "@/components/ui/badge";
+import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
 function lower(value?: string | null) {
@@ -48,7 +50,8 @@ export default async function StudentPortalPage() {
     })
   ]);
   const certificateIds = certificates.map((certificate) => certificate.id);
-  const correctionRequests = await prisma.certificateCorrectionRequest.findMany({
+  const [correctionRequests, authority] = await Promise.all([
+    prisma.certificateCorrectionRequest.findMany({
     where: {
       OR: [
         { requesterId: session.user.id },
@@ -59,7 +62,9 @@ export default async function StudentPortalPage() {
     },
     orderBy: { createdAt: "desc" },
     take: 100
-  });
+    }),
+    getOfficialIssuanceAuthority(session.user.id)
+  ]);
 
   return (
     <div className="space-y-6">
@@ -79,6 +84,11 @@ export default async function StudentPortalPage() {
             <Badge>{candidates.length} student record(s)</Badge>
             <Badge>{certificates.length} certificate(s)</Badge>
             <Badge>{correctionRequests.filter((request) => request.status === "PENDING").length} pending correction(s)</Badge>
+            {authority.canManageSchoolAcademics ? (
+              <Link className="inline-flex h-8 items-center rounded-md border border-ink/10 bg-paper px-3 text-xs font-medium text-ink hover:bg-mint/40" href="/dashboard/school-secretary">
+                Register admission
+              </Link>
+            ) : null}
           </div>
         </div>
       </section>

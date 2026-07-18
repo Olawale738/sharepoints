@@ -13,9 +13,10 @@ export default async function AcademicOperationsPage() {
   if (!session?.user?.id) redirect("/login");
 
   const authority = await getOfficialIssuanceAuthority(session.user.id);
-  if (!authority.canIssueAcademicCertificates && !authority.canIssueCertificates) {
+  if (!authority.canManageSchoolAcademics && !authority.canIssueAcademicCertificates && !authority.canIssueCertificates) {
     redirect("/dashboard");
   }
+  const canManageSchoolAcademics = authority.canManageSchoolAcademics || authority.canIssueAcademicCertificates || authority.canIssueCertificates;
 
   let setupWarning: string | null = null;
   async function academicOpsQuery<T>(query: Promise<T>, fallback: T) {
@@ -94,7 +95,7 @@ export default async function AcademicOperationsPage() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-ink">Board approvals, corrections, print control, licenses, and audit</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/60">
-              A rector and president-facing command center for academic governance and ministry credential control.
+              A theology-school command center for admissions, Student IDs, academic governance, certificates, and ministry credential control.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -111,6 +112,7 @@ export default async function AcademicOperationsPage() {
         boardCandidates={boardCandidates}
         boards={boards}
         canAcademic={authority.canIssueAcademicCertificates}
+        canManageSchoolAcademics={canManageSchoolAcademics}
         canMinistryLicense={authority.canIssueCertificates}
         candidates={candidates}
         certificates={certificates}

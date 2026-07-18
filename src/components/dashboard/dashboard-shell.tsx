@@ -163,6 +163,14 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                 <span className="hidden 2xl:inline">Student ID</span>
               </Link>
               <Link
+                aria-label="School secretary dashboard"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
+                href="/dashboard/school-secretary"
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                <span className="hidden 2xl:inline">School</span>
+              </Link>
+              <Link
                 aria-label="Knowledge base"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
                 href="/dashboard/knowledge"

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Award, BadgeCheck, FileSignature, GraduationCap, IdCard, Loader2, ShieldCheck, Trash2 } from "lucide-react";
+import { Award, ClipboardCheck, FileSignature, GraduationCap, IdCard, Loader2, ShieldCheck, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ type IssuanceGrant = {
   userId: string;
   canIssueCertificates: boolean;
   canIssueAcademicCertificates: boolean;
+  canManageSchoolAcademics: boolean;
   canIssueIdCards: boolean;
   canIssueLetters: boolean;
   reason?: string | null;
@@ -103,6 +104,7 @@ export function OfficialIssuancePanel() {
       userId,
       canIssueCertificates: formData.get("canIssueCertificates") === "on",
       canIssueAcademicCertificates: formData.get("canIssueAcademicCertificates") === "on",
+      canManageSchoolAcademics: formData.get("canManageSchoolAcademics") === "on",
       canIssueIdCards: formData.get("canIssueIdCards") === "on",
       canIssueLetters: formData.get("canIssueLetters") === "on",
       expiresAt: expiryFromPreset(expiryPreset),
@@ -154,9 +156,10 @@ export function OfficialIssuancePanel() {
       {notice ? <p className="rounded-md border border-moss/15 bg-mint px-4 py-3 text-sm text-moss">{notice}</p> : null}
       {error ? <p className="rounded-md bg-clay/10 px-4 py-3 text-sm text-clay">{error}</p> : null}
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-5">
         <Metric icon={<Award className="h-5 w-5" />} label="Certificate issuers" value={activeGrants.filter((grant) => grant.canIssueCertificates).length} />
         <Metric icon={<GraduationCap className="h-5 w-5" />} label="Assigned rectors" value={activeGrants.filter((grant) => grant.canIssueAcademicCertificates).length} />
+        <Metric icon={<ClipboardCheck className="h-5 w-5" />} label="School secretaries" value={activeGrants.filter((grant) => grant.canManageSchoolAcademics && !grant.canIssueAcademicCertificates).length} />
         <Metric icon={<IdCard className="h-5 w-5" />} label="ID-card issuers" value={activeGrants.filter((grant) => grant.canIssueIdCards).length} />
         <Metric icon={<FileSignature className="h-5 w-5" />} label="Letter issuers" value={activeGrants.filter((grant) => grant.canIssueLetters).length} />
       </section>
@@ -171,9 +174,9 @@ export function OfficialIssuancePanel() {
             Only the president can grant this authority. Delegated leaders can issue only the selected official record types.
           </p>
           <form className="mt-5 space-y-4" onSubmit={(event) => void submit(event)}>
-            <Input placeholder="Search leader or moderator" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input placeholder="Search invited LETW user, leader, rector, or secretary" value={query} onChange={(event) => setQuery(event.target.value)} />
             <select className="h-11 w-full rounded-md border border-ink/10 bg-white px-3 text-sm" name="userId" required>
-              <option value="">Choose leader, moderator, or admin</option>
+              <option value="">Choose invited LETW user, leader, moderator, or admin</option>
               {filteredUsers.map((user) => (
                 <option key={user.id} value={user.id}>
                   {displayName(user)} - {user.memberProfile?.organizationPosition ?? user.category ?? "LETW"}
@@ -183,6 +186,7 @@ export function OfficialIssuancePanel() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Toggle name="canIssueCertificates" icon={<Award className="h-4 w-4" />} label="Ministry certificates" />
               <Toggle name="canIssueAcademicCertificates" icon={<GraduationCap className="h-4 w-4" />} label="Rector academic certificates" />
+              <Toggle name="canManageSchoolAcademics" icon={<ClipboardCheck className="h-4 w-4" />} label="School secretary admissions" />
               <Toggle name="canIssueIdCards" icon={<IdCard className="h-4 w-4" />} label="ID cards" />
               <Toggle name="canIssueLetters" icon={<FileSignature className="h-4 w-4" />} label="Letters" />
             </div>
@@ -221,6 +225,7 @@ export function OfficialIssuancePanel() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       {grant.canIssueCertificates ? <Badge className="bg-mint text-moss">certificates</Badge> : null}
                       {grant.canIssueAcademicCertificates ? <Badge className="bg-mint text-moss">rector academic certificates</Badge> : null}
+                      {grant.canManageSchoolAcademics && !grant.canIssueAcademicCertificates ? <Badge className="bg-mint text-moss">school secretary</Badge> : null}
                       {grant.canIssueIdCards ? <Badge className="bg-mint text-moss">ID cards</Badge> : null}
                       {grant.canIssueLetters ? <Badge className="bg-mint text-moss">letters</Badge> : null}
                       <Badge>{grant.expiresAt ? `expires ${new Date(grant.expiresAt).toLocaleDateString()}` : "never expires"}</Badge>

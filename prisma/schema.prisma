@@ -3294,6 +3294,7 @@ model OfficialIssuanceGrant {
   grantedById          String
   canIssueCertificates Boolean   @default(false)
   canIssueAcademicCertificates Boolean @default(false)
+  canManageSchoolAcademics Boolean @default(false)
   canIssueIdCards      Boolean   @default(false)
   canIssueLetters      Boolean   @default(false)
   reason               String?   @db.Text

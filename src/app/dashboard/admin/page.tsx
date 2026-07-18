@@ -457,6 +457,12 @@ export default async function AdminControlCenterPage() {
           icon: ClipboardCheck
         },
         {
+          href: "/dashboard/school-secretary",
+          label: "School secretary dashboard",
+          detail: "Admit theology students, issue Student IDs, manage expiry dates, and prepare graduation lists for rector approval.",
+          icon: GraduationCap
+        },
+        {
           href: "/dashboard/student-id",
           label: "Student ID portal",
           detail: "Admission-issued Student ID numbers, expiry dates, academic records, clearance checklist, course history, and education certificates.",

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 
 import { academicClearanceStatus } from "@/lib/academic-certificates";
 import { ApiError, handleRouteError, ok, requireUser } from "@/lib/api";
-import { requireAcademicCertificateIssuer } from "@/lib/official-issuance";
+import { requireSchoolAcademicManager } from "@/lib/official-issuance";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -47,7 +47,7 @@ function generateStudentIdNumber(date = new Date()) {
 export async function GET() {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const [candidates, batchJobs] = await Promise.all([
       prisma.academicCandidate.findMany({
         orderBy: [{ updatedAt: "desc" }],
@@ -88,7 +88,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await requireUser();
-    await requireAcademicCertificateIssuer(actor.id);
+    await requireSchoolAcademicManager(actor.id);
     const parsed = candidateSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(422, parsed.error.issues[0]?.message ?? "Invalid academic candidate.");
     const data = parsed.data;
