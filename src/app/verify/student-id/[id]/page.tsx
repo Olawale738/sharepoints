@@ -48,6 +48,11 @@ export default async function StudentIdVerificationPage(context: PageContext) {
 
   const status = studentIdStatus(candidate);
   const active = status === "ACTIVE";
+  const candidatePhotoSrc = candidate.photoUrl
+    ? candidate.photoUrl.startsWith("/api/certificates/assets/")
+      ? `/api/academic-candidates/${candidate.id}/student-id-photo`
+      : candidate.photoUrl
+    : null;
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10">
@@ -131,10 +136,11 @@ export default async function StudentIdVerificationPage(context: PageContext) {
           </div>
 
           <aside className="rounded-xl border border-[#d4af37]/35 bg-[#f8fbff] p-4 text-center">
-            <div className="mx-auto flex h-36 w-36 items-center justify-center overflow-hidden rounded-xl border-2 border-[#d4af37]/55 bg-white">
-              {candidate.photoUrl ? (
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0b1b3d]">Candidate photograph</p>
+            <div className="mx-auto flex h-56 w-44 items-center justify-center overflow-hidden rounded-xl border-2 border-[#d4af37]/55 bg-white p-1">
+              {candidatePhotoSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img alt={candidate.fullName} className="h-full w-full object-cover" src={candidate.photoUrl} />
+                <img alt={candidate.fullName} className="h-full w-full object-contain" src={candidatePhotoSrc} />
               ) : (
                 <GraduationCap className="h-10 w-10 text-ink/30" />
               )}

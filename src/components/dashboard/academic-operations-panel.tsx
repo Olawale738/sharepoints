@@ -538,7 +538,12 @@ export function AcademicOperationsPanel({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-ink">{candidate.fullName}</p>
-                      <Badge className={statusClass(candidate.clearanceStatus)}>{candidate.clearanceStatus.toLowerCase()}</Badge>
+                      <Badge className={statusClass(candidate.clearanceStatus)}>
+                        clearance {candidate.clearanceStatus.toLowerCase()}
+                      </Badge>
+                      <Badge className={statusClass(candidate.studentIdStatus ?? "ACTIVE")}>
+                        ID {(candidate.studentIdStatus ?? "ACTIVE").toLowerCase()}
+                      </Badge>
                     </div>
                     <p className="mt-1 text-xs text-ink/55">{candidate.educationLevel} - {candidate.programName}</p>
                     <p className="mt-1 text-xs text-ink/50">{candidate.email ?? "No email"}{candidate.graduationDate ? ` - graduates ${formatDate(candidate.graduationDate)}` : ""}</p>
@@ -571,15 +576,26 @@ export function AcademicOperationsPanel({
                       </div>
                       {candidate.studentIdNumber ? (
                         <div className="border-t border-[#d4af37]/20 bg-[#f8fbff] px-3 py-2">
-                          <a
-                            className="inline-flex h-8 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-xs font-semibold text-[#0b1b3d] hover:bg-mint/40"
-                            href={`/api/academic-candidates/${candidate.id}/student-id-pdf`}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            <Printer className="h-3.5 w-3.5" />
-                            Open printable Student ID PDF
-                          </a>
+                          <div className="flex flex-wrap gap-2">
+                            <a
+                              className="inline-flex h-8 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-xs font-semibold text-[#0b1b3d] hover:bg-mint/40"
+                              href={`/api/academic-candidates/${candidate.id}/student-id-pdf`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Print sheet
+                            </a>
+                            <a
+                              className="inline-flex h-8 items-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#fffaf0] px-3 text-xs font-semibold text-[#0b1b3d] hover:bg-mint/40"
+                              href={`/api/academic-candidates/${candidate.id}/student-id-pdf?format=plastic`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Plastic CR80
+                            </a>
+                          </div>
                         </div>
                       ) : null}
                     </div>

@@ -40,6 +40,17 @@ function IdentityMetric({
   );
 }
 
+function titleCase(value?: string | null) {
+  if (!value) return null;
+  return value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export default async function MembershipCardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -54,6 +65,7 @@ export default async function MembershipCardPage() {
         name: true,
         email: true,
         image: true,
+        category: true,
         memberProfile: {
           select: {
             membershipNumber: true,
@@ -115,7 +127,7 @@ export default async function MembershipCardPage() {
     account?.memberProfile?.digitalIdLocation ||
     [account?.memberProfile?.city, account?.memberProfile?.country].filter(Boolean).join(", ") ||
     "LETTW Worldwide";
-  const position = account?.memberProfile?.organizationPosition ?? "Member";
+  const position = account?.memberProfile?.organizationPosition ?? titleCase(account?.category) ?? "Member";
   const memberPhone = account?.memberProfile?.phone || account?.memberProfile?.alternatePhone || null;
   const membershipNumber = ensuredMembershipNumber;
   const memberSince = String(
@@ -157,8 +169,19 @@ export default async function MembershipCardPage() {
           A portrait, two-sided plastic membership identity for Light Encounter Tabernacle Worldwide, with
           high-contrast QR authentication.
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <PrintIdButton />
+          {card ? (
+            <a
+              className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-sm font-medium hover:bg-mint/40"
+              href="/api/membership-card/plastic-pdf"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download className="h-4 w-4" />
+              Plastic card PDF
+            </a>
+          ) : null}
         </div>
       </section>
 

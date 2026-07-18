@@ -72,6 +72,49 @@ function drawFittedText(input: {
   page.drawText(displayText, { x, y, size, font, color });
 }
 
+function wrapTextToWidth(font: PDFFont, text: string, size: number, maxWidth: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (!current || font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next;
+      continue;
+    }
+    lines.push(current);
+    current = word;
+  }
+
+  if (current) lines.push(current);
+  return lines;
+}
+
+function drawWrappedText(input: {
+  page: PDFPage;
+  text: string;
+  x: number;
+  y: number;
+  maxWidth: number;
+  font: PDFFont;
+  size: number;
+  lineHeight: number;
+  color: PdfColor;
+}) {
+  const lines = wrapTextToWidth(input.font, input.text, input.size, input.maxWidth);
+  lines.forEach((line, index) => {
+    input.page.drawText(line, {
+      x: input.x,
+      y: input.y - index * input.lineHeight,
+      size: input.size,
+      font: input.font,
+      color: input.color
+    });
+  });
+  return Math.max(lines.length, 1) * input.lineHeight;
+}
+
 function drawCenteredText(page: PDFPage, text: string, centerX: number, y: number, font: PDFFont, size: number, color: PdfColor) {
   page.drawText(text, {
     x: centerX - font.widthOfTextAtSize(text, size) / 2,
@@ -126,6 +169,123 @@ async function embedStorageImage(pdf: PDFDocument, key: string | null) {
 function drawInactiveOverlay(page: PDFPage, input: { x: number; y: number; width: number; height: number; font: PDFFont; status: string }) {
   page.drawRectangle({ x: input.x, y: input.y + input.height / 2 - 22, width: input.width, height: 44, color: rgb(1, 1, 1), opacity: 0.78 });
   drawCenteredText(page, input.status, input.x + input.width / 2, input.y + input.height / 2 - 8, input.font, 26, rgb(0.65, 0.14, 0.12));
+}
+
+function drawStudentPlasticPages(input: {
+  pdf: PDFDocument;
+  logo: PDFImage;
+  photo: PDFImage | null;
+  qr: PDFImage;
+  fonts: { sans: PDFFont; bold: PDFFont };
+  candidate: {
+    id: string;
+    fullName: string;
+    phone?: string | null;
+    email?: string | null;
+    organization?: string | null;
+    programName: string;
+    educationLevel: string;
+    fieldOfStudy: string;
+    studyMode?: string | null;
+    admissionDate?: Date | null;
+    studentIdNumber: string;
+    studentIdIssuedAt?: Date | null;
+    studentIdExpiresAt?: Date | null;
+  };
+  status: string;
+}) {
+  const { pdf, logo, photo, qr, fonts, candidate, status } = input;
+  const pageW = 243;
+  const pageH = 153;
+  const navy = rgb(0.043, 0.106, 0.239);
+  const deepNavy = rgb(0.027, 0.067, 0.16);
+  const gold = rgb(0.831, 0.686, 0.216);
+  const softGold = rgb(0.965, 0.862, 0.45);
+  const blue = rgb(0.039, 0.239, 0.514);
+  const ink = rgb(0.071, 0.102, 0.157);
+  const muted = rgb(0.38, 0.44, 0.52);
+  const light = rgb(0.952, 0.973, 1);
+  const white = rgb(1, 1, 1);
+  const schoolName = candidate.organization?.trim() || "LETW School of Theology";
+  const front = pdf.addPage([pageW, pageH]);
+
+  front.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: deepNavy });
+  front.drawRectangle({ x: 0, y: pageH - 36, width: pageW, height: 36, color: navy });
+  front.drawRectangle({ x: 0, y: pageH - 39, width: pageW, height: 3, color: gold });
+  front.drawCircle({ x: pageW - 28, y: pageH + 4, size: 52, color: rgb(0.07, 0.16, 0.31), opacity: 0.42 });
+  front.drawCircle({ x: 17, y: -7, size: 50, color: rgb(0.08, 0.19, 0.36), opacity: 0.35 });
+  front.drawImage(logo, { x: 12, y: pageH - 31, width: 24, height: 24 });
+  front.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 43, y: pageH - 17, size: 5.7, font: fonts.bold, color: white });
+  drawFittedText({ page: front, text: schoolName, x: 43, y: pageH - 29, maxWidth: 158, font: fonts.bold, preferredSize: 5.5, minimumSize: 4.2, color: softGold });
+
+  front.drawRectangle({ x: 12, y: 42, width: 61, height: 78, color: white, borderColor: gold, borderWidth: 1 });
+  if (photo) {
+    drawImageFit(front, photo, 15, 45, 55, 72);
+  } else {
+    front.drawRectangle({ x: 15, y: 45, width: 55, height: 72, color: light });
+    drawCenteredText(front, "PHOTO", 42.5, 82, fonts.bold, 7, muted);
+    drawCenteredText(front, "PENDING", 42.5, 72, fonts.sans, 5.5, muted);
+  }
+
+  drawFittedText({ page: front, text: candidate.fullName, x: 83, y: 99, maxWidth: 144, font: fonts.bold, preferredSize: 13.8, minimumSize: 8.5, color: white });
+  drawFittedText({ page: front, text: candidate.educationLevel, x: 83, y: 84, maxWidth: 122, font: fonts.bold, preferredSize: 7.3, minimumSize: 5.5, color: softGold });
+  drawFittedText({ page: front, text: candidate.programName, x: 83, y: 72, maxWidth: 135, font: fonts.sans, preferredSize: 6.3, minimumSize: 4.9, color: rgb(0.86, 0.9, 0.96) });
+  drawField({ page: front, label: "Student ID", value: candidate.studentIdNumber, x: 83, y: 49, width: 134, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
+  drawField({ page: front, label: "Admitted", value: dateText(candidate.admissionDate), x: 83, y: 27, width: 60, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
+  drawField({ page: front, label: "Expires", value: dateText(candidate.studentIdExpiresAt), x: 151, y: 27, width: 66, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
+  front.drawRectangle({ x: 0, y: 0, width: pageW, height: 20, color: navy });
+  front.drawRectangle({ x: 0, y: 20, width: pageW, height: 2, color: gold });
+  front.drawCircle({ x: 19, y: 10, size: 3.2, color: status === "ACTIVE" ? rgb(0.14, 0.75, 0.48) : rgb(0.84, 0.24, 0.18) });
+  front.drawText(`Status: ${status}`, { x: 27, y: 7.2, size: 6.2, font: fonts.bold, color: white });
+  front.drawText("letw.org", { x: pageW - 51, y: 7.2, size: 6.2, font: fonts.bold, color: softGold });
+
+  const back = pdf.addPage([pageW, pageH]);
+  back.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: white });
+  back.drawRectangle({ x: 0, y: pageH - 36, width: pageW, height: 36, color: navy });
+  back.drawRectangle({ x: 0, y: pageH - 39, width: pageW, height: 3, color: gold });
+  back.drawImage(logo, { x: 76, y: 36, width: 88, height: 88, opacity: 0.042 });
+  back.drawText("IDENTITY VERIFICATION", { x: 15, y: pageH - 18, size: 8.8, font: fonts.bold, color: white });
+  back.drawText("Scan to confirm current student status", { x: 15, y: pageH - 30, size: 5.5, font: fonts.sans, color: rgb(0.82, 0.88, 0.96) });
+  back.drawText("Verification rules", { x: 15, y: 104, size: 7, font: fonts.bold, color: navy });
+  let plasticTermY = 91;
+  for (const line of [
+    "This card remains the property of Light Encounter Tabernacle Worldwide.",
+    "It is valid only when the QR confirmation page displays an active status.",
+    "Suspended, expired, revoked, or replaced student IDs must not be accepted.",
+    "Use the QR page for entrance, exam, class, and official school verification."
+  ]) {
+    back.drawCircle({ x: 18, y: plasticTermY + 2.3, size: 1.7, color: gold });
+    const used = drawWrappedText({
+      page: back,
+      text: line,
+      x: 25,
+      y: plasticTermY,
+      maxWidth: 111,
+      font: fonts.sans,
+      size: 4.4,
+      lineHeight: 5.25,
+      color: ink
+    });
+    plasticTermY -= used + 2.2;
+  }
+  const qrSize = 78;
+  const qrX = pageW - 18 - qrSize;
+  const qrY = 37;
+  back.drawRectangle({ x: qrX - 7, y: qrY - 7, width: qrSize + 14, height: qrSize + 23, color: white, borderColor: gold, borderWidth: 1 });
+  drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 8, fonts.bold, 5.1, navy);
+  back.drawRectangle({ x: qrX - 2, y: qrY - 2, width: qrSize + 4, height: qrSize + 4, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.6 });
+  back.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+  drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 12, fonts.bold, 5, navy);
+  drawCenteredText(back, candidate.studentIdNumber, qrX + qrSize / 2, qrY - 22, fonts.bold, 4.2, blue);
+  back.drawText("Contact", { x: 15, y: 25, size: 5.8, font: fonts.bold, color: navy });
+  drawFittedText({ page: back, text: candidate.phone ?? candidate.email ?? "LETW academic office", x: 50, y: 25, maxWidth: 85, font: fonts.sans, preferredSize: 5.2, minimumSize: 4, color: muted });
+  back.drawRectangle({ x: 0, y: 0, width: pageW, height: 16, color: navy });
+  drawCenteredText(back, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", pageW / 2, 5.7, fonts.bold, 5.2, white);
+
+  if (status !== "ACTIVE") {
+    drawInactiveOverlay(front, { x: 0, y: 0, width: pageW, height: pageH, font: fonts.bold, status });
+    drawInactiveOverlay(back, { x: 0, y: 0, width: pageW, height: pageH, font: fonts.bold, status });
+  }
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -196,6 +356,36 @@ export async function GET(request: Request, context: RouteContext) {
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
     const status = studentIdStatus(candidate);
     const schoolName = candidate.organization?.trim() || "LETW School of Theology";
+    const format = new URL(request.url).searchParams.get("format");
+
+    if (format === "plastic") {
+      drawStudentPlasticPages({
+        pdf,
+        logo,
+        photo,
+        qr,
+        fonts: { sans, bold },
+        candidate: {
+          ...candidate,
+          studentIdNumber: candidate.studentIdNumber
+        },
+        status
+      });
+      const pdfBytes = await pdf.save();
+      const safeId = candidate.studentIdNumber.replace(/[^A-Za-z0-9-]/g, "");
+      return new Response(Buffer.from(pdfBytes), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${safeId}-student-id-plastic-cr80.pdf"`,
+          "Cache-Control": "private, no-store, no-cache, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+          "X-Content-Type-Options": "nosniff",
+          "X-Robots-Tag": "noindex, nofollow, noarchive"
+        }
+      });
+    }
+
     const cardW = 344;
     const cardH = 216;
     const frontX = 58;
@@ -254,26 +444,40 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawText("IDENTITY VERIFICATION", { x: backX + 26, y: cardY + cardH - 25, size: 12, font: bold, color: white });
     page.drawText("Scan to confirm current student status", { x: backX + 26, y: cardY + cardH - 41, size: 8, font: sans, color: rgb(0.82, 0.88, 0.96) });
 
-    const qrX = backX + cardW - 130;
-    const qrY = cardY + 58;
-    page.drawRectangle({ x: qrX - 8, y: qrY - 8, width: 116, height: 116, color: white, borderColor: gold, borderWidth: 1.2 });
-    page.drawRectangle({ x: qrX - 3, y: qrY - 3, width: 106, height: 106, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.7 });
-    page.drawImage(qr, { x: qrX, y: qrY, width: 100, height: 100 });
-    drawCenteredText(page, "SCAN TO VERIFY", qrX + 50, qrY - 17, bold, 7.5, navy);
-    drawCenteredText(page, candidate.studentIdNumber, qrX + 50, qrY - 31, bold, 5.9, blue);
+    const qrSize = 112;
+    const qrX = backX + cardW - 26 - qrSize;
+    const qrY = cardY + 40;
+    const qrCenterX = qrX + qrSize / 2;
+    page.drawRectangle({ x: qrX - 10, y: qrY - 10, width: qrSize + 20, height: qrSize + 32, color: white, borderColor: gold, borderWidth: 1.25 });
+    page.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 8, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.8 });
+    drawCenteredText(page, "LIVE QR VERIFICATION", qrCenterX, qrY + qrSize + 11, bold, 6.6, navy);
+    page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+    drawCenteredText(page, "SCAN TO AUTHENTICATE", qrCenterX, qrY - 16, bold, 7.2, navy);
+    drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 29, bold, 5.8, blue);
 
     const termsX = backX + 24;
     page.drawText("Verification rules", { x: termsX, y: cardY + 136, size: 10, font: bold, color: navy });
-    [
+    let termY = cardY + 117;
+    for (const line of [
       "This card remains the property of Light Encounter Tabernacle Worldwide.",
       "It is valid only when the QR confirmation page displays an active status.",
       "Suspended, expired, revoked, or replaced student IDs must not be accepted.",
       "Use the QR page for entrance, exam, class, and official school verification."
-    ].forEach((line, index) => {
-      const y = cardY + 116 - index * 18;
-      page.drawCircle({ x: termsX + 4, y: y + 3, size: 2.2, color: gold });
-      drawFittedText({ page, text: line, x: termsX + 13, y, maxWidth: 164, font: sans, preferredSize: 7, minimumSize: 5.5, color: ink });
-    });
+    ]) {
+      page.drawCircle({ x: termsX + 4, y: termY + 3, size: 2.1, color: gold });
+      const used = drawWrappedText({
+        page,
+        text: line,
+        x: termsX + 13,
+        y: termY,
+        maxWidth: 154,
+        font: sans,
+        size: 6.1,
+        lineHeight: 7.15,
+        color: ink
+      });
+      termY -= used + 3.2;
+    }
     page.drawText("Contact", { x: termsX, y: cardY + 36, size: 7.5, font: bold, color: navy });
     page.drawText("letw.org", { x: termsX, y: cardY + 24, size: 7, font: sans, color: blue });
     page.drawText(candidate.phone ?? candidate.email ?? "LETW academic office", { x: termsX + 58, y: cardY + 24, size: 7, font: sans, color: muted });
