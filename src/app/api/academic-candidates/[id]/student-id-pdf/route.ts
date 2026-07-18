@@ -212,8 +212,8 @@ function drawStudentPlasticPages(input: {
   front.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: deepNavy });
   front.drawRectangle({ x: 0, y: pageH - 36, width: pageW, height: 36, color: navy });
   front.drawRectangle({ x: 0, y: pageH - 39, width: pageW, height: 3, color: gold });
-  front.drawCircle({ x: pageW - 28, y: pageH + 4, size: 52, color: rgb(0.07, 0.16, 0.31), opacity: 0.42 });
-  front.drawCircle({ x: 17, y: -7, size: 50, color: rgb(0.08, 0.19, 0.36), opacity: 0.35 });
+  front.drawCircle({ x: pageW - 24, y: pageH - 24, size: 36, color: rgb(0.07, 0.16, 0.31), opacity: 0.32 });
+  front.drawCircle({ x: 22, y: 34, size: 34, color: rgb(0.08, 0.19, 0.36), opacity: 0.26 });
   front.drawImage(logo, { x: 12, y: pageH - 31, width: 24, height: 24 });
   front.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 43, y: pageH - 17, size: 5.7, font: fonts.bold, color: white });
   drawFittedText({ page: front, text: schoolName, x: 43, y: pageH - 29, maxWidth: 158, font: fonts.bold, preferredSize: 5.5, minimumSize: 4.2, color: softGold });
@@ -268,19 +268,19 @@ function drawStudentPlasticPages(input: {
     });
     plasticTermY -= used + 2.2;
   }
-  const qrSize = 78;
+  const qrSize = 68;
   const qrX = pageW - 18 - qrSize;
-  const qrY = 37;
-  back.drawRectangle({ x: qrX - 7, y: qrY - 7, width: qrSize + 14, height: qrSize + 23, color: white, borderColor: gold, borderWidth: 1 });
-  drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 8, fonts.bold, 5.1, navy);
+  const qrY = 38;
+  back.drawRectangle({ x: qrX - 7, y: qrY - 7, width: qrSize + 14, height: qrSize + 15, color: white, borderColor: gold, borderWidth: 1 });
+  drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 4.5, fonts.bold, 4.7, navy);
   back.drawRectangle({ x: qrX - 2, y: qrY - 2, width: qrSize + 4, height: qrSize + 4, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.6 });
   back.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-  drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 12, fonts.bold, 5, navy);
-  drawCenteredText(back, candidate.studentIdNumber, qrX + qrSize / 2, qrY - 22, fonts.bold, 4.2, blue);
+  drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 11, fonts.bold, 4.6, navy);
+  drawCenteredText(back, candidate.studentIdNumber, qrX + qrSize / 2, qrY - 19, fonts.bold, 3.9, blue);
   back.drawText("Contact", { x: 15, y: 25, size: 5.8, font: fonts.bold, color: navy });
   drawFittedText({ page: back, text: candidate.phone ?? candidate.email ?? "LETW academic office", x: 50, y: 25, maxWidth: 85, font: fonts.sans, preferredSize: 5.2, minimumSize: 4, color: muted });
-  back.drawRectangle({ x: 0, y: 0, width: pageW, height: 16, color: navy });
-  drawCenteredText(back, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", pageW / 2, 5.7, fonts.bold, 5.2, white);
+  back.drawRectangle({ x: 0, y: 0, width: pageW, height: 13, color: navy });
+  drawCenteredText(back, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", pageW / 2, 4.8, fonts.bold, 4.8, white);
 
   if (status !== "ACTIVE") {
     drawInactiveOverlay(front, { x: 0, y: 0, width: pageW, height: pageH, font: fonts.bold, status });
@@ -329,7 +329,6 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const pdf = await PDFDocument.create();
-    const page = pdf.addPage([842, 595]);
     const navy = rgb(0.043, 0.106, 0.239);
     const deepNavy = rgb(0.027, 0.067, 0.16);
     const gold = rgb(0.831, 0.686, 0.216);
@@ -386,6 +385,7 @@ export async function GET(request: Request, context: RouteContext) {
       });
     }
 
+    const page = pdf.addPage([842, 595]);
     const cardW = 344;
     const cardH = 216;
     const frontX = 58;
@@ -404,8 +404,8 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawRectangle({ x: frontX, y: cardY, width: cardW, height: cardH, color: deepNavy, borderColor: gold, borderWidth: 1.1 });
     page.drawRectangle({ x: frontX, y: cardY + cardH - 52, width: cardW, height: 52, color: navy });
     page.drawRectangle({ x: frontX, y: cardY + cardH - 56, width: cardW, height: 4, color: gold });
-    page.drawCircle({ x: frontX + cardW - 44, y: cardY + cardH + 3, size: 84, color: rgb(0.07, 0.16, 0.31), opacity: 0.45 });
-    page.drawCircle({ x: frontX + 28, y: cardY - 8, size: 82, color: rgb(0.08, 0.19, 0.36), opacity: 0.35 });
+    page.drawCircle({ x: frontX + cardW - 40, y: cardY + cardH - 62, size: 45, color: rgb(0.07, 0.16, 0.31), opacity: 0.22 });
+    page.drawCircle({ x: frontX + 46, y: cardY + 52, size: 46, color: rgb(0.08, 0.19, 0.36), opacity: 0.18 });
     page.drawImage(logo, { x: frontX + 17, y: cardY + cardH - 43, width: 35, height: 35 });
     page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: frontX + 62, y: cardY + cardH - 25, size: 8.2, font: bold, color: white });
     page.drawText("Official Student Identity", { x: frontX + 62, y: cardY + cardH - 40, size: 7.4, font: bold, color: softGold });
