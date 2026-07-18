@@ -311,7 +311,7 @@ export function AcademicOperationsPanel({
         clearanceNotes: formText(formData, "clearanceNotes") || null
       });
       form.reset();
-      setNotice("Graduand added to the academic candidate registry.");
+      setNotice("Student admitted and Student ID issued.");
     });
   }
 
@@ -329,10 +329,10 @@ export function AcademicOperationsPanel({
   }
 
   async function deleteAcademicCandidate(candidate: Candidate) {
-    if (!window.confirm(`Delete ${candidate.fullName} from registered graduands? This is permanent unless the record has certificate history.`)) return;
+    if (!window.confirm(`Delete ${candidate.fullName} from admitted students? This is permanent unless the record has certificate history.`)) return;
     await runAction(`candidate-delete-${candidate.id}`, async () => {
       await jsonRequest(`/api/academic-candidates/${candidate.id}`, "DELETE");
-      setNotice("Registered graduand deleted.");
+      setNotice("Admitted student record deleted.");
     });
   }
 
@@ -470,10 +470,10 @@ export function AcademicOperationsPanel({
       {canAcademic ? (
         <section className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
-            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Award className="h-4 w-4 text-moss" />Register Graduand / Student</p>
-            <p className="mt-1 text-xs text-ink/55">This is where the graduand name is captured before board approval and certificate issuing.</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink"><Award className="h-4 w-4 text-moss" />Admit Student / Candidate</p>
+            <p className="mt-1 text-xs text-ink/55">Create the admission record here. The Student ID is issued immediately at admission; graduation date is optional and only needed later for certificate approval.</p>
             <form className="mt-4 grid gap-3 lg:grid-cols-3" onSubmit={createAcademicCandidate}>
-              <Input className="lg:col-span-2" name="fullName" placeholder="Graduand full name" required />
+              <Input className="lg:col-span-2" name="fullName" placeholder="Student full name" required />
               <Input name="email" placeholder="Email optional" type="email" />
               <Input name="phone" placeholder="Phone optional" />
               <Input name="programName" placeholder="Program name" required />
@@ -482,12 +482,21 @@ export function AcademicOperationsPanel({
               <Input name="organization" placeholder="School / church / ministry optional" />
               <Input name="studyMode" placeholder="Study mode" />
               <label className="flex min-h-10 flex-col justify-center rounded-md border border-ink/10 bg-white px-3 py-2 text-xs text-ink/55">
-                Graduand photo
+                Student photo
                 <input accept="image/png,image/jpeg,image/webp" className="mt-1 text-xs" name="photoFile" type="file" />
               </label>
-              <Input name="admissionDate" type="date" />
-              <Input name="graduationDate" type="date" />
-              <Input name="studentIdExpiresAt" type="date" />
+              <label className="flex flex-col gap-1 text-xs text-ink/55">
+                Admission date
+                <Input name="admissionDate" type="date" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-ink/55">
+                Expected graduation date
+                <Input name="graduationDate" type="date" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-ink/55">
+                Student ID expiry
+                <Input name="studentIdExpiresAt" type="date" />
+              </label>
               <Textarea className="lg:col-span-1" name="clearanceNotes" placeholder="Clearance notes optional" />
               <div className="flex flex-wrap gap-3 rounded-md bg-paper p-3 text-xs text-ink/65 lg:col-span-3">
                 {[
@@ -505,15 +514,15 @@ export function AcademicOperationsPanel({
               </div>
               <Button className="lg:col-span-3" disabled={busy === "candidate-create"} type="submit">
                 {busy === "candidate-create" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Award className="h-4 w-4" />}
-                Add graduand
+                Admit student and issue ID
               </Button>
             </form>
           </div>
 
           <div className="rounded-lg border border-ink/10 bg-white shadow-soft">
             <div className="border-b border-ink/10 p-4">
-              <p className="text-sm font-semibold text-ink">Registered graduands</p>
-              <p className="mt-1 text-xs text-ink/55">Select these names when creating a graduation approval list.</p>
+              <p className="text-sm font-semibold text-ink">Admitted students and graduands</p>
+              <p className="mt-1 text-xs text-ink/55">Student IDs are issued at admission. Select these names later when creating a graduation approval list.</p>
             </div>
             <div className="divide-y divide-ink/10">
               {candidates.slice(0, 8).map((candidate) => (
@@ -549,13 +558,13 @@ export function AcademicOperationsPanel({
                     <div className="mt-2">
                       <Button className="h-8 px-3 text-xs text-clay" disabled={busy === `candidate-delete-${candidate.id}`} type="button" variant="ghost" onClick={() => deleteAcademicCandidate(candidate)}>
                         {busy === `candidate-delete-${candidate.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                        Delete graduand
+                        Delete student
                       </Button>
                     </div>
                   </div>
                 </div>
               ))}
-              {candidates.length === 0 ? <p className="p-6 text-sm text-ink/55">No graduands registered yet.</p> : null}
+              {candidates.length === 0 ? <p className="p-6 text-sm text-ink/55">No admitted students registered yet.</p> : null}
             </div>
           </div>
         </section>

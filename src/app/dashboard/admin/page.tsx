@@ -459,7 +459,7 @@ export default async function AdminControlCenterPage() {
         {
           href: "/dashboard/student-id",
           label: "Student ID portal",
-          detail: "Student ID numbers, expiry dates, academic records, clearance checklist, course history, and education certificates.",
+          detail: "Admission-issued Student ID numbers, expiry dates, academic records, clearance checklist, course history, and education certificates.",
           icon: GraduationCap
         }
       ]

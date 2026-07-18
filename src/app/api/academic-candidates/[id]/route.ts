@@ -53,8 +53,8 @@ function nullableText(value?: string | null) {
   return text || null;
 }
 
-function generateStudentIdNumber() {
-  return `LETW-STU-${new Date().getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
+function generateStudentIdNumber(date = new Date()) {
+  return `LETW-STU-${date.getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -91,6 +91,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       photoUploaded: data.photoUploaded ?? existing.photoUploaded,
       nameVerified: data.nameVerified ?? existing.nameVerified
     };
+    const admissionDate = data.admissionDate === undefined ? existing.admissionDate : nullableDate(data.admissionDate) ?? new Date();
+    const shouldIssueStudentId = !existing.studentIdNumber && Boolean(admissionDate);
+    const studentIdIssuedAt = admissionDate ?? existing.createdAt ?? new Date();
     const candidate = await prisma.academicCandidate.update({
       where: { id },
       data: {
@@ -103,10 +106,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         educationLevel: data.educationLevel,
         fieldOfStudy: data.fieldOfStudy === undefined ? undefined : nullableText(data.fieldOfStudy) ?? "Theology",
         studyMode: data.studyMode === undefined ? undefined : nullableText(data.studyMode),
-        admissionDate: data.admissionDate === undefined ? undefined : nullableDate(data.admissionDate),
+        admissionDate: data.admissionDate === undefined ? undefined : admissionDate,
         graduationDate: data.graduationDate === undefined ? undefined : nullableDate(data.graduationDate),
-        studentIdNumber: data.studentIdExpiresAt !== undefined && !existing.studentIdNumber ? generateStudentIdNumber() : undefined,
-        studentIdIssuedAt: data.studentIdExpiresAt !== undefined && !existing.studentIdIssuedAt ? new Date() : undefined,
+        studentIdNumber: shouldIssueStudentId ? generateStudentIdNumber(studentIdIssuedAt) : undefined,
+        studentIdIssuedAt: shouldIssueStudentId || (!existing.studentIdIssuedAt && data.studentIdExpiresAt !== undefined) ? studentIdIssuedAt : undefined,
         studentIdExpiresAt: data.studentIdExpiresAt === undefined ? undefined : nullableDate(data.studentIdExpiresAt),
         studentIdStatus: data.studentIdStatus,
         paymentStatus: data.paymentStatus === undefined ? undefined : nullableText(data.paymentStatus) ?? "PENDING",

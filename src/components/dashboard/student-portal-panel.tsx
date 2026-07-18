@@ -254,7 +254,7 @@ export function StudentPortalPanel({
           <Award className="mx-auto h-8 w-8 text-moss" />
           <h2 className="mt-3 text-xl font-semibold text-ink">No student record is linked to this login yet.</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-ink/60">
-            Ask the rector or certificate office to connect your invited LETW account email to your academic candidate record.
+            Ask the rector or certificate office to create your admission record or connect your invited LETW account email to your existing student record.
           </p>
         </section>
       ) : null}
@@ -323,6 +323,7 @@ export function StudentPortalPanel({
                     <div>
                       <p className="text-sm font-semibold text-ink">Student ID card</p>
                       <p className="mt-1 font-mono text-sm font-semibold text-moss">{candidate.studentIdNumber ?? "Pending issue"}</p>
+                      <p className="mt-1 text-xs text-ink/50">Issued when admission is given, before graduation.</p>
                     </div>
                     <Badge className={statusClass(studentIdStatus(candidate))}>{studentIdStatus(candidate).toLowerCase()}</Badge>
                   </div>

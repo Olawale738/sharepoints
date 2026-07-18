@@ -40,8 +40,8 @@ function nullableText(value?: string | null) {
   return text || null;
 }
 
-function generateStudentIdNumber() {
-  return `LETW-STU-${new Date().getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
+function generateStudentIdNumber(date = new Date()) {
+  return `LETW-STU-${date.getUTCFullYear()}-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 export async function GET() {
@@ -99,6 +99,7 @@ export async function POST(request: Request) {
       photoUploaded: data.photoUploaded ?? Boolean(data.photoUrl),
       nameVerified: data.nameVerified ?? false
     };
+    const admittedAt = nullableDate(data.admissionDate) ?? new Date();
     const candidate = await prisma.academicCandidate.create({
       data: {
         userId: data.userId ?? null,
@@ -111,10 +112,10 @@ export async function POST(request: Request) {
         educationLevel: data.educationLevel,
         fieldOfStudy: nullableText(data.fieldOfStudy) ?? "Theology",
         studyMode: nullableText(data.studyMode),
-        admissionDate: nullableDate(data.admissionDate),
+        admissionDate: admittedAt,
         graduationDate: nullableDate(data.graduationDate),
-        studentIdNumber: generateStudentIdNumber(),
-        studentIdIssuedAt: new Date(),
+        studentIdNumber: generateStudentIdNumber(admittedAt),
+        studentIdIssuedAt: admittedAt,
         studentIdExpiresAt: nullableDate(data.studentIdExpiresAt),
         studentIdStatus: "ACTIVE",
         paymentStatus: nullableText(data.paymentStatus) ?? (flags.feesCleared ? "CLEARED" : "PENDING"),

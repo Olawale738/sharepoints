@@ -807,7 +807,7 @@ export default async function DashboardPage() {
     },
     {
       title: "Student ID cards",
-      detail: "Open the academic ID portal to view student numbers, expiry dates, clearance, courses, and issued education certificates.",
+      detail: "Open the academic ID portal to view admission-issued student numbers, expiry dates, clearance, courses, and issued education certificates.",
       action: "Open Student ID",
       href: "/dashboard/student-id",
       icon: GraduationCap
