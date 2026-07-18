@@ -569,6 +569,19 @@ export function AcademicOperationsPanel({
                           )}
                         </div>
                       </div>
+                      {candidate.studentIdNumber ? (
+                        <div className="border-t border-[#d4af37]/20 bg-[#f8fbff] px-3 py-2">
+                          <a
+                            className="inline-flex h-8 items-center gap-2 rounded-md border border-ink/10 bg-white px-3 text-xs font-semibold text-[#0b1b3d] hover:bg-mint/40"
+                            href={`/api/academic-candidates/${candidate.id}/student-id-pdf`}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Open printable Student ID PDF
+                          </a>
+                        </div>
+                      ) : null}
                     </div>
                     <form className="mt-3 flex flex-wrap items-center gap-2" onSubmit={(event) => updateStudentIdExpiry(event, candidate.id)}>
                       <Input className="h-8 w-40 text-xs" name="studentIdExpiresAt" type="date" defaultValue={formatDateInput(candidate.studentIdExpiresAt)} />
