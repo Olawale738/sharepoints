@@ -5,7 +5,7 @@ import { PDFDocument, PDFImage, PDFFont, PDFPage, rgb, StandardFonts } from "pdf
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
 import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
-import { detectedImageType } from "@/lib/profile-photo";
+import { embedImageForPdf } from "@/lib/pdf-images";
 import { prisma } from "@/lib/prisma";
 import { cardStatusTone } from "@/lib/qr-identity";
 import { hasAnyWorkspaceAdminRole } from "@/lib/rbac";
@@ -163,14 +163,10 @@ function drawField(input: {
 async function embedProfilePhoto(pdf: PDFDocument, userId: string) {
   try {
     const body = await getObjectBuffer(`profiles/${userId}/avatar`);
-    if (!body.length) return null;
-    const type = detectedImageType(body);
-    if (type === "image/png") return await pdf.embedPng(body);
-    if (type === "image/jpeg") return await pdf.embedJpg(body);
+    return await embedImageForPdf(pdf, body);
   } catch {
     return null;
   }
-  return null;
 }
 
 function drawInactiveOverlay(page: PDFPage, input: { width: number; height: number; font: PDFFont; status: string }) {
@@ -265,32 +261,32 @@ export async function GET(request: Request) {
     front.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: deepNavy });
     front.drawRectangle({ x: 0, y: pageH - 38, width: pageW, height: 38, color: navy });
     front.drawRectangle({ x: 0, y: pageH - 41, width: pageW, height: 3, color: gold });
-    front.drawCircle({ x: pageW - 31, y: pageH + 2, size: 54, color: rgb(0.07, 0.16, 0.31), opacity: 0.42 });
-    front.drawCircle({ x: 18, y: -8, size: 54, color: rgb(0.08, 0.19, 0.36), opacity: 0.36 });
+    front.drawCircle({ x: pageW - 26, y: pageH - 24, size: 36, color: rgb(0.07, 0.16, 0.31), opacity: 0.28 });
+    front.drawCircle({ x: 24, y: 34, size: 35, color: rgb(0.08, 0.19, 0.36), opacity: 0.22 });
     front.drawImage(logo, { x: 11, y: pageH - 32, width: 25, height: 25 });
-    front.drawText("LIGHT ENCOUNTER TABERNACLE", { x: 43, y: pageH - 17, size: 7.1, font: bold, color: white });
-    front.drawText("WORLDWIDE", { x: 43, y: pageH - 28, size: 7.1, font: bold, color: white });
-    front.drawText("Official Membership Identity", { x: pageW - 91, y: pageH - 22, size: 5.5, font: sans, color: softGold });
-    front.drawImage(logo, { x: 117, y: 33, width: 108, height: 108, opacity: 0.045 });
+    front.drawText("LIGHT ENCOUNTER TABERNACLE", { x: 43, y: pageH - 16, size: 6.5, font: bold, color: white });
+    front.drawText("WORLDWIDE", { x: 43, y: pageH - 27, size: 6.5, font: bold, color: white });
+    drawFittedText({ page: front, text: "Membership Identity", x: 152, y: pageH - 25, maxWidth: 72, font: bold, preferredSize: 5.7, minimumSize: 4.6, color: softGold });
+    front.drawImage(logo, { x: 118, y: 31, width: 104, height: 104, opacity: 0.038 });
 
-    front.drawCircle({ x: 51, y: 91, size: 34, color: gold });
-    front.drawCircle({ x: 51, y: 91, size: 30.7, color: white });
+    front.drawRectangle({ x: 17, y: 61, width: 50, height: 62, color: gold });
+    front.drawRectangle({ x: 20, y: 64, width: 44, height: 56, color: white });
     if (photo) {
-      drawImageFit(front, photo, 23, 63, 56, 56);
+      drawImageFit(front, photo, 22, 66, 40, 52);
     } else {
-      front.drawCircle({ x: 51, y: 91, size: 28, color: light });
-      drawCenteredText(front, "PHOTO", 51, 93, bold, 7.5, muted);
-      drawCenteredText(front, "PENDING", 51, 82, sans, 5.6, muted);
+      front.drawRectangle({ x: 22, y: 66, width: 40, height: 52, color: light });
+      drawCenteredText(front, "PHOTO", 42, 93, bold, 6.2, muted);
+      drawCenteredText(front, "PENDING", 42, 84, sans, 4.8, muted);
     }
 
-    drawFittedText({ page: front, text: account.name ?? "LETTW Member", x: 88, y: 104, maxWidth: 137, font: bold, preferredSize: 12.8, minimumSize: 8.4, color: white });
-    drawFittedText({ page: front, text: position, x: 88, y: 88, maxWidth: 111, font: bold, preferredSize: 7.7, minimumSize: 5.6, color: softGold });
-    front.drawRectangle({ x: 88, y: 81, width: 32, height: 1, color: gold });
+    drawFittedText({ page: front, text: account.name ?? "LETTW Member", x: 82, y: 106, maxWidth: 144, font: bold, preferredSize: 11.8, minimumSize: 7.8, color: white });
+    drawFittedText({ page: front, text: position, x: 82, y: 91, maxWidth: 124, font: bold, preferredSize: 7.4, minimumSize: 5.5, color: softGold });
+    front.drawRectangle({ x: 82, y: 84, width: 34, height: 1, color: gold });
 
-    drawField({ page: front, label: "Organization ID", value: card.organizationId, x: 17, y: 45, width: 94, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
-    drawField({ page: front, label: "Member Number", value: memberNumber, x: 128, y: 45, width: 96, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
-    drawField({ page: front, label: "Member Since", value: memberSince, x: 17, y: 25, width: 84, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
-    drawField({ page: front, label: "Location", value: location, x: 128, y: 25, width: 96, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
+    drawField({ page: front, label: "Organization ID", value: card.organizationId, x: 17, y: 42, width: 96, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
+    drawField({ page: front, label: "Member Number", value: memberNumber, x: 127, y: 42, width: 96, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
+    drawField({ page: front, label: "Member Since", value: memberSince, x: 17, y: 24, width: 84, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
+    drawField({ page: front, label: "Location", value: location, x: 127, y: 24, width: 96, labelFont: bold, valueFont: bold, labelColor: softGold, valueColor: white });
     front.drawRectangle({ x: 0, y: 0, width: pageW, height: 18, color: navy });
     front.drawRectangle({ x: 0, y: 18, width: pageW, height: 2, color: gold });
     front.drawCircle({ x: 18, y: 9, size: 3.1, color: status === "ACTIVE" ? rgb(0.14, 0.75, 0.48) : rgb(0.84, 0.24, 0.18) });
@@ -328,15 +324,15 @@ export async function GET(request: Request) {
       termY -= used + 3;
     }
 
-    const qrSize = 80;
+    const qrSize = 70;
     const qrX = pageW - 18 - qrSize;
-    const qrY = 36;
-    back.drawRectangle({ x: qrX - 8, y: qrY - 8, width: qrSize + 16, height: qrSize + 24, color: white, borderColor: gold, borderWidth: 1 });
-    drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 8, bold, 5.1, navy);
+    const qrY = 42;
+    back.drawRectangle({ x: qrX - 8, y: qrY - 8, width: qrSize + 16, height: qrSize + 17, color: white, borderColor: gold, borderWidth: 1 });
+    drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 5, bold, 4.8, navy);
     back.drawRectangle({ x: qrX - 2, y: qrY - 2, width: qrSize + 4, height: qrSize + 4, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.6 });
     back.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-    drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 11, bold, 4.8, navy);
-    drawCenteredText(back, card.organizationId, qrX + qrSize / 2, qrY - 20, bold, 4.25, blue);
+    drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 10, bold, 4.5, navy);
+    drawCenteredText(back, card.organizationId, qrX + qrSize / 2, qrY - 18, bold, 3.9, blue);
 
     back.drawText("Contact", { x: 15, y: 27, size: 5.8, font: bold, color: navy });
     drawFittedText({ page: back, text: contact, x: 50, y: 27, maxWidth: 84, font: sans, preferredSize: 5.25, minimumSize: 4, color: muted });

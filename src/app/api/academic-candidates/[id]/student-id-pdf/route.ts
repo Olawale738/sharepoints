@@ -5,7 +5,7 @@ import { PDFDocument, PDFImage, PDFFont, PDFPage, StandardFonts, rgb } from "pdf
 
 import { ApiError, handleRouteError, requireUser } from "@/lib/api";
 import { getOfficialIssuanceAuthority } from "@/lib/official-issuance";
-import { detectedImageType } from "@/lib/profile-photo";
+import { embedImageForPdf } from "@/lib/pdf-images";
 import { prisma } from "@/lib/prisma";
 import { getObjectBuffer } from "@/lib/storage";
 
@@ -153,18 +153,25 @@ function drawImageFit(page: PDFPage, image: PDFImage, x: number, y: number, widt
   });
 }
 
-async function embedStorageImage(pdf: PDFDocument, key: string | null) {
-  if (!key) return null;
+async function getPhotoBytes(photoUrl?: string | null) {
+  const key = storageKeyFromAssetUrl(photoUrl);
+  if (key) return getObjectBuffer(key);
+
+  if (!photoUrl || !/^https?:\/\//i.test(photoUrl)) return null;
   try {
-    const body = await getObjectBuffer(key);
-    if (!body.length) return null;
-    const type = detectedImageType(body);
-    if (type === "image/png") return await pdf.embedPng(body);
-    if (type === "image/jpeg") return await pdf.embedJpg(body);
+    const response = await fetch(photoUrl, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return null;
+    const body = Buffer.from(await response.arrayBuffer());
+    return body.length ? body : null;
   } catch {
     return null;
   }
-  return null;
+}
+
+async function embedStudentPhoto(pdf: PDFDocument, photoUrl?: string | null) {
+  const body = await getPhotoBytes(photoUrl);
+  if (!body) return null;
+  return embedImageForPdf(pdf, body);
 }
 
 function drawInactiveOverlay(page: PDFPage, input: { x: number; y: number; width: number; height: number; font: PDFFont; status: string }) {
@@ -344,7 +351,7 @@ export async function GET(request: Request, context: RouteContext) {
     const oblique = await pdf.embedFont(StandardFonts.HelveticaOblique);
     const logoBytes = await readFile(path.join(process.cwd(), "public", "letw-logo-transparent.png"));
     const logo = await pdf.embedPng(logoBytes);
-    const photo = await embedStorageImage(pdf, storageKeyFromAssetUrl(candidate.photoUrl));
+    const photo = await embedStudentPhoto(pdf, candidate.photoUrl);
     const origin = new URL(request.url).origin;
     const verifyUrl = `${origin}/verify/student-id/${candidate.id}`;
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
