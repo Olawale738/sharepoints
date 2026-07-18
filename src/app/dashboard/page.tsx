@@ -9,6 +9,7 @@ import {
   Files,
   FolderPlus,
   Gauge,
+  GraduationCap,
   HeartHandshake,
   MessageSquareText,
   ShieldCheck,
@@ -803,6 +804,13 @@ export default async function DashboardPage() {
       action: "Open growth suite",
       href: "/dashboard/growth",
       icon: Sprout
+    },
+    {
+      title: "Student ID cards",
+      detail: "Open the academic ID portal to view student numbers, expiry dates, clearance, courses, and issued education certificates.",
+      action: "Open Student ID",
+      href: "/dashboard/student-id",
+      icon: GraduationCap
     },
     {
       title: "Global Prayer Wall",

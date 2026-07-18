@@ -68,11 +68,11 @@ export default async function StudentPortalPage() {
           <div>
             <p className="flex items-center gap-2 text-sm font-medium text-moss">
               <GraduationCap className="h-4 w-4" />
-              Student Portal
+              Student ID Portal
             </p>
-            <h1 className="mt-2 text-3xl font-semibold text-ink">Academic status, certificates, and corrections</h1>
+            <h1 className="mt-2 text-3xl font-semibold text-ink">Student ID, academic status, certificates, and corrections</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/60">
-              View your admission record, clearance checklist, completed courses, issued certificates, and request corrections without exposing the academic registry to other users.
+              View your Student ID number, expiry date, admission record, clearance checklist, completed courses, issued certificates, and correction requests without exposing the academic registry to other users.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

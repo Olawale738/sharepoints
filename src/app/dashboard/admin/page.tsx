@@ -455,6 +455,12 @@ export default async function AdminControlCenterPage() {
           label: "Academic operations",
           detail: "Board graduation approvals, correction inbox, print logs, ministry licenses, and academic audits.",
           icon: ClipboardCheck
+        },
+        {
+          href: "/dashboard/student-id",
+          label: "Student ID portal",
+          detail: "Student ID numbers, expiry dates, academic records, clearance checklist, course history, and education certificates.",
+          icon: GraduationCap
         }
       ]
     },

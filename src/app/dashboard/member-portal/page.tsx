@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BadgeCheck, CalendarDays, ClipboardCheck, CreditCard, IdCard, MessageSquareText, ReceiptText, UserRound } from "lucide-react";
+import { BadgeCheck, CalendarDays, ClipboardCheck, CreditCard, GraduationCap, IdCard, MessageSquareText, ReceiptText, UserRound } from "lucide-react";
 
 import { auth } from "@/auth";
 import { Badge } from "@/components/ui/badge";
@@ -71,7 +71,7 @@ export default async function MemberPortalPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-4">
+      <section className="grid gap-4 lg:grid-cols-5">
         <Link className="rounded-lg border border-ink/10 bg-white p-4 transition hover:bg-mint/35" href="/dashboard/profile">
           <UserRound className="h-5 w-5 text-moss" />
           <p className="mt-3 font-semibold">Profile</p>
@@ -81,6 +81,11 @@ export default async function MemberPortalPage() {
           <IdCard className="h-5 w-5 text-moss" />
           <p className="mt-3 font-semibold">Digital ID</p>
           <p className="text-sm text-ink/55">QR membership and access card</p>
+        </Link>
+        <Link className="rounded-lg border border-ink/10 bg-white p-4 transition hover:bg-mint/35" href="/dashboard/student-id">
+          <GraduationCap className="h-5 w-5 text-moss" />
+          <p className="mt-3 font-semibold">Student ID</p>
+          <p className="text-sm text-ink/55">Academic ID, expiry, courses, and certificates</p>
         </Link>
         <Link className="rounded-lg border border-ink/10 bg-white p-4 transition hover:bg-mint/35" href="/dashboard/compliance">
           <ClipboardCheck className="h-5 w-5 text-moss" />

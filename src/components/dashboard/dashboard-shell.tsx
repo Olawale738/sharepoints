@@ -155,12 +155,12 @@ export function DashboardShell({ user, workspaces, canCreateWorkspace, locale, c
                 <span className="hidden 2xl:inline">Portal</span>
               </Link>
               <Link
-                aria-label="Student portal"
+                aria-label="Student ID and academic portal"
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium text-ink transition hover:bg-ink/5"
-                href="/dashboard/student"
+                href="/dashboard/student-id"
               >
                 <GraduationCap className="h-4 w-4" />
-                <span className="hidden 2xl:inline">Student</span>
+                <span className="hidden 2xl:inline">Student ID</span>
               </Link>
               <Link
                 aria-label="Knowledge base"
