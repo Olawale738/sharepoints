@@ -492,20 +492,20 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawText("IDENTITY VERIFICATION", { x: backX + 26, y: cardY + cardH - 25, size: 12, font: bold, color: white });
     page.drawText("Scan to confirm current student status", { x: backX + 26, y: cardY + cardH - 41, size: 8, font: sans, color: rgb(0.82, 0.88, 0.96) });
 
-    const qrSize = 94;
-    const qrX = backX + cardW - 26 - qrSize;
-    const qrY = cardY + 55;
+    const qrSize = 86;
+    const qrX = backX + cardW - 22 - qrSize;
+    const qrY = cardY + 49;
     const qrCenterX = qrX + qrSize / 2;
-    page.drawRectangle({ x: qrX - 10, y: qrY - 10, width: qrSize + 20, height: qrSize + 30, color: white, borderColor: gold, borderWidth: 1.25 });
-    page.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 8, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.8 });
-    drawCenteredText(page, "LIVE QR VERIFICATION", qrCenterX, qrY + qrSize + 10, bold, 6.2, navy);
+    page.drawRectangle({ x: qrX - 9, y: qrY - 9, width: qrSize + 18, height: qrSize + 30, color: white, borderColor: gold, borderWidth: 1.2 });
+    page.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 8, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.9 });
+    drawCenteredText(page, "LIVE QR CHECK", qrCenterX, qrY + qrSize + 9, bold, 6.4, navy);
     page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-    drawCenteredText(page, "SCAN TO AUTHENTICATE", qrCenterX, qrY - 15, bold, 6.6, navy);
-    drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 27, bold, 5.2, blue);
+    drawCenteredText(page, "SCAN TO VERIFY", qrCenterX, qrY - 14, bold, 6.5, navy);
+    drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 25, bold, 4.8, blue);
 
     const termsX = backX + 24;
-    page.drawText("Verification rules", { x: termsX, y: cardY + 136, size: 10, font: bold, color: navy });
-    let termY = cardY + 117;
+    page.drawText("Verification rules", { x: termsX, y: cardY + 135, size: 11, font: bold, color: navy });
+    let termY = cardY + 116;
     for (const line of [
       "This card remains the property of Light Encounter Tabernacle Worldwide.",
       "It is valid only when the QR confirmation page displays an active status.",
@@ -518,17 +518,17 @@ export async function GET(request: Request, context: RouteContext) {
         text: line,
         x: termsX + 13,
         y: termY,
-        maxWidth: 154,
+        maxWidth: 170,
         font: sans,
-        size: 6.1,
-        lineHeight: 7.15,
+        size: 7.05,
+        lineHeight: 8.25,
         color: ink
       });
-      termY -= used + 3.2;
+      termY -= used + 4;
     }
-    page.drawText("Contact", { x: termsX, y: cardY + 36, size: 7.5, font: bold, color: navy });
-    page.drawText("letw.org", { x: termsX, y: cardY + 24, size: 7, font: sans, color: blue });
-    page.drawText(candidate.phone ?? candidate.email ?? "LETW academic office", { x: termsX + 58, y: cardY + 24, size: 7, font: sans, color: muted });
+    page.drawText("Contact", { x: termsX, y: cardY + 37, size: 8, font: bold, color: navy });
+    page.drawText("letw.org", { x: termsX, y: cardY + 24, size: 7.3, font: sans, color: blue });
+    page.drawText(candidate.phone ?? candidate.email ?? "LETW academic office", { x: termsX + 58, y: cardY + 24, size: 7.3, font: sans, color: muted });
     page.drawRectangle({ x: backX, y: cardY, width: cardW, height: 20, color: navy });
     drawCenteredText(page, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", backX + cardW / 2, cardY + 7, bold, 7, white);
 
