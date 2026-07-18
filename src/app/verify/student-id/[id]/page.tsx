@@ -140,7 +140,7 @@ export default async function StudentIdVerificationPage(context: PageContext) {
             <div className="mx-auto flex h-56 w-44 items-center justify-center overflow-hidden rounded-xl border-2 border-[#d4af37]/55 bg-white p-1">
               {candidatePhotoSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img alt={candidate.fullName} className="h-full w-full object-contain" src={candidatePhotoSrc} />
+                <img alt={candidate.fullName} className="h-full w-full object-cover" src={candidatePhotoSrc} />
               ) : (
                 <GraduationCap className="h-10 w-10 text-ink/30" />
               )}
