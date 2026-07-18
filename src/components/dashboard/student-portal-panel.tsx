@@ -210,15 +210,6 @@ function StudentIdCard({ candidate }: { candidate: StudentCandidate }) {
                 <Printer className="h-3.5 w-3.5" />
                 Print PDF
               </a>
-              <a
-                className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-[#d4af37]/40 bg-[#fffaf0] px-3 text-xs font-semibold text-[#0b1b3d] hover:bg-mint/40"
-                href={`/api/academic-candidates/${candidate.id}/student-id-pdf?format=plastic`}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Plastic card PDF
-              </a>
             </div>
           ) : null}
         </div>

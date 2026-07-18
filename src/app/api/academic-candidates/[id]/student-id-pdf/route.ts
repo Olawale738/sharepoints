@@ -179,123 +179,6 @@ function drawInactiveOverlay(page: PDFPage, input: { x: number; y: number; width
   drawCenteredText(page, input.status, input.x + input.width / 2, input.y + input.height / 2 - 8, input.font, 26, rgb(0.65, 0.14, 0.12));
 }
 
-function drawStudentPlasticPages(input: {
-  pdf: PDFDocument;
-  logo: PDFImage;
-  photo: PDFImage | null;
-  qr: PDFImage;
-  fonts: { sans: PDFFont; bold: PDFFont };
-  candidate: {
-    id: string;
-    fullName: string;
-    phone?: string | null;
-    email?: string | null;
-    organization?: string | null;
-    programName: string;
-    educationLevel: string;
-    fieldOfStudy: string;
-    studyMode?: string | null;
-    admissionDate?: Date | null;
-    studentIdNumber: string;
-    studentIdIssuedAt?: Date | null;
-    studentIdExpiresAt?: Date | null;
-  };
-  status: string;
-}) {
-  const { pdf, logo, photo, qr, fonts, candidate, status } = input;
-  const pageW = 243;
-  const pageH = 153;
-  const navy = rgb(0.043, 0.106, 0.239);
-  const deepNavy = rgb(0.027, 0.067, 0.16);
-  const gold = rgb(0.831, 0.686, 0.216);
-  const softGold = rgb(0.965, 0.862, 0.45);
-  const blue = rgb(0.039, 0.239, 0.514);
-  const ink = rgb(0.071, 0.102, 0.157);
-  const muted = rgb(0.38, 0.44, 0.52);
-  const light = rgb(0.952, 0.973, 1);
-  const white = rgb(1, 1, 1);
-  const schoolName = candidate.organization?.trim() || "LETW School of Theology";
-  const front = pdf.addPage([pageW, pageH]);
-
-  front.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: deepNavy });
-  front.drawRectangle({ x: 0, y: pageH - 36, width: pageW, height: 36, color: navy });
-  front.drawRectangle({ x: 0, y: pageH - 39, width: pageW, height: 3, color: gold });
-  front.drawCircle({ x: pageW - 24, y: pageH - 24, size: 36, color: rgb(0.07, 0.16, 0.31), opacity: 0.32 });
-  front.drawCircle({ x: 22, y: 34, size: 34, color: rgb(0.08, 0.19, 0.36), opacity: 0.26 });
-  front.drawImage(logo, { x: 12, y: pageH - 31, width: 24, height: 24 });
-  front.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 43, y: pageH - 17, size: 5.7, font: fonts.bold, color: white });
-  drawFittedText({ page: front, text: schoolName, x: 43, y: pageH - 29, maxWidth: 158, font: fonts.bold, preferredSize: 5.5, minimumSize: 4.2, color: softGold });
-
-  front.drawRectangle({ x: 17, y: 52, width: 50, height: 62, color: white, borderColor: gold, borderWidth: 1 });
-  if (photo) {
-    drawImageFit(front, photo, 20, 55, 44, 56);
-  } else {
-    front.drawRectangle({ x: 20, y: 55, width: 44, height: 56, color: light });
-    drawCenteredText(front, "PHOTO", 42, 84, fonts.bold, 6.2, muted);
-    drawCenteredText(front, "PENDING", 42, 75, fonts.sans, 4.8, muted);
-  }
-
-  drawFittedText({ page: front, text: candidate.fullName, x: 83, y: 99, maxWidth: 144, font: fonts.bold, preferredSize: 13.8, minimumSize: 8.5, color: white });
-  drawFittedText({ page: front, text: candidate.educationLevel, x: 83, y: 84, maxWidth: 122, font: fonts.bold, preferredSize: 7.3, minimumSize: 5.5, color: softGold });
-  drawFittedText({ page: front, text: candidate.programName, x: 83, y: 72, maxWidth: 135, font: fonts.sans, preferredSize: 6.3, minimumSize: 4.9, color: rgb(0.86, 0.9, 0.96) });
-  drawField({ page: front, label: "Student ID", value: candidate.studentIdNumber, x: 83, y: 49, width: 134, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-  drawField({ page: front, label: "Admitted", value: dateText(candidate.admissionDate), x: 83, y: 27, width: 60, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-  drawField({ page: front, label: "Expires", value: dateText(candidate.studentIdExpiresAt), x: 151, y: 27, width: 66, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-  front.drawRectangle({ x: 0, y: 0, width: pageW, height: 20, color: navy });
-  front.drawRectangle({ x: 0, y: 20, width: pageW, height: 2, color: gold });
-  front.drawCircle({ x: 19, y: 10, size: 3.2, color: status === "ACTIVE" ? rgb(0.14, 0.75, 0.48) : rgb(0.84, 0.24, 0.18) });
-  front.drawText(`Status: ${status}`, { x: 27, y: 7.2, size: 6.2, font: fonts.bold, color: white });
-  front.drawText("letw.org", { x: pageW - 51, y: 7.2, size: 6.2, font: fonts.bold, color: softGold });
-
-  const back = pdf.addPage([pageW, pageH]);
-  back.drawRectangle({ x: 0, y: 0, width: pageW, height: pageH, color: white });
-  back.drawRectangle({ x: 0, y: pageH - 36, width: pageW, height: 36, color: navy });
-  back.drawRectangle({ x: 0, y: pageH - 39, width: pageW, height: 3, color: gold });
-  back.drawImage(logo, { x: 76, y: 36, width: 88, height: 88, opacity: 0.042 });
-  back.drawText("IDENTITY VERIFICATION", { x: 15, y: pageH - 18, size: 8.8, font: fonts.bold, color: white });
-  back.drawText("Scan to confirm current student status", { x: 15, y: pageH - 30, size: 5.5, font: fonts.sans, color: rgb(0.82, 0.88, 0.96) });
-  back.drawText("Verification rules", { x: 15, y: 104, size: 7, font: fonts.bold, color: navy });
-  let plasticTermY = 91;
-  for (const line of [
-    "This card remains the property of Light Encounter Tabernacle Worldwide.",
-    "It is valid only when the QR confirmation page displays an active status.",
-    "Suspended, expired, revoked, or replaced student IDs must not be accepted.",
-    "Use the QR page for entrance, exam, class, and official school verification."
-  ]) {
-    back.drawCircle({ x: 18, y: plasticTermY + 2.3, size: 1.7, color: gold });
-    const used = drawWrappedText({
-      page: back,
-      text: line,
-      x: 25,
-      y: plasticTermY,
-      maxWidth: 111,
-      font: fonts.sans,
-      size: 4.4,
-      lineHeight: 5.25,
-      color: ink
-    });
-    plasticTermY -= used + 2.2;
-  }
-  const qrSize = 68;
-  const qrX = pageW - 18 - qrSize;
-  const qrY = 38;
-  back.drawRectangle({ x: qrX - 7, y: qrY - 7, width: qrSize + 14, height: qrSize + 15, color: white, borderColor: gold, borderWidth: 1 });
-  drawCenteredText(back, "LIVE QR", qrX + qrSize / 2, qrY + qrSize + 4.5, fonts.bold, 4.7, navy);
-  back.drawRectangle({ x: qrX - 2, y: qrY - 2, width: qrSize + 4, height: qrSize + 4, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.6 });
-  back.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-  drawCenteredText(back, "SCAN TO AUTHENTICATE", qrX + qrSize / 2, qrY - 11, fonts.bold, 4.6, navy);
-  drawCenteredText(back, candidate.studentIdNumber, qrX + qrSize / 2, qrY - 19, fonts.bold, 3.9, blue);
-  back.drawText("Contact", { x: 15, y: 25, size: 5.8, font: fonts.bold, color: navy });
-  drawFittedText({ page: back, text: candidate.phone ?? candidate.email ?? "LETW academic office", x: 50, y: 25, maxWidth: 85, font: fonts.sans, preferredSize: 5.2, minimumSize: 4, color: muted });
-  back.drawRectangle({ x: 0, y: 0, width: pageW, height: 13, color: navy });
-  drawCenteredText(back, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", pageW / 2, 4.8, fonts.bold, 4.8, white);
-
-  if (status !== "ACTIVE") {
-    drawInactiveOverlay(front, { x: 0, y: 0, width: pageW, height: pageH, font: fonts.bold, status });
-    drawInactiveOverlay(back, { x: 0, y: 0, width: pageW, height: pageH, font: fonts.bold, status });
-  }
-}
-
 export async function GET(request: Request, context: RouteContext) {
   try {
     const user = await requireUser();
@@ -363,35 +246,6 @@ export async function GET(request: Request, context: RouteContext) {
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
     const status = studentIdStatus(candidate);
     const schoolName = candidate.organization?.trim() || "LETW School of Theology";
-    const format = new URL(request.url).searchParams.get("format");
-
-    if (format === "plastic") {
-      drawStudentPlasticPages({
-        pdf,
-        logo,
-        photo,
-        qr,
-        fonts: { sans, bold },
-        candidate: {
-          ...candidate,
-          studentIdNumber: candidate.studentIdNumber
-        },
-        status
-      });
-      const pdfBytes = await pdf.save();
-      const safeId = candidate.studentIdNumber.replace(/[^A-Za-z0-9-]/g, "");
-      return new Response(Buffer.from(pdfBytes), {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `inline; filename="${safeId}-student-id-plastic-cr80.pdf"`,
-          "Cache-Control": "private, no-store, no-cache, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-          "X-Content-Type-Options": "nosniff",
-          "X-Robots-Tag": "noindex, nofollow, noarchive"
-        }
-      });
-    }
 
     const page = pdf.addPage([842, 595]);
     const cardW = 344;
@@ -402,7 +256,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     page.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(0.98, 0.975, 0.955) });
     page.drawText("LETW Student ID Printable PDF", { x: 58, y: 535, size: 22, font: bold, color: navy });
-    page.drawText("Print this sheet at high quality. Cut along the card edges, laminate, or send to a card printer.", { x: 58, y: 512, size: 9, font: sans, color: muted });
+    page.drawText("Print this sheet at high quality. Cut along the card edges, then laminate if a physical card is needed.", { x: 58, y: 512, size: 9, font: sans, color: muted });
     page.drawText(`Generated for ${candidate.fullName} - ${candidate.studentIdNumber}`, { x: 58, y: 496, size: 8, font: sans, color: muted });
 
     page.drawText("FRONT", { x: frontX, y: cardY + cardH + 14, size: 8, font: bold, color: muted });
@@ -499,7 +353,7 @@ export async function GET(request: Request, context: RouteContext) {
 
     page.drawLine({ start: { x: frontX, y: cardY - 18 }, end: { x: frontX + cardW, y: cardY - 18 }, thickness: 0.5, color: rgb(0.78, 0.72, 0.6) });
     page.drawLine({ start: { x: backX, y: cardY - 18 }, end: { x: backX + cardW, y: cardY - 18 }, thickness: 0.5, color: rgb(0.78, 0.72, 0.6) });
-    page.drawText("Cut guide. For plastic ID production, send this PDF to your card printer at high quality.", { x: 58, y: 122, size: 8, font: oblique, color: muted });
+    page.drawText("Cut guide. Print at high quality and laminate if a physical card is needed.", { x: 58, y: 122, size: 8, font: oblique, color: muted });
 
     const pdfBytes = await pdf.save();
     const safeId = candidate.studentIdNumber.replace(/[^A-Za-z0-9-]/g, "");

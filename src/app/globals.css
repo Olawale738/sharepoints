@@ -1381,7 +1381,7 @@ select {
   }
 }
 
-/* LETW executive CR80 card: navy, champagne gold, clean white body */
+/* LETW executive ID card: navy, champagne gold, clean white body */
 .digital-id-print-sheet {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.35rem;
