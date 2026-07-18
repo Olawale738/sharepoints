@@ -163,9 +163,10 @@ function drawField(input: {
 async function embedProfilePhoto(pdf: PDFDocument, userId: string) {
   try {
     const body = await getObjectBuffer(`profiles/${userId}/avatar`);
+    if (!body.length) return null;
     const type = detectedImageType(body);
-    if (type === "image/png") return pdf.embedPng(body);
-    if (type === "image/jpeg") return pdf.embedJpg(body);
+    if (type === "image/png") return await pdf.embedPng(body);
+    if (type === "image/jpeg") return await pdf.embedJpg(body);
   } catch {
     return null;
   }

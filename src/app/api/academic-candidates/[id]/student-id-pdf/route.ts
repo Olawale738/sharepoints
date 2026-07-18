@@ -157,9 +157,10 @@ async function embedStorageImage(pdf: PDFDocument, key: string | null) {
   if (!key) return null;
   try {
     const body = await getObjectBuffer(key);
+    if (!body.length) return null;
     const type = detectedImageType(body);
-    if (type === "image/png") return pdf.embedPng(body);
-    if (type === "image/jpeg") return pdf.embedJpg(body);
+    if (type === "image/png") return await pdf.embedPng(body);
+    if (type === "image/jpeg") return await pdf.embedJpg(body);
   } catch {
     return null;
   }
@@ -218,13 +219,13 @@ function drawStudentPlasticPages(input: {
   front.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: 43, y: pageH - 17, size: 5.7, font: fonts.bold, color: white });
   drawFittedText({ page: front, text: schoolName, x: 43, y: pageH - 29, maxWidth: 158, font: fonts.bold, preferredSize: 5.5, minimumSize: 4.2, color: softGold });
 
-  front.drawRectangle({ x: 12, y: 42, width: 61, height: 78, color: white, borderColor: gold, borderWidth: 1 });
+  front.drawRectangle({ x: 17, y: 52, width: 50, height: 62, color: white, borderColor: gold, borderWidth: 1 });
   if (photo) {
-    drawImageFit(front, photo, 15, 45, 55, 72);
+    drawImageFit(front, photo, 20, 55, 44, 56);
   } else {
-    front.drawRectangle({ x: 15, y: 45, width: 55, height: 72, color: light });
-    drawCenteredText(front, "PHOTO", 42.5, 82, fonts.bold, 7, muted);
-    drawCenteredText(front, "PENDING", 42.5, 72, fonts.sans, 5.5, muted);
+    front.drawRectangle({ x: 20, y: 55, width: 44, height: 56, color: light });
+    drawCenteredText(front, "PHOTO", 42, 84, fonts.bold, 6.2, muted);
+    drawCenteredText(front, "PENDING", 42, 75, fonts.sans, 4.8, muted);
   }
 
   drawFittedText({ page: front, text: candidate.fullName, x: 83, y: 99, maxWidth: 144, font: fonts.bold, preferredSize: 13.8, minimumSize: 8.5, color: white });
@@ -444,16 +445,16 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawText("IDENTITY VERIFICATION", { x: backX + 26, y: cardY + cardH - 25, size: 12, font: bold, color: white });
     page.drawText("Scan to confirm current student status", { x: backX + 26, y: cardY + cardH - 41, size: 8, font: sans, color: rgb(0.82, 0.88, 0.96) });
 
-    const qrSize = 112;
+    const qrSize = 94;
     const qrX = backX + cardW - 26 - qrSize;
-    const qrY = cardY + 40;
+    const qrY = cardY + 55;
     const qrCenterX = qrX + qrSize / 2;
-    page.drawRectangle({ x: qrX - 10, y: qrY - 10, width: qrSize + 20, height: qrSize + 32, color: white, borderColor: gold, borderWidth: 1.25 });
+    page.drawRectangle({ x: qrX - 10, y: qrY - 10, width: qrSize + 20, height: qrSize + 30, color: white, borderColor: gold, borderWidth: 1.25 });
     page.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 8, borderColor: rgb(0.66, 0.82, 0.96), borderWidth: 0.8 });
-    drawCenteredText(page, "LIVE QR VERIFICATION", qrCenterX, qrY + qrSize + 11, bold, 6.6, navy);
+    drawCenteredText(page, "LIVE QR VERIFICATION", qrCenterX, qrY + qrSize + 10, bold, 6.2, navy);
     page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-    drawCenteredText(page, "SCAN TO AUTHENTICATE", qrCenterX, qrY - 16, bold, 7.2, navy);
-    drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 29, bold, 5.8, blue);
+    drawCenteredText(page, "SCAN TO AUTHENTICATE", qrCenterX, qrY - 15, bold, 6.6, navy);
+    drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 27, bold, 5.2, blue);
 
     const termsX = backX + 24;
     page.drawText("Verification rules", { x: termsX, y: cardY + 136, size: 10, font: bold, color: navy });
