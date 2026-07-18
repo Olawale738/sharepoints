@@ -10,7 +10,6 @@ import {
   IdCard,
   KeyRound,
   Loader2,
-  Printer,
   RefreshCcw,
   ShieldCheck,
   Ticket,
@@ -285,15 +284,6 @@ export function QrIdentityAdminPanel() {
                   <div className="flex flex-wrap gap-2">
                     {canIssueIdCards && row.card ? (
                       <>
-                        <a
-                          className="inline-flex h-10 items-center gap-2 rounded-md border border-ink/10 px-3 text-sm font-medium hover:bg-mint/40"
-                          href={`/api/membership-card/plastic-pdf?userId=${row.user.id}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <Printer className="h-4 w-4" />
-                          Plastic ID
-                        </a>
                         <Button variant="secondary" onClick={() => void post("RENEW_CARD", { cardId: row.card?.id, expiresAt: oneYearFromNowIso(), rotateQr: false }, "Card renewed.")}><RefreshCcw className="h-4 w-4" />Renew</Button>
                         <Button variant="secondary" onClick={() => void post("ROTATE_QR", { cardId: row.card?.id, reason: "Admin QR rotation" }, "QR rotated.")}><KeyRound className="h-4 w-4" />Rotate QR</Button>
                         <Button variant="danger" onClick={() => void post("MARK_LOST", { cardId: row.card?.id, reason: "Reported lost by admin" }, "Card marked lost.")}><AlertTriangle className="h-4 w-4" />Lost</Button>

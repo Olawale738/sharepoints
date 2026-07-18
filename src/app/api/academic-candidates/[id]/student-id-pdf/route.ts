@@ -3,6 +3,7 @@ import path from "path";
 import QRCode from "qrcode";
 import {
   clip,
+  drawEllipsePath,
   endPath,
   PDFDocument,
   PDFImage,
@@ -10,7 +11,6 @@ import {
   PDFPage,
   popGraphicsState,
   pushGraphicsState,
-  rectangle,
   StandardFonts,
   rgb
 } from "pdf-lib";
@@ -154,11 +154,20 @@ function drawField(input: {
   drawFittedText({ page, text: value, x, y, maxWidth: width, font: valueFont, preferredSize: 8.6, minimumSize: 6, color: valueColor });
 }
 
-function drawImageCover(page: PDFPage, image: PDFImage, x: number, y: number, width: number, height: number, opacity = 1) {
+function drawCircularImageCover(page: PDFPage, image: PDFImage, centerX: number, centerY: number, radius: number, opacity = 1) {
+  const width = radius * 2;
+  const height = radius * 2;
+  const x = centerX - radius;
+  const y = centerY - radius;
   const scale = Math.max(width / image.width, height / image.height);
   const drawWidth = image.width * scale;
   const drawHeight = image.height * scale;
-  page.pushOperators(pushGraphicsState(), rectangle(x, y, width, height), clip(), endPath());
+  page.pushOperators(
+    pushGraphicsState(),
+    ...drawEllipsePath({ x: centerX, y: centerY, xScale: radius, yScale: radius }),
+    clip(),
+    endPath()
+  );
   page.drawImage(image, {
     x: x + (width - drawWidth) / 2,
     y: y + (height - drawHeight) / 2,
@@ -193,147 +202,6 @@ async function embedStudentPhoto(pdf: PDFDocument, photoUrl?: string | null) {
 function drawInactiveOverlay(page: PDFPage, input: { x: number; y: number; width: number; height: number; font: PDFFont; status: string }) {
   page.drawRectangle({ x: input.x, y: input.y + input.height / 2 - 22, width: input.width, height: 44, color: rgb(1, 1, 1), opacity: 0.78 });
   drawCenteredText(page, input.status, input.x + input.width / 2, input.y + input.height / 2 - 8, input.font, 26, rgb(0.65, 0.14, 0.12));
-}
-
-function drawStudentPlasticSheet(input: {
-  pdf: PDFDocument;
-  logo: PDFImage;
-  photo: PDFImage | null;
-  qr: PDFImage;
-  fonts: { sans: PDFFont; bold: PDFFont; oblique: PDFFont };
-  candidate: {
-    fullName: string;
-    phone?: string | null;
-    email?: string | null;
-    organization?: string | null;
-    programName: string;
-    educationLevel: string;
-    fieldOfStudy: string;
-    studyMode?: string | null;
-    admissionDate?: Date | null;
-    studentIdNumber: string;
-    studentIdIssuedAt?: Date | null;
-    studentIdExpiresAt?: Date | null;
-  };
-  status: string;
-}) {
-  const { pdf, logo, photo, qr, fonts, candidate, status } = input;
-  const page = pdf.addPage([842, 595]);
-  const navy = rgb(0.043, 0.106, 0.239);
-  const deepNavy = rgb(0.027, 0.067, 0.16);
-  const gold = rgb(0.831, 0.686, 0.216);
-  const softGold = rgb(0.965, 0.862, 0.45);
-  const blue = rgb(0.039, 0.239, 0.514);
-  const ink = rgb(0.071, 0.102, 0.157);
-  const muted = rgb(0.38, 0.44, 0.52);
-  const white = rgb(1, 1, 1);
-  const paleBlue = rgb(0.942, 0.974, 1);
-  const cardW = 344;
-  const cardH = 216;
-  const frontX = 58;
-  const backX = 440;
-  const cardY = 188;
-  const schoolName = candidate.organization?.trim() || "LETW School of Theology";
-
-  page.drawRectangle({ x: 0, y: 0, width: 842, height: 595, color: rgb(0.985, 0.988, 0.992) });
-  page.drawText("LETW Student Plastic ID Sheet", { x: 58, y: 535, size: 22, font: fonts.bold, color: navy });
-  page.drawText("Front and back layouts are QR-verifiable and ready for high-quality card production.", { x: 58, y: 512, size: 9, font: fonts.sans, color: muted });
-  page.drawText(`Generated for ${candidate.fullName} - ${candidate.studentIdNumber}`, { x: 58, y: 496, size: 8, font: fonts.sans, color: muted });
-  page.drawText("FRONT", { x: frontX, y: cardY + cardH + 16, size: 8, font: fonts.bold, color: muted });
-  page.drawText("BACK", { x: backX, y: cardY + cardH + 16, size: 8, font: fonts.bold, color: muted });
-
-  page.drawRectangle({ x: frontX, y: cardY, width: cardW, height: cardH, color: deepNavy, borderColor: gold, borderWidth: 1.3 });
-  page.drawRectangle({ x: frontX, y: cardY + cardH - 50, width: cardW, height: 50, color: navy });
-  page.drawRectangle({ x: frontX, y: cardY + cardH - 54, width: cardW, height: 4, color: gold });
-  page.drawImage(logo, { x: frontX + 18, y: cardY + cardH - 42, width: 34, height: 34 });
-  page.drawText("LIGHT ENCOUNTER TABERNACLE", { x: frontX + 62, y: cardY + cardH - 23, size: 8.1, font: fonts.bold, color: white });
-  page.drawText("WORLDWIDE", { x: frontX + 62, y: cardY + cardH - 38, size: 8.1, font: fonts.bold, color: white });
-  drawFittedText({ page, text: schoolName, x: frontX + 197, y: cardY + cardH - 33, maxWidth: 126, font: fonts.bold, preferredSize: 7.2, minimumSize: 5.6, color: softGold });
-  page.drawImage(logo, { x: frontX + 186, y: cardY + 41, width: 118, height: 118, opacity: 0.04 });
-
-  const photoX = frontX + 24;
-  const photoY = cardY + 62;
-  page.drawRectangle({ x: photoX - 4, y: photoY - 4, width: 92, height: 112, color: gold });
-  page.drawRectangle({ x: photoX, y: photoY, width: 84, height: 104, color: navy });
-  if (photo) {
-    drawImageCover(page, photo, photoX, photoY, 84, 104);
-  } else {
-    page.drawRectangle({ x: photoX, y: photoY, width: 84, height: 104, color: paleBlue });
-    drawCenteredText(page, "PHOTO", photoX + 42, photoY + 55, fonts.bold, 10, muted);
-    drawCenteredText(page, "PENDING", photoX + 42, photoY + 40, fonts.sans, 7, muted);
-  }
-
-  const infoX = frontX + 134;
-  drawFittedText({ page, text: candidate.fullName, x: infoX, y: cardY + 142, maxWidth: 184, font: fonts.bold, preferredSize: 18.5, minimumSize: 11, color: white });
-  drawFittedText({ page, text: candidate.educationLevel, x: infoX, y: cardY + 121, maxWidth: 176, font: fonts.bold, preferredSize: 10.5, minimumSize: 7.2, color: softGold });
-  drawFittedText({ page, text: candidate.programName, x: infoX, y: cardY + 104, maxWidth: 176, font: fonts.sans, preferredSize: 8.8, minimumSize: 6.3, color: rgb(0.86, 0.9, 0.96) });
-  drawField({ page, label: "Student ID", value: candidate.studentIdNumber, x: infoX, y: cardY + 73, width: 174, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-  drawField({ page, label: "Admitted", value: dateText(candidate.admissionDate), x: infoX, y: cardY + 43, width: 78, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-  drawField({ page, label: "Expires", value: dateText(candidate.studentIdExpiresAt), x: infoX + 96, y: cardY + 43, width: 86, labelFont: fonts.bold, valueFont: fonts.bold, labelColor: softGold, valueColor: white });
-
-  page.drawRectangle({ x: frontX, y: cardY, width: cardW, height: 32, color: navy });
-  page.drawRectangle({ x: frontX, y: cardY + 32, width: cardW, height: 3, color: gold });
-  page.drawCircle({ x: frontX + 27, y: cardY + 16, size: 4.4, color: status === "ACTIVE" ? rgb(0.14, 0.75, 0.48) : rgb(0.84, 0.24, 0.18) });
-  page.drawText(`Status: ${status}`, { x: frontX + 39, y: cardY + 12.5, size: 8.2, font: fonts.bold, color: white });
-  page.drawText(`Issued: ${dateText(candidate.studentIdIssuedAt)}`, { x: frontX + 122, y: cardY + 12.5, size: 7, font: fonts.sans, color: rgb(0.86, 0.9, 0.96) });
-  page.drawText("letw.org", { x: frontX + cardW - 62, y: cardY + 12.5, size: 8, font: fonts.bold, color: softGold });
-
-  page.drawRectangle({ x: backX, y: cardY, width: cardW, height: cardH, color: white, borderColor: gold, borderWidth: 1.3 });
-  page.drawRectangle({ x: backX, y: cardY + cardH - 50, width: cardW, height: 50, color: navy });
-  page.drawRectangle({ x: backX, y: cardY + cardH - 54, width: cardW, height: 4, color: gold });
-  page.drawImage(logo, { x: backX + 146, y: cardY + 48, width: 116, height: 116, opacity: 0.045 });
-  page.drawText("IDENTITY VERIFICATION", { x: backX + 24, y: cardY + cardH - 24, size: 12.4, font: fonts.bold, color: white });
-  page.drawText("Scan to confirm current student status", { x: backX + 24, y: cardY + cardH - 40, size: 8.2, font: fonts.sans, color: rgb(0.82, 0.88, 0.96) });
-
-  const termsX = backX + 24;
-  page.drawText("Verification rules", { x: termsX, y: cardY + 134, size: 10, font: fonts.bold, color: navy });
-  let termY = cardY + 116;
-  for (const line of [
-    "This card remains the property of Light Encounter Tabernacle Worldwide.",
-    "It is valid only when the QR confirmation page displays an active status.",
-    "Suspended, expired, revoked, replaced, or altered student IDs must not be accepted.",
-    "Use the QR page for entrance, exam, class, and official school verification."
-  ]) {
-    page.drawCircle({ x: termsX + 4, y: termY + 3, size: 2.2, color: gold });
-    const used = drawWrappedText({
-      page,
-      text: line,
-      x: termsX + 14,
-      y: termY,
-      maxWidth: 155,
-      font: fonts.sans,
-      size: 6.25,
-      lineHeight: 7.35,
-      color: ink
-    });
-    termY -= used + 3.2;
-  }
-
-  const qrSize = 104;
-  const qrX = backX + cardW - 24 - qrSize;
-  const qrY = cardY + 50;
-  const qrCenterX = qrX + qrSize / 2;
-  page.drawRectangle({ x: qrX - 11, y: qrY - 11, width: qrSize + 22, height: qrSize + 34, color: white, borderColor: gold, borderWidth: 1.2 });
-  page.drawRectangle({ x: qrX - 5, y: qrY - 5, width: qrSize + 10, height: qrSize + 10, borderColor: rgb(0.65, 0.82, 0.96), borderWidth: 1 });
-  page.drawText("LIVE QR", { x: qrCenterX - 18, y: qrY + qrSize + 10, size: 7, font: fonts.bold, color: navy });
-  page.drawImage(qr, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-  drawCenteredText(page, "SCAN TO AUTHENTICATE", qrCenterX, qrY - 16, fonts.bold, 6.6, navy);
-  drawCenteredText(page, candidate.studentIdNumber, qrCenterX, qrY - 28, fonts.bold, 5.3, blue);
-
-  page.drawText("Contact", { x: termsX, y: cardY + 34, size: 7.5, font: fonts.bold, color: navy });
-  drawFittedText({ page, text: candidate.phone ?? candidate.email ?? "LETW academic office", x: termsX + 58, y: cardY + 34, maxWidth: 104, font: fonts.sans, preferredSize: 7, minimumSize: 5.4, color: muted });
-  page.drawText("letw.org", { x: termsX, y: cardY + 21, size: 7.2, font: fonts.bold, color: blue });
-  page.drawRectangle({ x: backX, y: cardY, width: cardW, height: 18, color: navy });
-  drawCenteredText(page, "LIGHT ENCOUNTER TABERNACLE WORLDWIDE", backX + cardW / 2, cardY + 6.3, fonts.bold, 6.6, white);
-
-  if (status !== "ACTIVE") {
-    drawInactiveOverlay(page, { x: frontX, y: cardY, width: cardW, height: cardH, font: fonts.bold, status });
-    drawInactiveOverlay(page, { x: backX, y: cardY, width: cardW, height: cardH, font: fonts.bold, status });
-  }
-
-  page.drawLine({ start: { x: frontX, y: cardY - 18 }, end: { x: frontX + cardW, y: cardY - 18 }, thickness: 0.5, color: rgb(0.78, 0.72, 0.6) });
-  page.drawLine({ start: { x: backX, y: cardY - 18 }, end: { x: backX + cardW, y: cardY - 18 }, thickness: 0.5, color: rgb(0.78, 0.72, 0.6) });
-  page.drawText("Print at high quality. Keep the QR code flat and unobstructed for scanning.", { x: 58, y: 126, size: 8.3, font: fonts.oblique, color: muted });
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -403,35 +271,6 @@ export async function GET(request: Request, context: RouteContext) {
     const qr = await pdf.embedPng(Buffer.from(qrDataUrl.split(",")[1] ?? "", "base64"));
     const status = studentIdStatus(candidate);
     const schoolName = candidate.organization?.trim() || "LETW School of Theology";
-    const format = new URL(request.url).searchParams.get("format");
-
-    if (format === "plastic") {
-      drawStudentPlasticSheet({
-        pdf,
-        logo,
-        photo,
-        qr,
-        fonts: { sans, bold, oblique },
-        candidate: {
-          ...candidate,
-          studentIdNumber: candidate.studentIdNumber
-        },
-        status
-      });
-      const pdfBytes = await pdf.save();
-      const safeId = candidate.studentIdNumber.replace(/[^A-Za-z0-9-]/g, "");
-      return new Response(Buffer.from(pdfBytes), {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `inline; filename="${safeId}-plastic-id.pdf"`,
-          "Cache-Control": "private, no-store, no-cache, must-revalidate",
-          Pragma: "no-cache",
-          Expires: "0",
-          "X-Content-Type-Options": "nosniff",
-          "X-Robots-Tag": "noindex, nofollow, noarchive"
-        }
-      });
-    }
 
     const page = pdf.addPage([842, 595]);
     const cardW = 344;
@@ -458,15 +297,17 @@ export async function GET(request: Request, context: RouteContext) {
     page.drawText("LIGHT ENCOUNTER TABERNACLE WORLDWIDE", { x: frontX + 62, y: cardY + cardH - 25, size: 8.2, font: bold, color: white });
     page.drawText("Official Student Identity", { x: frontX + 62, y: cardY + cardH - 40, size: 7.4, font: bold, color: softGold });
 
-    const photoX = frontX + 24;
-    const photoY = cardY + 58;
-    page.drawRectangle({ x: photoX - 4, y: photoY - 4, width: 84, height: 106, color: white, borderColor: gold, borderWidth: 1.4 });
+    const photoCenterX = frontX + 67;
+    const photoCenterY = cardY + 107;
+    const photoRadius = 40;
+    page.drawCircle({ x: photoCenterX, y: photoCenterY, size: photoRadius + 6, color: gold });
+    page.drawCircle({ x: photoCenterX, y: photoCenterY, size: photoRadius + 2, color: deepNavy });
     if (photo) {
-      drawImageCover(page, photo, photoX, photoY, 76, 98);
+      drawCircularImageCover(page, photo, photoCenterX, photoCenterY, photoRadius);
     } else {
-      page.drawRectangle({ x: photoX, y: photoY, width: 76, height: 98, color: light });
-      drawCenteredText(page, "PHOTO", photoX + 38, photoY + 51, bold, 9, muted);
-      drawCenteredText(page, "PENDING", photoX + 38, photoY + 39, sans, 7, muted);
+      page.drawCircle({ x: photoCenterX, y: photoCenterY, size: photoRadius, color: light });
+      drawCenteredText(page, "PHOTO", photoCenterX, photoCenterY + 4, bold, 9, navy);
+      drawCenteredText(page, "PENDING", photoCenterX, photoCenterY - 8, sans, 7, muted);
     }
 
     const infoX = frontX + 124;
