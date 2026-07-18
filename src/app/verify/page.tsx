@@ -27,7 +27,7 @@ export default async function PublicVerifyPage({
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4af37]">Light Encounter Tabernacle Worldwide</p>
                 <h1 className="mt-2 text-3xl font-semibold">Document Authenticity Scanner</h1>
                 <p className="mt-2 max-w-2xl text-sm text-white/75">
-                  Scan or paste a LETW QR code, seal number, certificate number, letter number, report code, handover code, or digital ID.
+                  Scan or paste a LETW QR code, seal number, certificate number, letter number, report code, handover code, pastor transfer code, circular number, student ID, or digital ID.
                 </p>
               </div>
             </div>

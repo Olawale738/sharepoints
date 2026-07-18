@@ -792,6 +792,31 @@ enum OfficialLetterStatus {
   ARCHIVED
 }
 
+enum PastorTransferStatus {
+  DRAFT
+  PENDING_HANDOVER
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum OfficialCircularStatus {
+  DRAFT
+  ISSUED
+  EXPIRED
+  REPLACED
+  REVOKED
+  ARCHIVED
+}
+
+enum OfficialCircularAcknowledgementStatus {
+  PENDING
+  ACKNOWLEDGED
+  DECLINED
+  EXEMPTED
+}
+
 enum OfficialIssuanceScope {
   CERTIFICATE
   ID_CARD
@@ -3286,6 +3311,96 @@ model OfficialLetter {
   @@index([recipientUserId, createdAt])
   @@index([organizationUnitId, status])
   @@index([workspaceId, status])
+}
+
+model PastorTransferPosting {
+  id                      String               @id @default(cuid())
+  transferNumber          String               @unique
+  sealNumber              String               @unique
+  verifyToken             String               @unique
+  pastorUserId            String
+  fromOrganizationUnitId  String?
+  toOrganizationUnitId    String?
+  fromWorkspaceId         String?
+  toWorkspaceId           String?
+  title                   String
+  reason                  String?              @db.Text
+  effectiveAt             DateTime
+  handoverDueAt           DateTime?
+  handoverChecklist       Json?
+  housingNeeds            String?              @db.Text
+  resourceNeeds           String?              @db.Text
+  branchAssignmentHistory Json?
+  status                  PastorTransferStatus @default(DRAFT)
+  issuedById              String
+  approvedById            String?
+  approvedAt              DateTime?
+  completedAt             DateTime?
+  cancelledAt             DateTime?
+  replacementOfId         String?
+  replacedById            String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  @@index([pastorUserId, status, effectiveAt])
+  @@index([fromOrganizationUnitId, status])
+  @@index([toOrganizationUnitId, status])
+  @@index([fromWorkspaceId, status])
+  @@index([toWorkspaceId, status])
+  @@index([status, effectiveAt])
+  @@index([sealNumber])
+}
+
+model OfficialCircular {
+  id                      String                 @id @default(cuid())
+  circularNumber          String                 @unique
+  sealNumber              String                 @unique
+  verifyToken             String                 @unique
+  title                   String
+  summary                 String                 @db.Text
+  body                    String                 @db.Text
+  category                String                 @default("LEADERSHIP")
+  audienceType            String                 @default("SELECTED_UNITS")
+  audienceLabel           String                 @default("Selected LETW leaders and branches")
+  audience                Json?
+  workspaceId             String?
+  organizationUnitId      String?
+  requiresAcknowledgement Boolean                @default(true)
+  status                  OfficialCircularStatus @default(DRAFT)
+  issuedById              String
+  issuedAt                DateTime?
+  expiresAt               DateTime?
+  revokedAt               DateTime?
+  replacementOfId         String?
+  replacedById            String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  @@index([status, issuedAt])
+  @@index([category, status])
+  @@index([workspaceId, status])
+  @@index([organizationUnitId, status])
+  @@index([expiresAt, status])
+  @@index([sealNumber])
+}
+
+model OfficialCircularAcknowledgement {
+  id                 String                                  @id @default(cuid())
+  circularId         String
+  organizationUnitId String?
+  workspaceId        String?
+  userId             String?
+  acknowledgedById   String?
+  status             OfficialCircularAcknowledgementStatus   @default(PENDING)
+  note               String?                                 @db.Text
+  acknowledgedAt     DateTime?
+  createdAt          DateTime                                @default(now())
+  updatedAt          DateTime                                @updatedAt
+
+  @@index([circularId, status])
+  @@index([organizationUnitId, status])
+  @@index([workspaceId, status])
+  @@index([userId, status])
 }
 
 model OfficialIssuanceGrant {

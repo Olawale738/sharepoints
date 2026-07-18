@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Smartphone,
   Sparkles,
+  Stamp,
   UsersRound,
   UserRoundSearch,
   Workflow,
@@ -353,6 +354,12 @@ export default async function AdminControlCenterPage() {
           label: "Leadership governance",
           detail: "Decision tracker, monthly report packs, confidential vault, leadership handovers, and official letters.",
           icon: FileClock
+        },
+        {
+          href: "/dashboard/admin/official-records",
+          label: "Official records",
+          detail: "Pastor transfers, posting board, official circulars, branch acknowledgements, and QR seal verification.",
+          icon: Stamp
         },
         {
           href: "/dashboard/leadership-documents",

@@ -5,8 +5,11 @@ export type OfficialSealKind =
   | "CERTIFICATE"
   | "GIVING_RECEIPT"
   | "DIGITAL_ID"
+  | "STUDENT_ID"
   | "MONTHLY_REPORT"
   | "HANDOVER"
+  | "PASTOR_TRANSFER"
+  | "OFFICIAL_CIRCULAR"
   | "DIGITAL_SIGNATURE"
   | "UNKNOWN";
 
@@ -67,6 +70,14 @@ function reportActive(status: string) {
 
 function handoverActive(status: string) {
   return status !== "CANCELLED";
+}
+
+function pastorTransferActive(status: string) {
+  return ["APPROVED", "ACTIVE", "COMPLETED"].includes(status);
+}
+
+function circularActive(input: { status: string; expiresAt?: Date | null; revokedAt?: Date | null }) {
+  return input.status === "ISSUED" && !input.revokedAt && (!input.expiresAt || input.expiresAt > new Date());
 }
 
 function digitalIdActive(input: { status: string; expiresAt?: Date | null; revokedAt?: Date | null; deletedAt?: Date | null }) {
@@ -247,6 +258,45 @@ export async function lookupOfficialSeal(rawCode: string, origin?: string | null
     };
   }
 
+  const student = await prisma.academicCandidate.findFirst({
+    where: { OR: [{ id: code }, { studentIdNumber: code }] },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      organization: true,
+      programName: true,
+      educationLevel: true,
+      studentIdNumber: true,
+      studentIdIssuedAt: true,
+      studentIdExpiresAt: true,
+      studentIdStatus: true,
+      status: true
+    }
+  });
+  if (student?.studentIdNumber) {
+    const active =
+      student.status === "ACTIVE" &&
+      student.studentIdStatus === "ACTIVE" &&
+      (!student.studentIdExpiresAt || student.studentIdExpiresAt > new Date());
+    return {
+      found: true,
+      kind: "STUDENT_ID",
+      recordId: student.id,
+      title: "LETW student identity card",
+      sealNumber: student.studentIdNumber,
+      status: active ? "ACTIVE" : student.studentIdStatus,
+      active,
+      ownerName: active ? student.fullName : null,
+      scope: active ? `${student.educationLevel} - ${student.programName}` : student.organization ?? "LETW School of Theology",
+      issuedAt: student.studentIdIssuedAt,
+      expiresAt: student.studentIdExpiresAt,
+      verificationUrl: `${baseUrl}/verify/student-id/${student.id}`,
+      message: active ? "This LETW student ID is active." : "This LETW student ID is not active.",
+      warning: active ? null : "Expired, suspended, revoked, replaced, or inactive student IDs must not be accepted."
+    };
+  }
+
   const reportCodeMatch = /^LETW-RPT-(\d{4})-(\d{2})-([A-Z0-9]+)$/i.exec(code);
   const report = await prisma.monthlyMinistryReport.findFirst({
     where: reportCodeMatch
@@ -333,6 +383,104 @@ export async function lookupOfficialSeal(rawCode: string, origin?: string | null
     };
   }
 
+  const transfer = await prisma.pastorTransferPosting.findFirst({
+    where: { OR: [{ id: code }, { verifyToken: code }, { transferNumber: code }, { sealNumber: code }] },
+    select: {
+      id: true,
+      transferNumber: true,
+      sealNumber: true,
+      verifyToken: true,
+      title: true,
+      pastorUserId: true,
+      fromOrganizationUnitId: true,
+      toOrganizationUnitId: true,
+      fromWorkspaceId: true,
+      toWorkspaceId: true,
+      effectiveAt: true,
+      handoverDueAt: true,
+      status: true,
+      approvedAt: true,
+      completedAt: true,
+      cancelledAt: true,
+      createdAt: true
+    }
+  });
+  if (transfer) {
+    const active = pastorTransferActive(transfer.status);
+    const [pastor, fromUnit, toUnit, fromWorkspace, toWorkspace] = await Promise.all([
+      active ? prisma.user.findUnique({ where: { id: transfer.pastorUserId }, select: { name: true, email: true } }) : null,
+      transfer.fromOrganizationUnitId
+        ? prisma.organizationUnit.findUnique({ where: { id: transfer.fromOrganizationUnitId }, select: { name: true, type: true } })
+        : null,
+      transfer.toOrganizationUnitId
+        ? prisma.organizationUnit.findUnique({ where: { id: transfer.toOrganizationUnitId }, select: { name: true, type: true } })
+        : null,
+      transfer.fromWorkspaceId ? prisma.workspace.findUnique({ where: { id: transfer.fromWorkspaceId }, select: { name: true } }) : null,
+      transfer.toWorkspaceId ? prisma.workspace.findUnique({ where: { id: transfer.toWorkspaceId }, select: { name: true } }) : null
+    ]);
+    const fromScope = fromUnit ? `${fromUnit.name} - ${fromUnit.type.toLowerCase()}` : fromWorkspace?.name ?? "Not recorded";
+    const toScope = toUnit ? `${toUnit.name} - ${toUnit.type.toLowerCase()}` : toWorkspace?.name ?? "Not recorded";
+    return {
+      found: true,
+      kind: "PASTOR_TRANSFER",
+      recordId: transfer.id,
+      title: transfer.title,
+      sealNumber: transfer.sealNumber,
+      status: transfer.status,
+      active,
+      ownerName: active ? pastor?.name ?? pastor?.email ?? "Assigned pastor" : null,
+      scope: active ? `${fromScope} to ${toScope}` : "Hidden unless active",
+      issuedAt: transfer.approvedAt ?? transfer.createdAt,
+      expiresAt: transfer.handoverDueAt,
+      revokedAt: transfer.cancelledAt,
+      verificationUrl: `${baseUrl}/verify/transfer/${transfer.verifyToken}`,
+      message: active
+        ? "This LETW pastor transfer/posting record is registered and accepted."
+        : "This LETW pastor transfer/posting record is not active.",
+      warning: active ? null : "Draft, pending, cancelled, or unknown transfer postings must not be accepted as current authority."
+    };
+  }
+
+  const circular = await prisma.officialCircular.findFirst({
+    where: { OR: [{ id: code }, { verifyToken: code }, { circularNumber: code }, { sealNumber: code }] },
+    select: {
+      id: true,
+      circularNumber: true,
+      sealNumber: true,
+      verifyToken: true,
+      title: true,
+      summary: true,
+      category: true,
+      audienceLabel: true,
+      status: true,
+      issuedAt: true,
+      expiresAt: true,
+      revokedAt: true,
+      createdAt: true
+    }
+  });
+  if (circular) {
+    const active = circularActive(circular);
+    return {
+      found: true,
+      kind: "OFFICIAL_CIRCULAR",
+      recordId: circular.id,
+      title: circular.title,
+      sealNumber: circular.sealNumber,
+      status: circular.status,
+      active,
+      scope: active ? circular.audienceLabel : "Hidden unless active",
+      issuedAt: circular.issuedAt ?? circular.createdAt,
+      expiresAt: circular.expiresAt,
+      revokedAt: circular.revokedAt,
+      verificationUrl: `${baseUrl}/verify/circular/${circular.verifyToken}`,
+      message: active
+        ? "This LETW official circular is issued and active."
+        : "This LETW official circular is not active.",
+      warning: active ? null : "Draft, expired, replaced, revoked, or archived circulars should not be used as current instructions."
+    };
+  }
+
   const signature = await prisma.digitalSignature.findFirst({
     where: { OR: [{ id: code }, { verificationHash: code }] },
     select: {
@@ -370,13 +518,16 @@ export async function lookupOfficialSeal(rawCode: string, origin?: string | null
 }
 
 export async function officialSealRegistrySummary() {
-  const [letters, certificates, receipts, cards, reports, handovers, signatures] = await Promise.all([
+  const [letters, certificates, receipts, cards, students, reports, handovers, transfers, circulars, signatures] = await Promise.all([
     prisma.officialLetter.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.memberCertificationBadge.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.givingReceipt.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.digitalMembershipCard.findMany({ orderBy: { issuedAt: "desc" }, take: 50 }),
+    prisma.academicCandidate.findMany({ where: { studentIdNumber: { not: null } }, orderBy: { studentIdIssuedAt: "desc" }, take: 50 }),
     prisma.monthlyMinistryReport.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.leadershipHandover.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
+    prisma.pastorTransferPosting.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
+    prisma.officialCircular.findMany({ orderBy: { createdAt: "desc" }, take: 50 }),
     prisma.digitalSignature.findMany({ orderBy: { createdAt: "desc" }, take: 50 })
   ]);
   const userIds = Array.from(new Set([...certificates.map((item) => item.userId), ...cards.map((item) => item.userId)].filter(Boolean))) as string[];
@@ -449,6 +600,27 @@ export async function officialSealRegistrySummary() {
       verificationUrl: `/verify/member/${card.qrToken}`,
       message: digitalIdActive(card) ? "Active ID" : "Inactive ID"
     })),
+    ...students.map((student) => {
+      const active =
+        student.status === "ACTIVE" &&
+        student.studentIdStatus === "ACTIVE" &&
+        (!student.studentIdExpiresAt || student.studentIdExpiresAt > new Date());
+      return {
+        found: true,
+        kind: "STUDENT_ID" as const,
+        recordId: student.id,
+        title: "LETW student identity card",
+        sealNumber: student.studentIdNumber,
+        status: active ? "ACTIVE" : student.studentIdStatus,
+        active,
+        ownerName: active ? student.fullName : null,
+        scope: active ? `${student.educationLevel} - ${student.programName}` : student.organization ?? "LETW School of Theology",
+        issuedAt: student.studentIdIssuedAt,
+        expiresAt: student.studentIdExpiresAt,
+        verificationUrl: `/verify/student-id/${student.id}`,
+        message: active ? "Active student ID" : "Inactive student ID"
+      };
+    }),
     ...reports.map((report) => ({
       found: true,
       kind: "MONTHLY_REPORT" as const,
@@ -472,6 +644,35 @@ export async function officialSealRegistrySummary() {
       issuedAt: handover.completedAt ?? handover.acceptedAt ?? handover.createdAt,
       verificationUrl: `/verify/handover/${handover.id}`,
       message: handoverActive(handover.status) ? "Active handover" : "Inactive handover"
+    })),
+    ...transfers.map((transfer) => ({
+      found: true,
+      kind: "PASTOR_TRANSFER" as const,
+      recordId: transfer.id,
+      title: transfer.title,
+      sealNumber: transfer.sealNumber,
+      status: transfer.status,
+      active: pastorTransferActive(transfer.status),
+      issuedAt: transfer.approvedAt ?? transfer.createdAt,
+      expiresAt: transfer.handoverDueAt,
+      revokedAt: transfer.cancelledAt,
+      verificationUrl: `/verify/transfer/${transfer.verifyToken}`,
+      message: pastorTransferActive(transfer.status) ? "Active transfer/posting" : "Inactive transfer/posting"
+    })),
+    ...circulars.map((circular) => ({
+      found: true,
+      kind: "OFFICIAL_CIRCULAR" as const,
+      recordId: circular.id,
+      title: circular.title,
+      sealNumber: circular.sealNumber,
+      status: circular.status,
+      active: circularActive(circular),
+      scope: circular.audienceLabel,
+      issuedAt: circular.issuedAt ?? circular.createdAt,
+      expiresAt: circular.expiresAt,
+      revokedAt: circular.revokedAt,
+      verificationUrl: `/verify/circular/${circular.verifyToken}`,
+      message: circularActive(circular) ? "Active circular" : "Inactive circular"
     })),
     ...signatures.map((signature) => ({
       found: true,

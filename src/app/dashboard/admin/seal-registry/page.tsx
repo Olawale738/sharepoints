@@ -35,7 +35,7 @@ export default async function OfficialSealRegistryPage() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold text-ink">Document authenticity and seal control</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/60">
-              Review official letters, certificates, digital IDs, giving receipts, monthly reports, handovers, and digital signatures.
+              Review official letters, certificates, digital IDs, student IDs, giving receipts, monthly reports, handovers, pastor transfers, official circulars, and digital signatures.
               Every listed record has a seal number or verification code that can be checked publicly.
             </p>
           </div>

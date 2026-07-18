@@ -123,7 +123,7 @@ export function OfficialAuthenticityScanner({ initialCode = "" }: { initialCode?
       <section className="rounded-lg border border-ink/10 bg-white p-5 shadow-soft">
         <form className="space-y-4" onSubmit={submit}>
           <label className="space-y-2 text-sm font-medium text-ink">
-            LETW seal number, QR URL, certificate number, letter number, ID number, report code, or handover code
+            LETW seal number, QR URL, certificate number, letter number, ID number, student ID, report code, handover code, circular number, or pastor transfer code
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 value={query}
@@ -205,7 +205,7 @@ export function OfficialAuthenticityScanner({ initialCode = "" }: { initialCode?
         <div className="rounded-lg border border-ink/10 bg-white p-4 shadow-soft">
           <p className="text-sm font-semibold text-ink">What this scanner checks</p>
           <div className="mt-3 space-y-2 text-xs leading-5 text-ink/60">
-            <p>Official letters, certificates, reports, handovers, giving receipts, digital IDs, and digital signatures.</p>
+            <p>Official letters, certificates, reports, handovers, pastor transfers, circulars, giving receipts, digital IDs, student IDs, and digital signatures.</p>
             <p>Active records are marked as accepted. Revoked, expired, draft, archived, cancelled, lost, void, deleted, or unknown codes are rejected.</p>
             <p>The scanner does not expose confidential letter bodies, report details, pastoral notes, or protected internal metadata.</p>
           </div>
